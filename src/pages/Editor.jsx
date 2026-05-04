@@ -8,7 +8,7 @@ import '../index.css';
 
 // Helper icon selector
 const getIcon = (type) => {
-  switch(type) {
+  switch (type) {
     case 'header': return <Layout size={20} />;
     case 'logo': return <ImageIcon size={20} />;
     case 'banner': return <ImageIcon size={20} />;
@@ -80,7 +80,7 @@ function Editor() {
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
-  
+
   // Global Upload State
   const [uploadTargetId, setUploadTargetId] = useState(null);
   const [uploadIndex, setUploadIndex] = useState(0);
@@ -92,7 +92,7 @@ function Editor() {
   const [viewMode, setViewMode] = useState('desktop');
   const [canvases, setCanvases] = useState({ desktop: [], mobile: [] });
   const canvasItems = canvases[viewMode];
-  
+
   const [projectCanvasNodes, setProjectCanvasNodes] = useState({});
   const [editingNodeComponent, setEditingNodeComponent] = useState(null);
   const [selectedLayerId, setSelectedLayerId] = useState(null);
@@ -133,24 +133,24 @@ function Editor() {
       fetch(`http://localhost:4000/api/projects/${id}`, {
         headers: { 'Authorization': `Bearer ${parsed.token}` }
       })
-      .then(res => {
-        if (!res.ok) throw new Error('No se pudo cargar el proyecto');
-        return res.json();
-      })
-      .then(data => {
-        setProjectTitle(data.title);
-        setCanvases({
-          desktop: Array.isArray(data.desktopLayout) ? data.desktopLayout : [],
-          mobile: Array.isArray(data.mobileLayout) ? data.mobileLayout : []
+        .then(res => {
+          if (!res.ok) throw new Error('No se pudo cargar el proyecto');
+          return res.json();
+        })
+        .then(data => {
+          setProjectTitle(data.title);
+          setCanvases({
+            desktop: Array.isArray(data.desktopLayout) ? data.desktopLayout : [],
+            mobile: Array.isArray(data.mobileLayout) ? data.mobileLayout : []
+          });
+          setProjectCanvasNodes(data.canvasNodes || {});
+          // Esperamos un momento para que el setState no dispare el AutoGuardado
+          setTimeout(() => { isInitialLoad.current = false; }, 1000);
+        })
+        .catch(err => {
+          console.error(err);
+          navigate('/projects');
         });
-        setProjectCanvasNodes(data.canvasNodes || {});
-        // Esperamos un momento para que el setState no dispare el AutoGuardado
-        setTimeout(() => { isInitialLoad.current = false; }, 1000);
-      })
-      .catch(err => {
-        console.error(err);
-        navigate('/projects');
-      });
     }
   }, [id, navigate]);
 
@@ -162,7 +162,7 @@ function Editor() {
       setIsSaving(true);
       fetch(`http://localhost:4000/api/projects/${id}`, {
         method: 'PATCH',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
@@ -173,14 +173,14 @@ function Editor() {
           canvasNodes: projectCanvasNodes
         })
       })
-      .then(res => res.json())
-      .then(() => {
-        setTimeout(() => {
-          setIsSaving(false);
-          setLastSaved(new Date());
-        }, 500);
-      })
-      .catch(err => console.error('Error auto-guardando:', err));
+        .then(res => res.json())
+        .then(() => {
+          setTimeout(() => {
+            setIsSaving(false);
+            setLastSaved(new Date());
+          }, 500);
+        })
+        .catch(err => console.error('Error auto-guardando:', err));
     }, 1500);
 
     return () => clearTimeout(timer);
@@ -273,7 +273,7 @@ function Editor() {
         setScale(newScale);
       }
     };
-    
+
     updateScale();
     window.addEventListener('resize', updateScale);
     return () => window.removeEventListener('resize', updateScale);
@@ -337,7 +337,7 @@ function Editor() {
     setDragOverTarget(null);
 
     const componentId = e.dataTransfer.getData('componentId');
-    
+
     let dropIndex = fallbackIndex;
     let forceBottom = false;
 
@@ -355,7 +355,7 @@ function Editor() {
       const component = componentsList.find(c => c.id === componentId);
       if (component) {
         const newItem = { ...component, uniqueId: 'comp-' + Date.now() + Math.random() };
-        
+
         let itemsToAdd = [newItem];
         if (forceBottom) {
           const spacerComponent = componentsList.find(c => c.id === 'salto_linea');
@@ -375,10 +375,10 @@ function Editor() {
       const newItems = [...canvasItems];
       const removed = newItems[draggedIndex];
       newItems.splice(draggedIndex, 1);
-      
+
       let adjustedDropIndex = dropIndex;
       if (draggedIndex < dropIndex) adjustedDropIndex -= 1;
-      
+
       let itemsToAdd = [removed];
       if (forceBottom) {
         const spacerComponent = componentsList.find(c => c.id === 'salto_linea');
@@ -402,7 +402,7 @@ function Editor() {
       }
       return item;
     }).filter(Boolean));
-    
+
     const newSelected = new Set(selectedIds);
     newSelected.delete(uniqueId);
     setSelectedIds(newSelected);
@@ -410,7 +410,7 @@ function Editor() {
 
   const getScaledHeight = (item, mode) => {
     const size = mode === 'desktop' ? item.desktopSize : item.mobileSize;
-    if (!size) return 100; 
+    if (!size) return 100;
     return size.height;
   };
 
@@ -426,10 +426,10 @@ function Editor() {
       if (!e.target.closest('.context-menu')) setContextMenu(null);
       return;
     }
-    
+
     setContextMenu(null);
     if (!e.shiftKey) setSelectedIds(new Set());
-    
+
     setLasso({
       startX: e.clientX,
       startY: e.clientY,
@@ -445,20 +445,20 @@ function Editor() {
 
   const handleMouseUp = (e) => {
     if (!lasso) return;
-    
+
     const left = Math.min(lasso.startX, lasso.currentX);
     const right = Math.max(lasso.startX, lasso.currentX);
     const top = Math.min(lasso.startY, lasso.currentY);
     const bottom = Math.max(lasso.startY, lasso.currentY);
-    
+
     if (right - left < 5 && bottom - top < 5) {
       setLasso(null);
       return;
     }
-    
+
     const newSelected = new Set(selectedIds);
     const itemElements = document.querySelectorAll('.canvas-item');
-    
+
     itemElements.forEach(el => {
       const rect = el.getBoundingClientRect();
       const isIntersecting = !(rect.right < left || rect.left > right || rect.bottom < top || rect.top > bottom);
@@ -466,7 +466,7 @@ function Editor() {
         newSelected.add(el.dataset.id);
       }
     });
-    
+
     setSelectedIds(newSelected);
     setLasso(null);
   };
@@ -521,7 +521,7 @@ function Editor() {
 
   const renderItem = (originalItem, isInsideGroup = false, index = null) => {
     let item = { ...originalItem };
-    
+
     // Inject Node Composition Layers
     const nodeData = projectCanvasNodes[item.uniqueId];
     if (nodeData && nodeData.nodes && nodeData.edges) {
@@ -529,7 +529,7 @@ function Editor() {
       if (outputNode) {
         const layerHandles = ['layer-0', 'layer-1', 'layer-2', 'layer-3'];
         const composedImages = [];
-        
+
         layerHandles.forEach(handle => {
           const edge = nodeData.edges.find(e => e.target === outputNode.id && e.targetHandle === handle);
           if (edge) {
@@ -552,9 +552,9 @@ function Editor() {
 
     if (item.type === 'rowGroup') {
       return (
-        <div 
-          key={item.uniqueId} 
-          className="row-group" 
+        <div
+          key={item.uniqueId}
+          className="row-group"
           style={{ justifyContent: item.justify }}
           draggable
           onDragStart={(e) => handleDragStartCanvas(e, index)}
@@ -604,10 +604,10 @@ function Editor() {
 
     if (viewMode === 'mobile' && !item.mobileSize) {
       return (
-        <div 
-          key={item.uniqueId} 
-          data-id={item.uniqueId} 
-          className={`canvas-item ${isSelected ? 'selected' : ''} ${indicatorClass}`} 
+        <div
+          key={item.uniqueId}
+          data-id={item.uniqueId}
+          className={`canvas-item ${isSelected ? 'selected' : ''} ${indicatorClass}`}
           style={{ width: '100%' }}
           onDragOver={(e) => handleItemDragOver(e, index)}
           onDrop={(e) => handleDropCanvas(e, index)}
@@ -628,14 +628,14 @@ function Editor() {
 
     if (item.type === 'spacer') {
       return (
-        <div 
-          key={item.uniqueId} 
-          data-id={item.uniqueId} 
-          className={`canvas-item ${isSelected ? 'selected' : ''} ${indicatorClass}`} 
-          style={{ width: '100%' }} 
-          draggable={!isInsideGroup} 
-          onDragStart={!isInsideGroup ? (e) => handleDragStartCanvas(e, index) : undefined} 
-          onDragOver={(e) => handleItemDragOver(e, index)} 
+        <div
+          key={item.uniqueId}
+          data-id={item.uniqueId}
+          className={`canvas-item ${isSelected ? 'selected' : ''} ${indicatorClass}`}
+          style={{ width: '100%' }}
+          draggable={!isInsideGroup}
+          onDragStart={!isInsideGroup ? (e) => handleDragStartCanvas(e, index) : undefined}
+          onDragOver={(e) => handleItemDragOver(e, index)}
           onDrop={!isInsideGroup ? (e) => handleDropCanvas(e, index) : undefined}
           onContextMenu={(e) => handleItemContextMenu(e, item.uniqueId)}
         >
@@ -646,8 +646,8 @@ function Editor() {
     }
 
     return (
-      <div 
-        key={item.uniqueId} 
+      <div
+        key={item.uniqueId}
         data-id={item.uniqueId}
         className={`canvas-item ${isSelected ? 'selected' : ''} ${indicatorClass}`}
         draggable={!isInsideGroup && !isHoveringText}
@@ -662,34 +662,34 @@ function Editor() {
             <Trash2 size={16} />
           </button>
         )}
-        <div 
-          className="component-placeholder" 
+        <div
+          className="component-placeholder"
           style={{ height: `${height}px`, width: '100%', position: 'relative', padding: 0 }}
         >
           {item.composedLayers ? (
-            <div style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, overflow: 'hidden' }} onClick={(e) => { if(editingNodeComponent?.uniqueId === item.uniqueId) setSelectedLayerId(null); }}>
+            <div style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, overflow: 'hidden' }} onClick={(e) => { if (editingNodeComponent?.uniqueId === item.uniqueId) setSelectedLayerId(null); }}>
               {item.composedLayers.map((layer, idx) => (
-                <img 
-                  key={layer.id} 
+                <img
+                  key={layer.id}
                   id={`layer-${item.uniqueId}-${layer.id}`}
-                  src={layer.imageUrl} 
-                  alt={`Layer ${idx}`} 
-                  onClick={(e) => { 
+                  src={layer.imageUrl}
+                  alt={`Layer ${idx}`}
+                  onClick={(e) => {
                     if (editingNodeComponent?.uniqueId === item.uniqueId) {
-                      e.stopPropagation(); 
-                      setSelectedLayerId(layer.id); 
+                      e.stopPropagation();
+                      setSelectedLayerId(layer.id);
                     }
                   }}
                   style={{
-                    position: 'absolute', 
-                    top: 0, left: 0, 
+                    position: 'absolute',
+                    top: 0, left: 0,
                     zIndex: idx,
                     width: layer.style.width || '100%',
                     height: layer.style.height || '100%',
                     transform: layer.style.transform || 'none',
                     cursor: editingNodeComponent?.uniqueId === item.uniqueId ? 'pointer' : 'default',
                     border: selectedLayerId === layer.id && editingNodeComponent?.uniqueId === item.uniqueId ? '2px solid #3483fa' : 'none'
-                  }} 
+                  }}
                 />
               ))}
 
@@ -752,124 +752,124 @@ function Editor() {
           ) : (
             <>
               {item.type === 'banner' && <AnimatedBanner item={item} height={height} isPreviewMode={isPreviewMode} />}
-          
-          {item.id === 'encabezado_portada_logo' && (
-            <>
-              {item.uploadedImages && item.uploadedImages[0] && (
-                <img src={item.uploadedImages[0]} alt="Portada" style={{width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', top: 0, left: 0}} />
-              )}
-              {item.uploadedImages && item.uploadedImages[1] && (
-                <img src={item.uploadedImages[1]} alt="Logo" style={{width: '140px', height: '140px', borderRadius: '50%', objectFit: 'contain', position: 'absolute', top: '50%', left: '40px', transform: 'translateY(-50%)', background: 'white', border: '4px solid white', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', zIndex: 5}} />
-              )}
-            </>
-          )}
 
-          {item.type === 'list' && (
-            <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'white', overflow: 'hidden', position: 'absolute', top: 0, left: 0, width: '100%', zIndex: 2 }}>
-              <div style={{ height: item.showInfo === false ? '100%' : '55%', width: '100%', backgroundColor: '#f0f0f0', position: 'relative', transition: 'height 0.3s ease' }}>
-                {item.uploadedImages && item.uploadedImages[0] ? (
-                  <img src={item.uploadedImages[0]} alt="Card" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#999' }}>
-                    Sin Imagen
+              {item.id === 'encabezado_portada_logo' && (
+                <>
+                  {item.uploadedImages && item.uploadedImages[0] && (
+                    <img src={item.uploadedImages[0]} alt="Portada" style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', top: 0, left: 0 }} />
+                  )}
+                  {item.uploadedImages && item.uploadedImages[1] && (
+                    <img src={item.uploadedImages[1]} alt="Logo" style={{ width: '140px', height: '140px', borderRadius: '50%', objectFit: 'contain', position: 'absolute', top: '50%', left: '40px', transform: 'translateY(-50%)', background: 'white', border: '4px solid white', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', zIndex: 5 }} />
+                  )}
+                </>
+              )}
+
+              {item.type === 'list' && (
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'white', overflow: 'hidden', position: 'absolute', top: 0, left: 0, width: '100%', zIndex: 2 }}>
+                  <div style={{ height: item.showInfo === false ? '100%' : '55%', width: '100%', backgroundColor: '#f0f0f0', position: 'relative', transition: 'height 0.3s ease' }}>
+                    {item.uploadedImages && item.uploadedImages[0] ? (
+                      <img src={item.uploadedImages[0]} alt="Card" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#999' }}>
+                        Sin Imagen
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-              {item.showInfo !== false && (
-                <div 
-                  style={{ padding: '15px', display: 'flex', flexDirection: 'column', flex: 1, border: '1px solid #e6e6e6', borderTop: 'none', borderRadius: '0 0 4px 4px' }}
-                  onMouseEnter={() => setIsHoveringText(true)}
-                  onMouseLeave={() => setIsHoveringText(false)}
-                >
-                  {editingField.id === item.uniqueId && editingField.field === 'contentTitle' ? (
-                    <input 
-                      autoFocus
-                      defaultValue={item.contentTitle || 'Título de la tarjeta'}
-                      onBlur={(e) => {
-                        updateItemText(item.uniqueId, 'contentTitle', e.target.value);
-                        setEditingField({ id: null, field: null });
-                      }}
-                      onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
-                      style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#333', border: '1px solid #3483fa', borderRadius: '3px', padding: '2px 5px', width: '100%', outline: 'none' }}
-                    />
-                  ) : (
-                    <h4 
-                      onDoubleClick={() => !isPreviewMode && setEditingField({ id: item.uniqueId, field: 'contentTitle' })}
-                      style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#333', cursor: isPreviewMode ? 'default' : 'text' }}
+                  {item.showInfo !== false && (
+                    <div
+                      style={{ padding: '15px', display: 'flex', flexDirection: 'column', flex: 1, border: '1px solid #e6e6e6', borderTop: 'none', borderRadius: '0 0 4px 4px' }}
+                      onMouseEnter={() => setIsHoveringText(true)}
+                      onMouseLeave={() => setIsHoveringText(false)}
                     >
-                      {item.contentTitle || 'Título de la tarjeta'}
-                    </h4>
-                  )}
-                  
-                  {editingField.id === item.uniqueId && editingField.field === 'contentParagraph' ? (
-                    <textarea 
-                      autoFocus
-                      defaultValue={item.contentParagraph || 'Este es un párrafo de ejemplo para la lista de contenido. Describe el evento o promoción.'}
-                      onBlur={(e) => {
-                        updateItemText(item.uniqueId, 'contentParagraph', e.target.value);
-                        setEditingField({ id: null, field: null });
-                      }}
-                      style={{ margin: '0 0 15px 0', fontSize: '12px', color: '#666', lineHeight: '1.4', flex: 1, border: '1px solid #3483fa', borderRadius: '3px', padding: '5px', width: '100%', resize: 'none', outline: 'none' }}
-                      rows={3}
-                    />
-                  ) : (
-                    <p 
-                      onDoubleClick={() => !isPreviewMode && setEditingField({ id: item.uniqueId, field: 'contentParagraph' })}
-                      style={{ margin: '0 0 15px 0', fontSize: '12px', color: '#666', lineHeight: '1.4', flex: 1, cursor: isPreviewMode ? 'default' : 'text' }}
-                    >
-                      {item.contentParagraph || 'Este es un párrafo de ejemplo para la lista de contenido. Describe el evento o promoción.'}
-                    </p>
-                  )}
+                      {editingField.id === item.uniqueId && editingField.field === 'contentTitle' ? (
+                        <input
+                          autoFocus
+                          defaultValue={item.contentTitle || 'Título de la tarjeta'}
+                          onBlur={(e) => {
+                            updateItemText(item.uniqueId, 'contentTitle', e.target.value);
+                            setEditingField({ id: null, field: null });
+                          }}
+                          onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
+                          style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#333', border: '1px solid #3483fa', borderRadius: '3px', padding: '2px 5px', width: '100%', outline: 'none' }}
+                        />
+                      ) : (
+                        <h4
+                          onDoubleClick={() => !isPreviewMode && setEditingField({ id: item.uniqueId, field: 'contentTitle' })}
+                          style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#333', cursor: isPreviewMode ? 'default' : 'text' }}
+                        >
+                          {item.contentTitle || 'Título de la tarjeta'}
+                        </h4>
+                      )}
 
-                  {editingField.id === item.uniqueId && editingField.field === 'contentCTA' ? (
-                    <input 
-                      autoFocus
-                      defaultValue={item.contentCTA || 'Descubrir más'}
-                      onBlur={(e) => {
-                        updateItemText(item.uniqueId, 'contentCTA', e.target.value);
-                        setEditingField({ id: null, field: null });
-                      }}
-                      onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
-                      style={{ color: '#3483fa', fontSize: '12px', fontWeight: 'bold', border: '1px solid #3483fa', borderRadius: '3px', padding: '2px 5px', width: 'fit-content', outline: 'none' }}
-                    />
-                  ) : (
-                    <a 
-                      href="#" 
-                      onDoubleClick={(e) => {
-                        if (!isPreviewMode) {
-                          e.preventDefault();
-                          setEditingField({ id: item.uniqueId, field: 'contentCTA' });
-                        }
-                      }}
-                      style={{ color: '#3483fa', fontSize: '12px', fontWeight: 'bold', textDecoration: 'none', cursor: isPreviewMode ? 'pointer' : 'text' }}
-                      onClick={(e) => { if(!isPreviewMode) e.preventDefault(); }}
-                    >
-                      {item.contentCTA || 'Descubrir más'}
-                    </a>
+                      {editingField.id === item.uniqueId && editingField.field === 'contentParagraph' ? (
+                        <textarea
+                          autoFocus
+                          defaultValue={item.contentParagraph || 'Este es un párrafo de ejemplo para la lista de contenido. Describe el evento o promoción.'}
+                          onBlur={(e) => {
+                            updateItemText(item.uniqueId, 'contentParagraph', e.target.value);
+                            setEditingField({ id: null, field: null });
+                          }}
+                          style={{ margin: '0 0 15px 0', fontSize: '12px', color: '#666', lineHeight: '1.4', flex: 1, border: '1px solid #3483fa', borderRadius: '3px', padding: '5px', width: '100%', resize: 'none', outline: 'none' }}
+                          rows={3}
+                        />
+                      ) : (
+                        <p
+                          onDoubleClick={() => !isPreviewMode && setEditingField({ id: item.uniqueId, field: 'contentParagraph' })}
+                          style={{ margin: '0 0 15px 0', fontSize: '12px', color: '#666', lineHeight: '1.4', flex: 1, cursor: isPreviewMode ? 'default' : 'text' }}
+                        >
+                          {item.contentParagraph || 'Este es un párrafo de ejemplo para la lista de contenido. Describe el evento o promoción.'}
+                        </p>
+                      )}
+
+                      {editingField.id === item.uniqueId && editingField.field === 'contentCTA' ? (
+                        <input
+                          autoFocus
+                          defaultValue={item.contentCTA || 'Descubrir más'}
+                          onBlur={(e) => {
+                            updateItemText(item.uniqueId, 'contentCTA', e.target.value);
+                            setEditingField({ id: null, field: null });
+                          }}
+                          onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
+                          style={{ color: '#3483fa', fontSize: '12px', fontWeight: 'bold', border: '1px solid #3483fa', borderRadius: '3px', padding: '2px 5px', width: 'fit-content', outline: 'none' }}
+                        />
+                      ) : (
+                        <a
+                          href="#"
+                          onDoubleClick={(e) => {
+                            if (!isPreviewMode) {
+                              e.preventDefault();
+                              setEditingField({ id: item.uniqueId, field: 'contentCTA' });
+                            }
+                          }}
+                          style={{ color: '#3483fa', fontSize: '12px', fontWeight: 'bold', textDecoration: 'none', cursor: isPreviewMode ? 'pointer' : 'text' }}
+                          onClick={(e) => { if (!isPreviewMode) e.preventDefault(); }}
+                        >
+                          {item.contentCTA || 'Descubrir más'}
+                        </a>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
-            </div>
-          )}
 
-          {item.type !== 'banner' && item.id !== 'encabezado_portada_logo' && item.type !== 'list' && !item.composedLayers && item.uploadedImages && item.uploadedImages[0] && (
-            <img src={item.uploadedImages[0]} alt="Uploaded" style={{width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', top: 0, left: 0}} />
-          )}
+              {item.type !== 'banner' && item.id !== 'encabezado_portada_logo' && item.type !== 'list' && !item.composedLayers && item.uploadedImages && item.uploadedImages[0] && (
+                <img src={item.uploadedImages[0]} alt="Uploaded" style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', top: 0, left: 0 }} />
+              )}
 
-          {item.composedLayers && item.type === 'list' && (
-            <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '55%', zIndex: 1 }}>
-               {/* Just let the background render, the text is above z-index 2 */}
-            </div>
-          )}
-          
-          {/* Close the composedLayers fallback */}
-          {item.composedLayers && (
-            <></>
-          )}
-          {!item.composedLayers && (
-            <></>
-          )}
-          </>
+              {item.composedLayers && item.type === 'list' && (
+                <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '55%', zIndex: 1 }}>
+                  {/* Just let the background render, the text is above z-index 2 */}
+                </div>
+              )}
+
+              {/* Close the composedLayers fallback */}
+              {item.composedLayers && (
+                <></>
+              )}
+              {!item.composedLayers && (
+                <></>
+              )}
+            </>
           )}
 
           {!isPreviewMode && (
@@ -879,9 +879,9 @@ function Editor() {
                 <h3>{item.name}</h3>
                 <p>Renderizado: {size.width} x {size.height} px</p>
                 {safeAreaStr && <p className="safe-area">Área Segura: {safeAreaStr}</p>}
-                
-                {item.uploadedImages?.length > 0 && <span style={{fontSize: '11px', marginTop: '10px', display: 'block', color: '#666'}}>{item.uploadedImages.length} imágenes cargadas (Click derecho para abrir Nodos)</span>}
-                
+
+                {item.uploadedImages?.length > 0 && <span style={{ fontSize: '11px', marginTop: '10px', display: 'block', color: '#666' }}>{item.uploadedImages.length} imágenes cargadas (Click derecho para abrir Nodos)</span>}
+
                 {item.notes && <p style={{ fontSize: '0.75rem', marginTop: '5px', color: '#666' }}>Nota: {item.notes}</p>}
               </div>
             </>
@@ -893,21 +893,21 @@ function Editor() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      
+
       {/* Editor Top Navigation Bar */}
       <div style={{ height: '60px', backgroundColor: 'white', borderBottom: '1px solid #e6e6e6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', zIndex: 100 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <button 
+          <button
             onClick={() => navigate('/projects')}
             style={{ background: 'none', border: 'none', color: '#3483fa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 'bold' }}
           >
             <ArrowLeft size={18} /> Volver a Proyectos
           </button>
-          
+
           <div style={{ width: '1px', height: '30px', backgroundColor: '#e6e6e6' }}></div>
-          
+
           {isEditingTitle ? (
-            <input 
+            <input
               autoFocus
               value={projectTitle}
               onChange={(e) => setProjectTitle(e.target.value)}
@@ -916,15 +916,15 @@ function Editor() {
               style={{ fontSize: '18px', color: '#333', margin: 0, border: '1px solid #3483fa', borderRadius: '4px', padding: '4px 8px', outline: 'none' }}
             />
           ) : (
-            <h2 
-              onDoubleClick={() => setIsEditingTitle(true)} 
+            <h2
+              onDoubleClick={() => setIsEditingTitle(true)}
               title="Doble clic para editar nombre"
               style={{ fontSize: '18px', color: '#333', margin: 0, cursor: 'text' }}
             >
               {projectTitle}
             </h2>
           )}
-          
+
           {/* Indicador de Autoguardado */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginLeft: '10px' }}>
             {isSaving ? (
@@ -938,18 +938,18 @@ function Editor() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <button 
+          <button
             onClick={() => setIsPreviewMode(!isPreviewMode)}
-            style={{ 
-              background: isPreviewMode ? '#10b981' : '#f0f0f0', 
+            style={{
+              background: isPreviewMode ? '#10b981' : '#f0f0f0',
               color: isPreviewMode ? 'white' : '#333',
-              border: 'none', 
-              padding: '6px 12px', 
-              borderRadius: '6px', 
-              cursor: 'pointer', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '6px', 
+              border: 'none',
+              padding: '6px 12px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
               fontWeight: 'bold',
               transition: 'all 0.2s'
             }}
@@ -1007,46 +1007,46 @@ function Editor() {
             <div style={{ width: (viewMode === 'desktop' ? 1920 : 375) * scale, display: 'flex', justifyContent: 'center', transition: 'width 0.3s ease' }}>
               <div className={`canvas-wrapper ${viewMode}`} style={{ transform: `scale(${scale})`, transformOrigin: 'top center' }}>
                 <div className={`meli-header-container ${viewMode === 'mobile' ? 'mobile-header' : ''}`}>
-                <div className="meli-header-top">
-                  <div className="meli-logo"><img src="https://http2.mlstatic.com/frontend-assets/ml-web-navigation/ui-navigation/6.6.73/mercadolibre/logo_large_25years_v2.png" alt="Mercado Libre" /></div>
-                  <div className="meli-search-bar">
-                    <input type="text" placeholder="Buscar productos, marcas y más..." />
-                    <div className="meli-search-store"><span>en Nike</span><ChevronDown size={14} /></div>
-                    <button className="meli-search-btn"><Search size={18} color="#666" /></button>
+                  <div className="meli-header-top">
+                    <div className="meli-logo"><img src="https://http2.mlstatic.com/frontend-assets/ml-web-navigation/ui-navigation/6.6.73/mercadolibre/logo_large_25years_v2.png" alt="Mercado Libre" /></div>
+                    <div className="meli-search-bar">
+                      <input type="text" placeholder="Buscar productos, marcas y más..." />
+                      <div className="meli-search-store"><span>en Nike</span><ChevronDown size={14} /></div>
+                      <button className="meli-search-btn"><Search size={18} color="#666" /></button>
+                    </div>
+                    <div className="meli-promo"><Tag size={20} /><span>Ofertas por tiempo limitado</span></div>
                   </div>
-                  <div className="meli-promo"><Tag size={20} /><span>Ofertas por tiempo limitado</span></div>
+                  <div className="meli-header-bottom">
+                    <div className="meli-location"><MapPin size={22} opacity={0.6} /><div className="location-text"><span className="location-send">Enviar a</span><span className="location-cp">CP 56607</span></div></div>
+                    <div className="meli-nav-links">
+                      <a href="#">Categorías <ChevronDown size={12} /></a><a href="#">Ofertas</a><a href="#">Cupones</a><a href="#">Supermercado</a><a href="#">Moda</a><a href="#" className="mercado-play">Mercado Play <span className="gratis-badge">GRATIS</span></a><a href="#">Vender</a><a href="#">Ayuda</a>
+                    </div>
+                    <div className="meli-user-links">
+                      <a href="#" className="user-profile"><div className="user-avatar">MM</div>Manuel <ChevronDown size={12} /></a><a href="#">Mis compras</a><a href="#">Favoritos <ChevronDown size={12} /></a><a href="#"><Bell size={18} /></a><a href="#"><ShoppingCart size={18} /></a>
+                    </div>
+                  </div>
                 </div>
-                <div className="meli-header-bottom">
-                  <div className="meli-location"><MapPin size={22} opacity={0.6} /><div className="location-text"><span className="location-send">Enviar a</span><span className="location-cp">CP 56607</span></div></div>
-                  <div className="meli-nav-links">
-                    <a href="#">Categorías <ChevronDown size={12} /></a><a href="#">Ofertas</a><a href="#">Cupones</a><a href="#">Supermercado</a><a href="#">Moda</a><a href="#" className="mercado-play">Mercado Play <span className="gratis-badge">GRATIS</span></a><a href="#">Vender</a><a href="#">Ayuda</a>
-                  </div>
-                  <div className="meli-user-links">
-                    <a href="#" className="user-profile"><div className="user-avatar">MM</div>Manuel <ChevronDown size={12} /></a><a href="#">Mis compras</a><a href="#">Favoritos <ChevronDown size={12} /></a><a href="#"><Bell size={18} /></a><a href="#"><ShoppingCart size={18} /></a>
-                  </div>
+
+                <div
+                  className={`drop-zone ${isOverCanvas ? 'is-over' : ''}`}
+                  onDragOver={handleDragOverCanvas}
+                  onDragLeave={handleDragLeaveCanvas}
+                  onDrop={(e) => handleDropCanvas(e)}
+                >
+                  {canvasItems.length === 0 ? (
+                    <div style={{ textAlign: 'center', color: '#999', marginTop: '100px', width: '100%' }}>
+                      <h3>Arrastra componentes aquí para construir tu Landing</h3>
+                    </div>
+                  ) : (
+                    canvasItems.map((item, index) => renderItem(item, false, index))
+                  )}
                 </div>
               </div>
-              
-              <div 
-                className={`drop-zone ${isOverCanvas ? 'is-over' : ''}`}
-                onDragOver={handleDragOverCanvas}
-                onDragLeave={handleDragLeaveCanvas}
-                onDrop={(e) => handleDropCanvas(e)}
-              >
-                {canvasItems.length === 0 ? (
-                  <div style={{ textAlign: 'center', color: '#999', marginTop: '100px', width: '100%' }}>
-                    <h3>Arrastra componentes aquí para construir tu Landing</h3>
-                  </div>
-                ) : (
-                  canvasItems.map((item, index) => renderItem(item, false, index))
-                )}
-              </div>
             </div>
-            </div>
-            
+
             {/* Lasso Box Rendering */}
             {lasso && (
-              <div 
+              <div
                 className="lasso-selection"
                 style={{
                   left: Math.min(lasso.startX, lasso.currentX),
@@ -1058,53 +1058,53 @@ function Editor() {
             )}
           </div>
         </div>
-        
+
         {/* Context Menu */}
         {contextMenu && (
-          <div 
-            className="context-menu" 
+          <div
+            className="context-menu"
             style={{ position: 'fixed', top: contextMenu.y, left: contextMenu.x, zIndex: 1000, background: 'white', border: '1px solid #ccc', borderRadius: '4px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)', padding: '5px 0', minWidth: '150px' }}
           >
             {contextMenu.targetId && (() => {
               let targetItem = null;
               canvases.desktop.forEach(i => {
                 if (i.uniqueId === contextMenu.targetId) targetItem = i;
-                if (i.type === 'rowGroup') i.items.forEach(c => { if(c.uniqueId === contextMenu.targetId) targetItem = c; });
+                if (i.type === 'rowGroup') i.items.forEach(c => { if (c.uniqueId === contextMenu.targetId) targetItem = c; });
               });
               if (!targetItem) {
                 canvases.mobile.forEach(i => {
                   if (i.uniqueId === contextMenu.targetId) targetItem = i;
-                  if (i.type === 'rowGroup') i.items.forEach(c => { if(c.uniqueId === contextMenu.targetId) targetItem = c; });
+                  if (i.type === 'rowGroup') i.items.forEach(c => { if (c.uniqueId === contextMenu.targetId) targetItem = c; });
                 });
               }
               if (!targetItem || targetItem.type === 'spacer') return null;
 
               return (
-                <div 
-                  className="context-menu-item" 
-                  onClick={() => { 
+                <div
+                  className="context-menu-item"
+                  onClick={() => {
                     setEditingNodeComponent(targetItem);
-                    setContextMenu(null); 
+                    setContextMenu(null);
                   }}
                   style={{ fontWeight: 'bold', color: '#3483fa' }}
                 >
-                  <Layers size={16} /> 
+                  <Layers size={16} />
                   Abrir Editor de Nodos
                 </div>
               );
             })()}
-            
+
             {/* Toggle Info for Lists */}
             {(() => {
               let targetItem = null;
               canvases.desktop.forEach(i => {
                 if (i.uniqueId === contextMenu.targetId) targetItem = i;
-                if (i.type === 'rowGroup') i.items.forEach(c => { if(c.uniqueId === contextMenu.targetId) targetItem = c; });
+                if (i.type === 'rowGroup') i.items.forEach(c => { if (c.uniqueId === contextMenu.targetId) targetItem = c; });
               });
               if (!targetItem) {
                 canvases.mobile.forEach(i => {
                   if (i.uniqueId === contextMenu.targetId) targetItem = i;
-                  if (i.type === 'rowGroup') i.items.forEach(c => { if(c.uniqueId === contextMenu.targetId) targetItem = c; });
+                  if (i.type === 'rowGroup') i.items.forEach(c => { if (c.uniqueId === contextMenu.targetId) targetItem = c; });
                 });
               }
               if (targetItem && targetItem.type === 'list') {
@@ -1138,7 +1138,7 @@ function Editor() {
 
         {/* Floating Line Break Draggable */}
         {!isPreviewMode && (
-          <div 
+          <div
             className="floating-break-btn"
             draggable
             onDragStart={(e) => {
@@ -1151,14 +1151,14 @@ function Editor() {
           </div>
         )}
       </div>
-      
+
       {/* Global Hidden File Input */}
-      <input 
+      <input
         id="global-file-input"
-        type="file" 
-        accept="image/*" 
-        style={{ position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', border: 0 }} 
-        onChange={handleGlobalImageUpload} 
+        type="file"
+        accept="image/*"
+        style={{ position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', border: 0 }}
+        onChange={handleGlobalImageUpload}
       />
 
       {editingNodeComponent && (

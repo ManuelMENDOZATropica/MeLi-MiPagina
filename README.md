@@ -1,16 +1,30 @@
-# React + Vite
+# Landing Builder / MeLi MiPagina
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Landing Builder o MeLi MiPagina, es una herramienta interna diseñada para que el equipo de Trópica pueda maquetar páginas de Mercado Libre de forma rápida y compartir prototipos navegables con los clientes.
 
-Currently, two official plugins are available:
+A continuación se describen las características principales y la arquitectura técnica del sistema:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 1. Propósito y Flujo de Trabajo
+El sistema permite al equipo crear proyectos de "landings" donde se pueden organizar componentes visuales que respetan las guías de estilo y dimensiones oficiales de Mercado Libre. Estos componentes son interactivos y permiten previsualizar cómo se vería la página final tanto en escritorio como en dispositivos móviles.
 
-## React Compiler
+## 2. Características Principales del Editor
+* **Biblioteca de Componentes MeLi**: Incluye una lista predefinida de elementos como encabezados (portada + logo), banners principales (grandes, pequeños, flotantes), banners secundarios, listas de contenido, carruseles de categorías, galerías y videos.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+* **Composición Avanzada por Nodos (Capas)**: Una funcionalidad única del proyecto es el Editor de Nodos integrado. Utiliza `@xyflow/react` para permitir que el usuario cree composiciones de imágenes complejas mediante nodos de "capas", donde cada imagen puede ser movida, redimensionada o rotada individualmente con la librería `react-moveable` antes de ser renderizada en el componente final.
 
-## Expanding the ESLint configuration
+* **Responsive Design Real**: El editor permite alternar entre vistas de Desktop (1920px) y Mobile (375px). Los componentes tienen tamaños específicos y "Áreas Seguras" visualizables para asegurar que el contenido crítico no se corte en los dispositivos reales.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+* **Modo "Go Live" (Preview)**: Permite ocultar todas las herramientas de edición para presentar al cliente una versión limpia y navegable de la landing.
+
+## 3. Gestión y Colaboración
+* **Panel de Proyectos**: Los usuarios pueden gestionar múltiples maquetas (crear, renombrar, eliminar) desde un dashboard centralizado.
+
+* **Autenticación Corporativa**: El acceso está restringido estrictamente a cuentas con el dominio `@tropica.me` mediante Google OAuth.
+
+* **Persistencia y Auto-guardado**: El sistema guarda automáticamente los cambios en el layout, las posiciones de los nodos y los textos editados cada pocos segundos para evitar pérdida de información.
+
+## 4. Stack Tecnológico
+* **Frontend**: Construido con React y Vite. Utiliza Tailwind CSS para los estilos y Lucide React para la iconografía.
+* **Backend**: Un servidor en Node.js con Express que gestiona la API REST y la autenticación mediante JWT.
+* **Base de Datos**: Utiliza PostgreSQL y el ORM Prisma para manejar los modelos de usuarios y proyectos.
+* **Contenerización**: Incluye configuración de Docker Compose para levantar fácilmente una instancia local de la base de datos.
