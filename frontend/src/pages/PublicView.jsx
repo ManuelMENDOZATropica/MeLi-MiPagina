@@ -99,9 +99,6 @@ const MeLiHeaderDesktop = () => (
       </div>
       <div style={{ display: 'flex', alignItems: 'center', background: 'white', borderRadius: 2, boxShadow: '0 1px 2px rgba(0,0,0,.2)', width: 500, height: 40 }}>
         <input type="text" placeholder="Buscar productos, marcas y más..." style={{ flex: 1, border: 'none', padding: '0 15px', fontSize: 16, outline: 'none', background: 'transparent', color: '#999' }} readOnly />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#333', fontSize: 14, padding: '0 15px', borderLeft: '1px solid #e6e6e6', cursor: 'pointer' }}>
-          <span>en Nike</span><ChevronDown size={14} />
-        </div>
         <button style={{ background: 'white', border: 'none', padding: '0 15px', cursor: 'pointer', height: '100%', display: 'flex', alignItems: 'center' }}>
           <Search size={18} color="#666" />
         </button>
@@ -234,14 +231,29 @@ export default function PublicView() {
         )}
       </div>
 
-      {/* Canvas */}
-      <div ref={containerRef} style={{ flex: 1, overflow: 'auto', padding: isMobile ? 0 : '20px', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
-        <div style={{ width: (viewMode === 'desktop' ? 1920 : 375) * scale, display: 'flex', justifyContent: 'center' }}>
-          <div style={{ width: viewMode === 'desktop' ? 1920 : 375, background: 'white', boxShadow: isMobile ? 'none' : '0 10px 40px rgba(0,0,0,0.12)', transform: `scale(${scale})`, transformOrigin: 'top center' }}>
-            {/* Header MeLi correcto según el modo */}
+      {/* Canvas - sin scroll horizontal, contenido ajustado al ancho */}
+      <div
+        ref={containerRef}
+        style={{
+          flex: 1,
+          overflowX: 'hidden',
+          overflowY: 'auto',
+          padding: isMobile ? 0 : '20px',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'flex-start'
+        }}
+      >
+        {/* Caja que ocupa exactamente el ancho escalado para no generar scroll */}
+        <div style={{ width: '100%', maxWidth: viewMode === 'desktop' ? 1920 * scale : 375 * scale, overflow: 'hidden' }}>
+          <div style={{
+            width: viewMode === 'desktop' ? 1920 : 375,
+            background: 'white',
+            boxShadow: isMobile ? 'none' : '0 10px 40px rgba(0,0,0,0.12)',
+            transform: `scale(${scale})`,
+            transformOrigin: 'top left'
+          }}>
             {viewMode === 'desktop' ? <MeLiHeaderDesktop /> : <MeLiHeaderMobile />}
-
-            {/* Componentes de la maqueta */}
             <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignContent: 'flex-start', padding: 20, gap: 20 }}>
               {canvasItems?.map(item => renderPublicItem(item, viewMode))}
             </div>
