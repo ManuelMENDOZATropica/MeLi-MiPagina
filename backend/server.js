@@ -16,8 +16,9 @@ const allowedOrigins = [
   'http://localhost:5174',
   'http://localhost:3000',
   'https://meli-mipagina.onrender.com',
-  // dominios de Vercel (patrón)
-  /\.vercel\.app$/
+  'https://mipagina.tropica.me',      // dominio producción
+  'https://www.mipagina.tropica.me',  // con www
+  /\.vercel\.app$/                     // cualquier preview de Vercel
 ];
 
 app.use(cors({
