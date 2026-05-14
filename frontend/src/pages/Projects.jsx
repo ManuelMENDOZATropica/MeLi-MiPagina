@@ -11,6 +11,10 @@ function Projects() {
   const [projects, setProjects] = useState([]);
   const [projectToDelete, setProjectToDelete] = useState(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [createError, setCreateError] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
     const savedUser = localStorage.getItem('tropica_user');
@@ -38,20 +42,28 @@ function Projects() {
   };
 
   const handleNewProject = async () => {
+    const name = newProjectName.trim();
+    if (name.length < 2) {
+      setCreateError('El nombre debe tener al menos 2 caracteres.');
+      return;
+    }
+    setIsCreating(true);
     try {
       const response = await fetch(`${API_URL}/api/projects`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${user.token}`
         },
-        body: JSON.stringify({ title: 'Nueva Landing' })
+        body: JSON.stringify({ title: name })
       });
       const newProject = await response.json();
       navigate(`/editor/${newProject.id}`);
     } catch (err) {
       console.error('Error al crear proyecto:', err);
+      setCreateError('Error al crear el proyecto. Intenta de nuevo.');
     }
+    setIsCreating(false);
   };
 
   const handleDeleteProject = async () => {
@@ -106,8 +118,8 @@ function Projects() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '30px' }}>
           
           {/* New Project Card */}
-          <div 
-            onClick={handleNewProject}
+          <div
+            onClick={() => { setNewProjectName(''); setCreateError(''); setShowCreateModal(true); }}
             style={{ backgroundColor: 'white', border: '2px dashed #3483fa', borderRadius: '8px', height: '200px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s', color: '#3483fa' }}
             onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f0f5ff'; e.currentTarget.style.transform = 'translateY(-5px)'; }}
             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; e.currentTarget.style.transform = 'translateY(0)'; }}
@@ -186,6 +198,51 @@ function Projects() {
                 style={{ padding: '8px 16px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '4px', cursor: deleteConfirmText !== `delete ${projectToDelete.title}` ? 'not-allowed' : 'pointer', opacity: deleteConfirmText !== `delete ${projectToDelete.title}` ? 0.5 : 1 }}
               >
                 Eliminar Permanentemente
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Crear Nuevo Proyecto */}
+      {showCreateModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+          onClick={() => setShowCreateModal(false)}>
+          <div style={{ background: 'white', borderRadius: '12px', padding: '32px', width: '420px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ margin: 0, fontSize: '20px', color: '#333' }}>Nuevo Proyecto</h2>
+              <button onClick={() => setShowCreateModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#aaa' }}><X size={20} /></button>
+            </div>
+
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#555', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Nombre del proyecto
+            </label>
+            <input
+              autoFocus
+              type="text"
+              value={newProjectName}
+              onChange={e => { setNewProjectName(e.target.value); setCreateError(''); }}
+              onKeyDown={e => e.key === 'Enter' && handleNewProject()}
+              placeholder="Ej: Landing Verano 2026"
+              maxLength={80}
+              style={{ width: '100%', padding: '11px 14px', border: `1.5px solid ${createError ? '#e74c3c' : '#e6e6e6'}`, borderRadius: '8px', fontSize: '15px', outline: 'none', boxSizing: 'border-box', marginBottom: '6px', transition: 'border-color 0.2s' }}
+              onFocus={e => e.target.style.borderColor = createError ? '#e74c3c' : '#3483fa'}
+              onBlur={e => e.target.style.borderColor = createError ? '#e74c3c' : '#e6e6e6'}
+            />
+            {createError && <p style={{ color: '#e74c3c', fontSize: '13px', margin: '0 0 12px 0' }}>{createError}</p>}
+            {!createError && <p style={{ color: '#aaa', fontSize: '12px', margin: '0 0 20px 0' }}>Mínimo 2 caracteres · Máximo 80</p>}
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+              <button
+                onClick={handleNewProject}
+                disabled={isCreating}
+                style={{ flex: 1, background: '#3483fa', color: 'white', border: 'none', borderRadius: '8px', padding: '12px', fontSize: '15px', fontWeight: '700', cursor: isCreating ? 'not-allowed' : 'pointer', opacity: isCreating ? 0.7 : 1 }}
+              >
+                {isCreating ? 'Creando...' : 'Crear Proyecto'}
+              </button>
+              <button onClick={() => setShowCreateModal(false)} style={{ background: '#f5f5f5', color: '#666', border: 'none', borderRadius: '8px', padding: '12px 18px', fontSize: '14px', cursor: 'pointer' }}>
+                Cancelar
               </button>
             </div>
           </div>
