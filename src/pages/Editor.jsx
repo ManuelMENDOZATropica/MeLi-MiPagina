@@ -2,8 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Monitor, Smartphone, GripVertical, Trash2, Image as ImageIcon, Layout, Type, Video, Search, MapPin, Tag, ChevronDown, Bell, ShoppingCart, User, AlignCenter, MoveHorizontal, ListMinus, AlignJustify, CornerDownLeft, ArrowLeft, CheckCircle2, Play, Edit3, Eye, EyeOff, Layers } from 'lucide-react';
 import { componentsList } from '../componentsData';
-import NodeEditor from '../components/NodeEditor';
-import Moveable from 'react-moveable';
 import '../index.css';
 
 // Helper icon selector
@@ -93,31 +91,6 @@ function Editor() {
   const [canvases, setCanvases] = useState({ desktop: [], mobile: [] });
   const canvasItems = canvases[viewMode];
 
-  const [projectCanvasNodes, setProjectCanvasNodes] = useState({});
-  const [editingNodeComponent, setEditingNodeComponent] = useState(null);
-  const [selectedLayerId, setSelectedLayerId] = useState(null);
-
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if ((e.key === 'Backspace' || e.key === 'Delete') && selectedLayerId && editingNodeComponent) {
-        setProjectCanvasNodes(prev => {
-          const data = prev[editingNodeComponent.uniqueId];
-          if (!data) return prev;
-          return {
-            ...prev,
-            [editingNodeComponent.uniqueId]: {
-              nodes: data.nodes.filter(n => n.id !== selectedLayerId),
-              edges: data.edges.filter(edge => edge.source !== selectedLayerId && edge.target !== selectedLayerId)
-            }
-          };
-        });
-        setSelectedLayerId(null);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedLayerId, editingNodeComponent]);
-
   const isInitialLoad = useRef(true);
 
   // Carga inicial del proyecto
@@ -143,7 +116,6 @@ function Editor() {
             desktop: Array.isArray(data.desktopLayout) ? data.desktopLayout : [],
             mobile: Array.isArray(data.mobileLayout) ? data.mobileLayout : []
           });
-          setProjectCanvasNodes(data.canvasNodes || {});
           // Esperamos un momento para que el setState no dispare el AutoGuardado
           setTimeout(() => { isInitialLoad.current = false; }, 1000);
         })
@@ -169,8 +141,7 @@ function Editor() {
         body: JSON.stringify({
           title: projectTitle,
           desktopLayout: canvases.desktop,
-          mobileLayout: canvases.mobile,
-          canvasNodes: projectCanvasNodes
+          mobileLayout: canvases.mobile
         })
       })
         .then(res => res.json())
@@ -184,7 +155,7 @@ function Editor() {
     }, 1500);
 
     return () => clearTimeout(timer);
-  }, [canvases, projectTitle, token, id, projectCanvasNodes]);
+  }, [canvases, projectTitle, token, id]);
 
 
   const setCanvasItems = (updater) => {
@@ -196,8 +167,61 @@ function Editor() {
 
   const triggerUpload = (uniqueId) => {
     setUploadTargetId(uniqueId);
+    setUploadIndex(0);
     if (fileInputRef.current) {
       fileInputRef.current.click();
+    }
+  };
+
+  // Drag & Drop de archivos del sistema operativo sobre el componente
+  const handleFileDrop = (e, uniqueId) => {
+    if (isPreviewMode) return;
+    // Si es un archivo del SO (no un componente de la barra lateral)
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      e.preventDefault();
+      e.stopPropagation();
+      const file = e.dataTransfer.files[0];
+      if (!file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64Str = reader.result;
+        try {
+          const response = await fetch('http://localhost:4000/api/upload', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ image: base64Str })
+          });
+          if (!response.ok) throw new Error('Error al subir la imagen');
+          const data = await response.json();
+          if (data.url) {
+            setCanvasItems(prev => prev.map(item => {
+              if (item.uniqueId === uniqueId) {
+                const currentImages = [...(item.uploadedImages || [])];
+                currentImages[0] = data.url;
+                return { ...item, uploadedImages: currentImages };
+              }
+              if (item.type === 'rowGroup') {
+                return { ...item, items: item.items.map(child => {
+                  if (child.uniqueId === uniqueId) {
+                    const currentImages = [...(child.uploadedImages || [])];
+                    currentImages[0] = data.url;
+                    return { ...child, uploadedImages: currentImages };
+                  }
+                  return child;
+                })};
+              }
+              return item;
+            }));
+          }
+        } catch (error) {
+          console.error('Error subiendo imagen por drag:', error);
+          alert('Hubo un error subiendo la imagen.');
+        }
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -205,30 +229,53 @@ function Editor() {
     const file = e.target.files[0];
     if (file && uploadTargetId) {
       const reader = new FileReader();
-      reader.onloadend = () => {
+      reader.onloadend = async () => {
         const base64Str = reader.result;
-        setCanvasItems(prev => prev.map(item => {
-          if (item.uniqueId === uploadTargetId) {
-            const currentImages = [...(item.uploadedImages || [])];
-            currentImages[uploadIndex] = base64Str;
-            return { ...item, uploadedImages: currentImages };
-          }
-          if (item.type === 'rowGroup') {
-            const updatedChildren = item.items.map(child => {
-              if (child.uniqueId === uploadTargetId) {
-                const currentImages = [...(child.uploadedImages || [])];
-                currentImages[uploadIndex] = base64Str;
-                return { ...child, uploadedImages: currentImages };
+        
+        try {
+          // Send to Cloudinary backend
+          const response = await fetch('http://localhost:4000/api/upload', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ image: base64Str })
+          });
+          
+          if (!response.ok) throw new Error('Error al subir la imagen');
+          
+          const data = await response.json();
+          
+          if (data.url) {
+            setCanvasItems(prev => prev.map(item => {
+              if (item.uniqueId === uploadTargetId) {
+                const currentImages = [...(item.uploadedImages || [])];
+                currentImages[uploadIndex] = data.url;
+                return { ...item, uploadedImages: currentImages };
               }
-              return child;
-            });
-            return { ...item, items: updatedChildren };
+              if (item.type === 'rowGroup') {
+                const updatedChildren = item.items.map(child => {
+                  if (child.uniqueId === uploadTargetId) {
+                    const currentImages = [...(child.uploadedImages || [])];
+                    currentImages[uploadIndex] = data.url;
+                    return { ...child, uploadedImages: currentImages };
+                  }
+                  return child;
+                });
+                return { ...item, items: updatedChildren };
+              }
+              return item;
+            }));
           }
-          return item;
-        }));
-        setUploadTargetId(null);
-        setUploadIndex(0);
-        e.target.value = null; // Reset input
+        } catch (error) {
+          console.error('Error subiendo imagen a Cloudinary:', error);
+          alert('Hubo un error subiendo la imagen. Inténtalo de nuevo.');
+        } finally {
+          setUploadTargetId(null);
+          setUploadIndex(0);
+          e.target.value = null; // Reset input
+        }
       };
       reader.readAsDataURL(file);
     }
@@ -260,6 +307,7 @@ function Editor() {
   const [isOverCanvas, setIsOverCanvas] = useState(false);
   const [dragOverTarget, setDragOverTarget] = useState(null);
   const [showSafeAreas, setShowSafeAreas] = useState(true);
+  const [showComponentInfo, setShowComponentInfo] = useState(true);
 
   const containerRef = useRef(null);
   const [scale, setScale] = useState(1);
@@ -295,6 +343,32 @@ function Editor() {
     setDraggedIndex(index);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/html', '');
+
+    // Crear imagen de drag pequeña y compacta
+    const item = canvasItems[index];
+    const ghost = document.createElement('div');
+    ghost.style.cssText = `
+      position: fixed;
+      top: -1000px;
+      left: -1000px;
+      background: #3483fa;
+      color: white;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: sans-serif;
+      box-shadow: 0 4px 16px rgba(52,131,250,0.5);
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      pointer-events: none;
+    `;
+    ghost.textContent = `⠿ ${item?.name || 'Componente'}`;
+    document.body.appendChild(ghost);
+    e.dataTransfer.setDragImage(ghost, ghost.offsetWidth / 2, 20);
+    setTimeout(() => document.body.removeChild(ghost), 0);
   };
 
   const handleDragOverCanvas = (e) => {
@@ -310,16 +384,9 @@ function Editor() {
     e.dataTransfer.dropEffect = draggedIndex !== null ? 'move' : 'copy';
 
     const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-
-    let position = 'right';
-    if (y > rect.height * 0.6) {
-      position = 'bottom';
-    } else if (x < rect.width / 2) {
-      position = 'left';
-    }
-
+    // Si estamos en la mitad superior → 'before'; mitad inferior → 'after'
+    const position = y < rect.height / 2 ? 'before' : 'after';
     setDragOverTarget({ index, position });
   };
 
@@ -343,12 +410,10 @@ function Editor() {
 
     if (dropTarget) {
       dropIndex = dropTarget.index;
-      if (dropTarget.position === 'right' || dropTarget.position === 'bottom') {
+      if (dropTarget.position === 'after') {
         dropIndex += 1;
       }
-      if (dropTarget.position === 'bottom') {
-        forceBottom = true;
-      }
+      // 'before' → insert at dropTarget.index (no increment)
     }
 
     if (componentId) {
@@ -522,34 +587,6 @@ function Editor() {
   const renderItem = (originalItem, isInsideGroup = false, index = null) => {
     let item = { ...originalItem };
 
-    // Inject Node Composition Layers
-    const nodeData = projectCanvasNodes[item.uniqueId];
-    if (nodeData && nodeData.nodes && nodeData.edges) {
-      const outputNode = nodeData.nodes.find(n => n.type === 'outputNode');
-      if (outputNode) {
-        const layerHandles = ['layer-0', 'layer-1', 'layer-2', 'layer-3'];
-        const composedImages = [];
-
-        layerHandles.forEach(handle => {
-          const edge = nodeData.edges.find(e => e.target === outputNode.id && e.targetHandle === handle);
-          if (edge) {
-            const sourceNode = nodeData.nodes.find(n => n.id === edge.source);
-            if (sourceNode && sourceNode.data && sourceNode.data.imageUrl) {
-              composedImages.push({
-                id: sourceNode.id,
-                imageUrl: sourceNode.data.imageUrl,
-                style: sourceNode.data.style || {}
-              });
-            }
-          }
-        });
-
-        if (composedImages.length > 0) {
-          item.composedLayers = composedImages;
-        }
-      }
-    }
-
     if (item.type === 'rowGroup') {
       return (
         <div
@@ -649,12 +686,30 @@ function Editor() {
       <div
         key={item.uniqueId}
         data-id={item.uniqueId}
-        className={`canvas-item ${isSelected ? 'selected' : ''} ${indicatorClass}`}
+        className={`canvas-item ${isSelected ? 'selected' : ''} ${indicatorClass} ${draggedIndex === index ? 'is-dragging' : ''}`}
         draggable={!isInsideGroup && !isHoveringText}
         style={{ width: `${width}px` }}
         onDragStart={!isInsideGroup ? (e) => handleDragStartCanvas(e, index) : undefined}
-        onDragOver={!isPreviewMode ? (e) => handleItemDragOver(e, index) : undefined}
-        onDrop={!isInsideGroup && !isPreviewMode ? (e) => handleDropCanvas(e, index) : undefined}
+        onDragEnd={() => { setDraggedIndex(null); setDragOverTarget(null); }}
+        onDragOver={(e) => {
+          if (!isPreviewMode) {
+            // Si es un archivo del SO, solo resaltar; si es componente, comportamiento normal
+            if (e.dataTransfer.types.includes('Files')) {
+              e.preventDefault();
+              e.stopPropagation();
+            } else {
+              handleItemDragOver(e, index);
+            }
+          }
+        }}
+        onDrop={(e) => {
+          if (isPreviewMode) return;
+          if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            handleFileDrop(e, item.uniqueId);
+          } else if (!isInsideGroup) {
+            handleDropCanvas(e, index);
+          }
+        }}
         onContextMenu={(e) => handleItemContextMenu(e, item.uniqueId)}
       >
         {!isPreviewMode && (
@@ -666,90 +721,7 @@ function Editor() {
           className="component-placeholder"
           style={{ height: `${height}px`, width: '100%', position: 'relative', padding: 0 }}
         >
-          {item.composedLayers ? (
-            <div style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, overflow: 'hidden' }} onClick={(e) => { if (editingNodeComponent?.uniqueId === item.uniqueId) setSelectedLayerId(null); }}>
-              {item.composedLayers.map((layer, idx) => (
-                <img
-                  key={layer.id}
-                  id={`layer-${item.uniqueId}-${layer.id}`}
-                  src={layer.imageUrl}
-                  alt={`Layer ${idx}`}
-                  onClick={(e) => {
-                    if (editingNodeComponent?.uniqueId === item.uniqueId) {
-                      e.stopPropagation();
-                      setSelectedLayerId(layer.id);
-                    }
-                  }}
-                  style={{
-                    position: 'absolute',
-                    top: 0, left: 0,
-                    zIndex: idx,
-                    width: layer.style.width || '100%',
-                    height: layer.style.height || '100%',
-                    transform: layer.style.transform || 'none',
-                    cursor: editingNodeComponent?.uniqueId === item.uniqueId ? 'pointer' : 'default',
-                    border: selectedLayerId === layer.id && editingNodeComponent?.uniqueId === item.uniqueId ? '2px solid #3483fa' : 'none'
-                  }}
-                />
-              ))}
-
-              {editingNodeComponent?.uniqueId === item.uniqueId && selectedLayerId && document.getElementById(`layer-${item.uniqueId}-${selectedLayerId}`) && (
-                <Moveable
-                  target={document.getElementById(`layer-${item.uniqueId}-${selectedLayerId}`)}
-                  draggable={true}
-                  resizable={true}
-                  rotatable={true}
-                  keepRatio={false}
-                  onDrag={e => { e.target.style.transform = e.transform; }}
-                  onResize={e => {
-                    e.target.style.width = `${e.width}px`;
-                    e.target.style.height = `${e.height}px`;
-                    e.target.style.transform = e.drag.transform;
-                  }}
-                  onRotate={e => { e.target.style.transform = e.drag.transform; }}
-                  onDragEnd={e => {
-                    setProjectCanvasNodes(prev => {
-                      const data = prev[item.uniqueId];
-                      if (!data) return prev;
-                      return {
-                        ...prev,
-                        [item.uniqueId]: {
-                          ...data,
-                          nodes: data.nodes.map(n => n.id === selectedLayerId ? { ...n, data: { ...n.data, style: { transform: e.target.style.transform, width: e.target.style.width, height: e.target.style.height } } } : n)
-                        }
-                      };
-                    });
-                  }}
-                  onResizeEnd={e => {
-                    setProjectCanvasNodes(prev => {
-                      const data = prev[item.uniqueId];
-                      if (!data) return prev;
-                      return {
-                        ...prev,
-                        [item.uniqueId]: {
-                          ...data,
-                          nodes: data.nodes.map(n => n.id === selectedLayerId ? { ...n, data: { ...n.data, style: { transform: e.target.style.transform, width: e.target.style.width, height: e.target.style.height } } } : n)
-                        }
-                      };
-                    });
-                  }}
-                  onRotateEnd={e => {
-                    setProjectCanvasNodes(prev => {
-                      const data = prev[item.uniqueId];
-                      if (!data) return prev;
-                      return {
-                        ...prev,
-                        [item.uniqueId]: {
-                          ...data,
-                          nodes: data.nodes.map(n => n.id === selectedLayerId ? { ...n, data: { ...n.data, style: { transform: e.target.style.transform, width: e.target.style.width, height: e.target.style.height } } } : n)
-                        }
-                      };
-                    });
-                  }}
-                />
-              )}
-            </div>
-          ) : (
+          
             <>
               {item.type === 'banner' && <AnimatedBanner item={item} height={height} isPreviewMode={isPreviewMode} />}
 
@@ -852,38 +824,28 @@ function Editor() {
                 </div>
               )}
 
-              {item.type !== 'banner' && item.id !== 'encabezado_portada_logo' && item.type !== 'list' && !item.composedLayers && item.uploadedImages && item.uploadedImages[0] && (
+              {item.type !== 'banner' && item.id !== 'encabezado_portada_logo' && item.type !== 'list' && item.uploadedImages && item.uploadedImages[0] && (
                 <img src={item.uploadedImages[0]} alt="Uploaded" style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', top: 0, left: 0 }} />
               )}
 
-              {item.composedLayers && item.type === 'list' && (
-                <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '55%', zIndex: 1 }}>
-                  {/* Just let the background render, the text is above z-index 2 */}
-                </div>
-              )}
+              
 
-              {/* Close the composedLayers fallback */}
-              {item.composedLayers && (
-                <></>
-              )}
-              {!item.composedLayers && (
-                <></>
-              )}
-            </>
-          )}
+              </>
 
           {!isPreviewMode && (
             <>
               {safeAreaStyle && <div style={safeAreaStyle} title={`Área Segura: ${safeAreaStr}`} />}
-              <div className="component-content" style={{ position: 'relative', zIndex: 10, background: 'rgba(255,255,255,0.9)', padding: '15px', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-                <h3>{item.name}</h3>
-                <p>Renderizado: {size.width} x {size.height} px</p>
-                {safeAreaStr && <p className="safe-area">Área Segura: {safeAreaStr}</p>}
+              {showComponentInfo && (
+                <div className="component-content" style={{ position: 'relative', zIndex: 10, background: 'rgba(255,255,255,0.9)', padding: '15px', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+                  <h3>{item.name}</h3>
+                  <p>Renderizado: {size.width} x {size.height} px</p>
+                  {safeAreaStr && <p className="safe-area">Área Segura: {safeAreaStr}</p>}
 
-                {item.uploadedImages?.length > 0 && <span style={{ fontSize: '11px', marginTop: '10px', display: 'block', color: '#666' }}>{item.uploadedImages.length} imágenes cargadas (Click derecho para abrir Nodos)</span>}
+                  {item.uploadedImages?.length > 0 && <span style={{ fontSize: '11px', marginTop: '10px', display: 'block', color: '#666' }}>{item.uploadedImages.length} imágenes cargadas</span>}
 
-                {item.notes && <p style={{ fontSize: '0.75rem', marginTop: '5px', color: '#666' }}>Nota: {item.notes}</p>}
-              </div>
+                  {item.notes && <p style={{ fontSize: '0.75rem', marginTop: '5px', color: '#666' }}>Nota: {item.notes}</p>}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -1038,7 +1000,47 @@ function Editor() {
                       <h3>Arrastra componentes aquí para construir tu Landing</h3>
                     </div>
                   ) : (
-                    canvasItems.map((item, index) => renderItem(item, false, index))
+                    <>
+                      {/* Zona de drop en la parte superior para insertar ANTES del primer elemento */}
+                      {!isPreviewMode && (
+                        <div
+                          style={{
+                            width: '100%',
+                            height: dragOverTarget?.index === -1 ? '6px' : '6px',
+                            background: dragOverTarget?.index === -1 ? '#3483fa' : 'transparent',
+                            transition: 'background 0.15s',
+                            cursor: 'default'
+                          }}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setDragOverTarget({ index: -1, position: 'before' });
+                          }}
+                          onDragLeave={() => setDragOverTarget(null)}
+                          onDrop={(e) => {
+                            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) return;
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setDragOverTarget(null);
+                            const componentId = e.dataTransfer.getData('componentId');
+                            if (componentId) {
+                              const component = componentsList.find(c => c.id === componentId);
+                              if (component) {
+                                const newItem = { ...component, uniqueId: 'comp-' + Date.now() + Math.random() };
+                                setCanvasItems([newItem, ...canvasItems]);
+                              }
+                            } else if (draggedIndex !== null && draggedIndex !== 0) {
+                              const newItems = [...canvasItems];
+                              const [removed] = newItems.splice(draggedIndex, 1);
+                              newItems.unshift(removed);
+                              setCanvasItems(newItems);
+                              setDraggedIndex(null);
+                            }
+                          }}
+                        />
+                      )}
+                      {canvasItems.map((item, index) => renderItem(item, false, index))}
+                    </>
                   )}
                 </div>
               </div>
@@ -1065,32 +1067,38 @@ function Editor() {
             className="context-menu"
             style={{ position: 'fixed', top: contextMenu.y, left: contextMenu.x, zIndex: 1000, background: 'white', border: '1px solid #ccc', borderRadius: '4px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)', padding: '5px 0', minWidth: '150px' }}
           >
+            
+
             {contextMenu.targetId && (() => {
+              // Buscar el item target en ambos canvases
               let targetItem = null;
-              canvases.desktop.forEach(i => {
+              [...canvases.desktop, ...canvases.mobile].forEach(i => {
                 if (i.uniqueId === contextMenu.targetId) targetItem = i;
                 if (i.type === 'rowGroup') i.items.forEach(c => { if (c.uniqueId === contextMenu.targetId) targetItem = c; });
               });
-              if (!targetItem) {
-                canvases.mobile.forEach(i => {
-                  if (i.uniqueId === contextMenu.targetId) targetItem = i;
-                  if (i.type === 'rowGroup') i.items.forEach(c => { if (c.uniqueId === contextMenu.targetId) targetItem = c; });
-                });
-              }
-              if (!targetItem || targetItem.type === 'spacer') return null;
-
+              const hasImage = targetItem?.uploadedImages?.length > 0;
               return (
-                <div
-                  className="context-menu-item"
-                  onClick={() => {
-                    setEditingNodeComponent(targetItem);
-                    setContextMenu(null);
-                  }}
-                  style={{ fontWeight: 'bold', color: '#3483fa' }}
-                >
-                  <Layers size={16} />
-                  Abrir Editor de Nodos
-                </div>
+                <>
+                  <div className="context-menu-item" onClick={() => { triggerUpload(contextMenu.targetId); setContextMenu(null); }} style={{ fontWeight: 'bold', color: '#3483fa' }}>
+                    <ImageIcon size={16} /> {hasImage ? 'Cambiar Imagen' : 'Subir Imagen'}
+                  </div>
+                  {hasImage && (
+                    <div className="context-menu-item" onClick={() => {
+                      setCanvasItems(prev => prev.map(item => {
+                        if (item.uniqueId === contextMenu.targetId) return { ...item, uploadedImages: [] };
+                        if (item.type === 'rowGroup') return { ...item, items: item.items.map(c => c.uniqueId === contextMenu.targetId ? { ...c, uploadedImages: [] } : c) };
+                        return item;
+                      }));
+                      setContextMenu(null);
+                    }} style={{ color: '#e53e3e' }}>
+                      <ImageIcon size={16} /> Quitar Imagen
+                    </div>
+                  )}
+                  <div className="context-menu-item" onClick={() => { removeItem(contextMenu.targetId); setContextMenu(null); }} style={{ color: '#e53e3e', borderTop: '1px solid #eee', marginTop: '4px', paddingTop: '4px' }}>
+                    <Trash2 size={16} /> Eliminar Componente
+                  </div>
+                  <div style={{ borderTop: '1px solid #eee', margin: '4px 0' }} />
+                </>
               );
             })()}
 
@@ -1119,6 +1127,9 @@ function Editor() {
 
             <div className="context-menu-item" onClick={() => { setShowSafeAreas(!showSafeAreas); setContextMenu(null); }}>
               <Tag size={16} /> {showSafeAreas ? "Ocultar Áreas Seguras" : "Visualizar Áreas Seguras"}
+            </div>
+            <div className="context-menu-item" onClick={() => { setShowComponentInfo(!showComponentInfo); setContextMenu(null); }}>
+              {showComponentInfo ? <><EyeOff size={16} /> Ocultar Info de Componentes</> : <><Eye size={16} /> Mostrar Info de Componentes</>}
             </div>
             {selectedIds.size >= 2 && (
               <>
@@ -1154,6 +1165,7 @@ function Editor() {
 
       {/* Global Hidden File Input */}
       <input
+        ref={fileInputRef}
         id="global-file-input"
         type="file"
         accept="image/*"
@@ -1161,20 +1173,7 @@ function Editor() {
         onChange={handleGlobalImageUpload}
       />
 
-      {editingNodeComponent && (
-        <NodeEditor
-          component={editingNodeComponent}
-          initialData={projectCanvasNodes[editingNodeComponent.uniqueId]}
-          onLiveUpdate={(data) => {
-            setProjectCanvasNodes(prev => ({ ...prev, [editingNodeComponent.uniqueId]: data }));
-          }}
-          onSave={(data) => {
-            setProjectCanvasNodes(prev => ({ ...prev, [editingNodeComponent.uniqueId]: data }));
-            setEditingNodeComponent(null);
-          }}
-          onClose={() => setEditingNodeComponent(null)}
-        />
-      )}
+      
     </div>
   );
 }
