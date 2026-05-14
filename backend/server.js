@@ -273,11 +273,10 @@ app.post('/api/upload', authenticateToken, async (req, res) => {
 
 const PORT = process.env.PORT || 4000;
 
-// En local corre con listen; en Vercel se exporta como handler serverless
-if (process.env.NODE_ENV !== 'production') {
-  app.listen(PORT, () => {
-    console.log(`🚀 Backend server running on http://localhost:${PORT}`);
-  });
-}
+// Siempre escuchar (Render lo necesita como servidor Node.js tradicional)
+// El export permite que Vercel lo use como serverless handler
+app.listen(PORT, () => {
+  console.log(`🚀 Backend server running on http://localhost:${PORT}`);
+});
 
 export default app;
