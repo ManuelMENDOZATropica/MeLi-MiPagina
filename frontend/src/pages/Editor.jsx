@@ -78,6 +78,9 @@ function Editor() {
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [isPublished, setIsPublished] = useState(false);
+  const [showPublishModal, setShowPublishModal] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   // Global Upload State
   const [uploadTargetId, setUploadTargetId] = useState(null);
@@ -116,6 +119,7 @@ function Editor() {
             desktop: Array.isArray(data.desktopLayout) ? data.desktopLayout : [],
             mobile: Array.isArray(data.mobileLayout) ? data.mobileLayout : []
           });
+          setIsPublished(data.isPublished || false);
           // Esperamos un momento para que el setState no dispare el AutoGuardado
           setTimeout(() => { isInitialLoad.current = false; }, 1000);
         })
@@ -918,6 +922,73 @@ function Editor() {
           >
             {isPreviewMode ? <><Edit3 size={16} /> Volver al Editor</> : <><Play size={16} /> Go Live (Preview)</>}
           </button>
+
+          {/* Botón Publish */}
+          <button
+            onClick={async () => {
+              setIsPublishing(true);
+              try {
+                const res = await fetch(`http://localhost:4000/api/projects/${id}/publish`, {
+                  method: 'POST',
+                  headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                setIsPublished(data.isPublished);
+                if (data.isPublished) setShowPublishModal(true);
+              } catch (e) { console.error(e); }
+              setIsPublishing(false);
+            }}
+            style={{
+              background: isPublished ? '#7c3aed' : '#f5f0ff',
+              color: isPublished ? 'white' : '#7c3aed',
+              border: '1.5px solid #7c3aed',
+              padding: '6px 14px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontWeight: 'bold',
+              fontSize: '13px',
+              transition: 'all 0.2s'
+            }}
+          >
+            {isPublishing ? '...' : isPublished ? '✓ Publicado' : '🔗 Publicar'}
+          </button>
+
+          {/* Modal Publish */}
+          {showPublishModal && (() => {
+            const publicUrl = `${window.location.origin}/view/${id}`;
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(publicUrl)}`;
+            return (
+              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowPublishModal(false)}>
+                <div style={{ background: 'white', borderRadius: '16px', padding: '32px', maxWidth: '480px', width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', position: 'relative' }} onClick={e => e.stopPropagation()}>
+                  <button onClick={() => setShowPublishModal(false)} style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: '#888' }}>✕</button>
+                  <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                    <div style={{ fontSize: '40px', marginBottom: '8px' }}>🎉</div>
+                    <h2 style={{ margin: '0 0 4px 0', fontSize: '22px', color: '#1a1a1a' }}>¡Maqueta publicada!</h2>
+                    <p style={{ color: '#888', fontSize: '14px', margin: 0 }}>Cualquier persona con el enlace puede verla</p>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
+                    <img src={qrUrl} alt="QR Code" style={{ width: '160px', height: '160px', borderRadius: '12px', border: '3px solid #7c3aed', padding: '6px' }} />
+                  </div>
+                  <div style={{ background: '#f8f5ff', border: '1px solid #e0d5ff', borderRadius: '8px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                    <span style={{ flex: 1, fontSize: '13px', color: '#444', wordBreak: 'break-all', fontFamily: 'monospace' }}>{publicUrl}</span>
+                    <button onClick={() => { navigator.clipboard.writeText(publicUrl); }} style={{ background: '#7c3aed', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>Copiar</button>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <a href={publicUrl} target="_blank" rel="noreferrer" style={{ flex: 1, background: '#7c3aed', color: 'white', border: 'none', borderRadius: '8px', padding: '10px', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold', textAlign: 'center', textDecoration: 'none', display: 'block' }}>Abrir enlace</a>
+                    <button onClick={async () => {
+                      const res = await fetch(`http://localhost:4000/api/projects/${id}/publish`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
+                      const data = await res.json();
+                      setIsPublished(data.isPublished);
+                      setShowPublishModal(false);
+                    }} style={{ background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '8px', padding: '10px 16px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}>Despublicar</button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {user && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
