@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Layout, LogOut, Trash2, X } from 'lucide-react';
 import '../index.css';
+import API_URL from '../api';
 
 function Projects() {
   const navigate = useNavigate();
@@ -19,7 +20,7 @@ function Projects() {
       const parsedUser = JSON.parse(savedUser);
       setUser(parsedUser);
       // Cargar proyectos de la DB
-      fetch('http://localhost:4000/api/projects', {
+      fetch(`${API_URL}/api/projects`, {
         headers: { 'Authorization': `Bearer ${parsedUser.token}` }
       })
       .then(res => res.json())
@@ -35,7 +36,7 @@ function Projects() {
 
   const handleNewProject = async () => {
     try {
-      const response = await fetch('http://localhost:4000/api/projects', {
+      const response = await fetch(`${API_URL}/api/projects`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -54,7 +55,7 @@ function Projects() {
     if (deleteConfirmText !== `delete ${projectToDelete.title}`) return;
     
     try {
-      await fetch(`http://localhost:4000/api/projects/${projectToDelete.id}`, {
+      await fetch(`${API_URL}/api/projects/${projectToDelete.id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${user.token}` }
       });
