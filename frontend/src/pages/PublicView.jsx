@@ -99,9 +99,6 @@ const MeLiHeaderDesktop = () => (
       </div>
       <div style={{ display: 'flex', alignItems: 'center', background: 'white', borderRadius: 2, boxShadow: '0 1px 2px rgba(0,0,0,.2)', width: 500, height: 40 }}>
         <input type="text" placeholder="Buscar productos, marcas y más..." style={{ flex: 1, border: 'none', padding: '0 15px', fontSize: 16, outline: 'none', background: 'transparent', color: '#999' }} readOnly />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#333', fontSize: 14, padding: '0 15px', borderLeft: '1px solid #e6e6e6', cursor: 'pointer' }}>
-          <span>en Nike</span><ChevronDown size={14} />
-        </div>
         <button style={{ background: 'white', border: 'none', padding: '0 15px', cursor: 'pointer', height: '100%', display: 'flex', alignItems: 'center' }}>
           <Search size={18} color="#666" />
         </button>
@@ -185,16 +182,16 @@ export default function PublicView() {
 
   useEffect(() => {
     const update = () => {
-      if (containerRef.current) {
-        const cw = containerRef.current.clientWidth - (isMobile ? 0 : 40);
-        const tw = viewMode === 'desktop' ? 1920 : 375;
-        setScale(cw < tw ? cw / tw : 1);
-      }
+      // Usar window.innerWidth, NO el clientWidth del contenedor
+      // (el contenedor se expande por el hijo de 1920px y siempre da 1920)
+      const vw = window.innerWidth;
+      const tw = viewMode === 'desktop' ? 1920 : 375;
+      setScale(vw < tw ? vw / tw : 1);
     };
     update();
     window.addEventListener('resize', update);
     return () => window.removeEventListener('resize', update);
-  }, [viewMode, isMobile]);
+  }, [viewMode]);
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#f5f5f5', flexDirection: 'column', gap: 16, fontFamily: 'sans-serif' }}>
@@ -215,7 +212,7 @@ export default function PublicView() {
   const canvasItems = viewMode === 'mobile' ? project.mobileLayout : project.desktopLayout;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: '#f5f5f5', fontFamily: 'sans-serif' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', maxWidth: '100vw', overflowX: 'hidden', fontFamily: 'sans-serif' }}>
       {/* Barra herramientas del builder */}
       <div style={{ height: 48, background: 'white', borderBottom: '1px solid #e6e6e6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', boxShadow: '0 2px 6px rgba(0,0,0,0.06)', position: 'sticky', top: 0, zIndex: 200 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -234,17 +231,27 @@ export default function PublicView() {
         )}
       </div>
 
-      {/* Canvas */}
-      <div ref={containerRef} style={{ flex: 1, overflow: 'auto', padding: isMobile ? 0 : '20px', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
-        <div style={{ width: (viewMode === 'desktop' ? 1920 : 375) * scale, display: 'flex', justifyContent: 'center' }}>
-          <div style={{ width: viewMode === 'desktop' ? 1920 : 375, background: 'white', boxShadow: isMobile ? 'none' : '0 10px 40px rgba(0,0,0,0.12)', transform: `scale(${scale})`, transformOrigin: 'top center' }}>
-            {/* Header MeLi correcto según el modo */}
-            {viewMode === 'desktop' ? <MeLiHeaderDesktop /> : <MeLiHeaderMobile />}
-
-            {/* Componentes de la maqueta */}
-            <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignContent: 'flex-start', padding: 20, gap: 20 }}>
-              {canvasItems?.map(item => renderPublicItem(item, viewMode))}
-            </div>
+      {/* Canvas - zoom afecta el layout, no hay overflow ni espacio extra */}
+      <div
+        ref={containerRef}
+        style={{
+          flex: 1,
+          overflowX: 'hidden',
+          overflowY: 'auto',
+          background: '#f0f0f0',
+          padding: isMobile ? 0 : '20px 0'
+        }}
+      >
+        <div style={{
+          width: viewMode === 'desktop' ? 1920 : 375,
+          zoom: scale,
+          background: 'white',
+          margin: isMobile ? 0 : '0 auto',
+          boxShadow: isMobile ? 'none' : '0 10px 40px rgba(0,0,0,0.12)'
+        }}>
+          {viewMode === 'desktop' ? <MeLiHeaderDesktop /> : <MeLiHeaderMobile />}
+          <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignContent: 'flex-start', padding: 20, gap: 20 }}>
+            {canvasItems?.map(item => renderPublicItem(item, viewMode))}
           </div>
         </div>
       </div>
