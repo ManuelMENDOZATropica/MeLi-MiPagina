@@ -182,16 +182,16 @@ export default function PublicView() {
 
   useEffect(() => {
     const update = () => {
-      if (containerRef.current) {
-        const cw = containerRef.current.clientWidth - (isMobile ? 0 : 40);
-        const tw = viewMode === 'desktop' ? 1920 : 375;
-        setScale(cw < tw ? cw / tw : 1);
-      }
+      // Usar window.innerWidth, NO el clientWidth del contenedor
+      // (el contenedor se expande por el hijo de 1920px y siempre da 1920)
+      const vw = window.innerWidth;
+      const tw = viewMode === 'desktop' ? 1920 : 375;
+      setScale(vw < tw ? vw / tw : 1);
     };
     update();
     window.addEventListener('resize', update);
     return () => window.removeEventListener('resize', update);
-  }, [viewMode, isMobile]);
+  }, [viewMode]);
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#f5f5f5', flexDirection: 'column', gap: 16, fontFamily: 'sans-serif' }}>
@@ -212,7 +212,7 @@ export default function PublicView() {
   const canvasItems = viewMode === 'mobile' ? project.mobileLayout : project.desktopLayout;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: '#f5f5f5', fontFamily: 'sans-serif' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', maxWidth: '100vw', overflowX: 'hidden', fontFamily: 'sans-serif' }}>
       {/* Barra herramientas del builder */}
       <div style={{ height: 48, background: 'white', borderBottom: '1px solid #e6e6e6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', boxShadow: '0 2px 6px rgba(0,0,0,0.06)', position: 'sticky', top: 0, zIndex: 200 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -231,32 +231,27 @@ export default function PublicView() {
         )}
       </div>
 
-      {/* Canvas - sin scroll horizontal, contenido ajustado al ancho */}
+      {/* Canvas - zoom afecta el layout, no hay overflow ni espacio extra */}
       <div
         ref={containerRef}
         style={{
           flex: 1,
           overflowX: 'hidden',
           overflowY: 'auto',
-          padding: isMobile ? 0 : '20px',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'flex-start'
+          background: '#f0f0f0',
+          padding: isMobile ? 0 : '20px 0'
         }}
       >
-        {/* Caja que ocupa exactamente el ancho escalado para no generar scroll */}
-        <div style={{ width: '100%', maxWidth: viewMode === 'desktop' ? 1920 * scale : 375 * scale, overflow: 'hidden' }}>
-          <div style={{
-            width: viewMode === 'desktop' ? 1920 : 375,
-            background: 'white',
-            boxShadow: isMobile ? 'none' : '0 10px 40px rgba(0,0,0,0.12)',
-            transform: `scale(${scale})`,
-            transformOrigin: 'top left'
-          }}>
-            {viewMode === 'desktop' ? <MeLiHeaderDesktop /> : <MeLiHeaderMobile />}
-            <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignContent: 'flex-start', padding: 20, gap: 20 }}>
-              {canvasItems?.map(item => renderPublicItem(item, viewMode))}
-            </div>
+        <div style={{
+          width: viewMode === 'desktop' ? 1920 : 375,
+          zoom: scale,
+          background: 'white',
+          margin: isMobile ? 0 : '0 auto',
+          boxShadow: isMobile ? 'none' : '0 10px 40px rgba(0,0,0,0.12)'
+        }}>
+          {viewMode === 'desktop' ? <MeLiHeaderDesktop /> : <MeLiHeaderMobile />}
+          <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignContent: 'flex-start', padding: 20, gap: 20 }}>
+            {canvasItems?.map(item => renderPublicItem(item, viewMode))}
           </div>
         </div>
       </div>
