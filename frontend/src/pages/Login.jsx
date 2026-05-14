@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogIn } from 'lucide-react';
 import '../index.css';
+import API_URL from '../api';
 
 function Login() {
   const navigate = useNavigate();
@@ -10,7 +11,7 @@ function Login() {
   const handleMockLogin = async (type) => {
     if (type === 'valid') {
       try {
-        const response = await fetch('http://localhost:4000/api/auth/google', {
+        const response = await fetch(`${API_URL}/api/auth/google`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ mockEmail: 'manu@tropica.me' })

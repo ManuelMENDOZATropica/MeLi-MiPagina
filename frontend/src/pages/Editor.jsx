@@ -2,7 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Monitor, Smartphone, GripVertical, Trash2, Image as ImageIcon, Layout, Type, Video, Search, MapPin, Tag, ChevronDown, Bell, ShoppingCart, User, AlignCenter, MoveHorizontal, ListMinus, AlignJustify, CornerDownLeft, ArrowLeft, CheckCircle2, Play, Edit3, Eye, EyeOff, Layers } from 'lucide-react';
 import { componentsList } from '../componentsData';
+import API_URL from '../api';
 import '../index.css';
+
 
 // Helper icon selector
 const getIcon = (type) => {
@@ -107,7 +109,7 @@ function Editor() {
       setUser(parsed.user);
       setToken(parsed.token);
 
-      fetch(`http://localhost:4000/api/projects/${id}`, {
+      fetch(`${API_URL}/api/projects/${id}`, {
         headers: { 'Authorization': `Bearer ${parsed.token}` }
       })
         .then(res => {
@@ -137,7 +139,7 @@ function Editor() {
 
     const timer = setTimeout(() => {
       setIsSaving(true);
-      fetch(`http://localhost:4000/api/projects/${id}`, {
+      fetch(`${API_URL}/api/projects/${id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -191,7 +193,7 @@ function Editor() {
       reader.onloadend = async () => {
         const base64Str = reader.result;
         try {
-          const response = await fetch('http://localhost:4000/api/upload', {
+          const response = await fetch(`${API_URL}/api/upload`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -239,7 +241,7 @@ function Editor() {
         
         try {
           // Send to Cloudinary backend
-          const response = await fetch('http://localhost:4000/api/upload', {
+          const response = await fetch(`${API_URL}/api/upload`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -929,7 +931,7 @@ function Editor() {
             onClick={async () => {
               setIsPublishing(true);
               try {
-                const res = await fetch(`http://localhost:4000/api/projects/${id}/publish`, {
+                const res = await fetch(`${API_URL}/api/projects/${id}/publish`, {
                   method: 'POST',
                   headers: { 'Authorization': `Bearer ${token}` }
                 });
@@ -980,7 +982,7 @@ function Editor() {
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <a href={publicUrl} target="_blank" rel="noreferrer" style={{ flex: 1, background: '#7c3aed', color: 'white', border: 'none', borderRadius: '8px', padding: '10px', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold', textAlign: 'center', textDecoration: 'none', display: 'block' }}>Abrir enlace</a>
                     <button onClick={async () => {
-                      const res = await fetch(`http://localhost:4000/api/projects/${id}/publish`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
+                      const res = await fetch(`${API_URL}/api/projects/${id}/publish`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
                       const data = await res.json();
                       setIsPublished(data.isPublished);
                       setShowPublishModal(false);

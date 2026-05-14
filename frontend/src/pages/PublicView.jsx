@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { Monitor, Smartphone, ChevronDown, Search, Tag, MapPin, Bell, ShoppingCart, Menu, ChevronRight } from 'lucide-react';
+import API_URL from '../api';
 
 const isMobileDevice = () => /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768;
 
@@ -174,7 +175,7 @@ export default function PublicView() {
   const [scale, setScale] = useState(1);
 
   useEffect(() => {
-    fetch(`http://localhost:4000/api/public/projects/${id}`)
+    fetch(`${API_URL}/api/public/projects/${id}`)
       .then(res => { if (!res.ok) throw new Error(); return res.json(); })
       .then(data => { setProject(data); setLoading(false); })
       .catch(() => { setError(true); setLoading(false); });
