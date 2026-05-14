@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -22,6 +23,7 @@ model Project {
   desktopLayout Json     @default("[]")
   mobileLayout  Json     @default("[]")
   canvasNodes   Json     @default("{}")
+  isPublished   Boolean  @default(false)
   userId        String
   user          User     @relation(fields: [userId], references: [id])
   createdAt     DateTime @default(now())

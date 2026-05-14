@@ -168,6 +168,46 @@ app.delete('/api/projects/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// 6. Publicar / despublicar proyecto
+app.post('/api/projects/:id/publish', authenticateToken, async (req, res) => {
+  try {
+    const project = await prisma.project.findUnique({
+      where: { id: req.params.id, userId: req.user.id }
+    });
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    const updated = await prisma.project.update({
+      where: { id: req.params.id },
+      data: { isPublished: !project.isPublished }
+    });
+    res.json({ isPublished: updated.isPublished });
+  } catch (error) {
+    res.status(500).json({ error: 'Error toggling publish state' });
+  }
+});
+
+// =======================
+// RUTA PÚBLICA (sin auth)
+// =======================
+app.get('/api/public/projects/:id', async (req, res) => {
+  try {
+    const project = await prisma.project.findUnique({
+      where: { id: req.params.id }
+    });
+    if (!project || !project.isPublished) {
+      return res.status(404).json({ error: 'Este proyecto no está publicado o no existe.' });
+    }
+    // Solo enviamos los datos necesarios para la vista pública
+    res.json({
+      title: project.title,
+      desktopLayout: project.desktopLayout,
+      mobileLayout: project.mobileLayout
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching public project' });
+  }
+});
+
 
 // =======================
 // RUTA DE SUBIDA (CLOUDINARY)
