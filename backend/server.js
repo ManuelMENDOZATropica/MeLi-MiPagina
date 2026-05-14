@@ -189,6 +189,18 @@ app.delete('/api/projects/:id', authenticateToken, async (req, res) => {
 });
 
 // 6. Publicar / despublicar proyecto
+// Genera slug corto único (7 chars, base62)
+const SLUG_CHARS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+const generateSlug = () => Array.from({ length: 7 }, () => SLUG_CHARS[Math.floor(Math.random() * SLUG_CHARS.length)]).join('');
+const getUniqueSlug = async () => {
+  let slug, exists;
+  do {
+    slug = generateSlug();
+    exists = await prisma.project.findUnique({ where: { slug } });
+  } while (exists);
+  return slug;
+};
+
 app.post('/api/projects/:id/publish', authenticateToken, async (req, res) => {
   try {
     const project = await prisma.project.findUnique({
@@ -196,28 +208,36 @@ app.post('/api/projects/:id/publish', authenticateToken, async (req, res) => {
     });
     if (!project) return res.status(404).json({ error: 'Project not found' });
 
+    const willPublish = !project.isPublished;
+    // Generar slug solo si va a publicarse y aún no tiene uno
+    const slug = willPublish && !project.slug ? await getUniqueSlug() : project.slug;
+
     const updated = await prisma.project.update({
       where: { id: req.params.id },
-      data: { isPublished: !project.isPublished }
+      data: { isPublished: willPublish, ...(slug ? { slug } : {}) }
     });
-    res.json({ isPublished: updated.isPublished });
+    res.json({ isPublished: updated.isPublished, slug: updated.slug });
   } catch (error) {
     res.status(500).json({ error: 'Error toggling publish state' });
   }
 });
 
+
 // =======================
-// RUTA PÚBLICA (sin auth)
+// RUTA PÚBLICA (sin auth) - acepta slug corto O uuid
 // =======================
-app.get('/api/public/projects/:id', async (req, res) => {
+app.get('/api/public/projects/:key', async (req, res) => {
   try {
-    const project = await prisma.project.findUnique({
-      where: { id: req.params.id }
-    });
+    const key = req.params.key;
+    // Detectar si es UUID (36 chars con guiones) o slug corto
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(key);
+    const project = isUUID
+      ? await prisma.project.findUnique({ where: { id: key } })
+      : await prisma.project.findUnique({ where: { slug: key } });
+
     if (!project || !project.isPublished) {
       return res.status(404).json({ error: 'Este proyecto no está publicado o no existe.' });
     }
-    // Solo enviamos los datos necesarios para la vista pública
     res.json({
       title: project.title,
       desktopLayout: project.desktopLayout,

@@ -81,6 +81,7 @@ function Editor() {
   const [lastSaved, setLastSaved] = useState(null);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [isPublished, setIsPublished] = useState(false);
+  const [publishedSlug, setPublishedSlug] = useState(null);
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [textEditorPanel, setTextEditorPanel] = useState(null); // { item, x, y }
@@ -123,6 +124,7 @@ function Editor() {
             mobile: Array.isArray(data.mobileLayout) ? data.mobileLayout : []
           });
           setIsPublished(data.isPublished || false);
+          if (data.slug) setPublishedSlug(data.slug);
           // Esperamos un momento para que el setState no dispare el AutoGuardado
           setTimeout(() => { isInitialLoad.current = false; }, 1000);
         })
@@ -937,6 +939,7 @@ function Editor() {
                 });
                 const data = await res.json();
                 setIsPublished(data.isPublished);
+                if (data.slug) setPublishedSlug(data.slug);
                 if (data.isPublished) setShowPublishModal(true);
               } catch (e) { console.error(e); }
               setIsPublishing(false);
@@ -961,7 +964,7 @@ function Editor() {
 
           {/* Modal Publish */}
           {showPublishModal && (() => {
-            const publicUrl = `${window.location.origin}/view/${id}`;
+            const publicUrl = `${window.location.origin}/view/${publishedSlug || id}`;
             const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(publicUrl)}`;
             return (
               <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowPublishModal(false)}>
