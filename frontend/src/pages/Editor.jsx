@@ -81,6 +81,7 @@ function Editor() {
   const [isPublished, setIsPublished] = useState(false);
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [textEditorPanel, setTextEditorPanel] = useState(null); // { item, x, y }
 
   // Global Upload State
   const [uploadTargetId, setUploadTargetId] = useState(null);
@@ -1148,8 +1149,17 @@ function Editor() {
                 if (i.type === 'rowGroup') i.items.forEach(c => { if (c.uniqueId === contextMenu.targetId) targetItem = c; });
               });
               const hasImage = targetItem?.uploadedImages?.length > 0;
+              const hasTexts = targetItem?.type === 'list'; // Solo 'list' tiene textos editables
               return (
                 <>
+                  {hasTexts && (
+                    <div className="context-menu-item" onClick={() => {
+                      setTextEditorPanel({ item: targetItem });
+                      setContextMenu(null);
+                    }} style={{ fontWeight: 'bold', color: '#333', borderBottom: '1px solid #eee', marginBottom: '4px', paddingBottom: '8px' }}>
+                      <Edit3 size={16} /> Editar Textos
+                    </div>
+                  )}
                   <div className="context-menu-item" onClick={() => { triggerUpload(contextMenu.targetId); setContextMenu(null); }} style={{ fontWeight: 'bold', color: '#3483fa' }}>
                     <ImageIcon size={16} /> {hasImage ? 'Cambiar Imagen' : 'Subir Imagen'}
                   </div>
@@ -1244,7 +1254,94 @@ function Editor() {
         onChange={handleGlobalImageUpload}
       />
 
-      
+      {/* Panel flotante de edición de textos */}
+      {textEditorPanel && (() => {
+        const panelItem = textEditorPanel.item;
+        const fields = [
+          { key: 'contentTitle', label: 'Título', type: 'input', placeholder: 'Título de la tarjeta' },
+          { key: 'contentParagraph', label: 'Párrafo', type: 'textarea', placeholder: 'Describe el evento o promoción.' },
+          { key: 'contentCTA', label: 'Texto del CTA', type: 'input', placeholder: 'Descubrir más' },
+        ];
+        // Estado local temporal para los valores del panel
+        const handleSave = (e) => {
+          e.preventDefault();
+          const form = e.target;
+          const updates = {};
+          fields.forEach(f => {
+            const el = form.elements[f.key];
+            if (el) updates[f.key] = el.value;
+          });
+          setCanvasItems(prev => prev.map(item => {
+            if (item.uniqueId === panelItem.uniqueId) return { ...item, ...updates };
+            if (item.type === 'rowGroup') return {
+              ...item,
+              items: item.items.map(c => c.uniqueId === panelItem.uniqueId ? { ...c, ...updates } : c)
+            };
+            return item;
+          }));
+          setTextEditorPanel(null);
+        };
+
+        return (
+          <div
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            onClick={() => setTextEditorPanel(null)}
+          >
+            <div
+              style={{ background: 'white', borderRadius: '14px', padding: '28px 32px', width: '440px', boxShadow: '0 24px 60px rgba(0,0,0,0.25)', position: 'relative' }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Header del panel */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '17px', color: '#1a1a1a', fontWeight: 700 }}>✏️ Editar Textos</h3>
+                  <p style={{ margin: '3px 0 0 0', fontSize: '12px', color: '#999' }}>{panelItem.name}</p>
+                </div>
+                <button onClick={() => setTextEditorPanel(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#aaa', fontSize: '20px', lineHeight: 1 }}>✕</button>
+              </div>
+
+              <form onSubmit={handleSave}>
+                {fields.map(f => (
+                  <div key={f.key} style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#555', marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      {f.label}
+                    </label>
+                    {f.type === 'textarea' ? (
+                      <textarea
+                        name={f.key}
+                        defaultValue={panelItem[f.key] || ''}
+                        placeholder={f.placeholder}
+                        rows={3}
+                        style={{ width: '100%', border: '1.5px solid #e6e6e6', borderRadius: '8px', padding: '10px 12px', fontSize: '14px', color: '#333', outline: 'none', resize: 'vertical', fontFamily: 'inherit', transition: 'border-color 0.2s', boxSizing: 'border-box' }}
+                        onFocus={e => e.target.style.borderColor = '#3483fa'}
+                        onBlur={e => e.target.style.borderColor = '#e6e6e6'}
+                      />
+                    ) : (
+                      <input
+                        name={f.key}
+                        defaultValue={panelItem[f.key] || ''}
+                        placeholder={f.placeholder}
+                        style={{ width: '100%', border: '1.5px solid #e6e6e6', borderRadius: '8px', padding: '10px 12px', fontSize: '14px', color: '#333', outline: 'none', fontFamily: 'inherit', transition: 'border-color 0.2s', boxSizing: 'border-box' }}
+                        onFocus={e => e.target.style.borderColor = '#3483fa'}
+                        onBlur={e => e.target.style.borderColor = '#e6e6e6'}
+                      />
+                    )}
+                  </div>
+                ))}
+
+                <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+                  <button type="submit" style={{ flex: 1, background: '#3483fa', color: 'white', border: 'none', borderRadius: '8px', padding: '11px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' }}>
+                    Guardar Cambios
+                  </button>
+                  <button type="button" onClick={() => setTextEditorPanel(null)} style={{ background: '#f5f5f5', color: '#666', border: 'none', borderRadius: '8px', padding: '11px 18px', fontSize: '14px', cursor: 'pointer' }}>
+                    Cancelar
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
