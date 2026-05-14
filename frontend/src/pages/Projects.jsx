@@ -23,9 +23,12 @@ function Projects() {
       fetch(`${API_URL}/api/projects`, {
         headers: { 'Authorization': `Bearer ${parsedUser.token}` }
       })
-      .then(res => res.json())
-      .then(data => setProjects(data))
-      .catch(err => console.error(err));
+      .then(res => {
+        if (!res.ok) throw new Error(`Error ${res.status}`);
+        return res.json();
+      })
+      .then(data => setProjects(Array.isArray(data) ? data : []))
+      .catch(err => console.error('Error cargando proyectos:', err));
     }
   }, [navigate]);
 
