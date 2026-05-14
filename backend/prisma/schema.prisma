@@ -24,6 +24,7 @@ model Project {
   mobileLayout  Json     @default("[]")
   canvasNodes   Json     @default("{}")
   isPublished   Boolean  @default(false)
+  slug          String?  @unique
   userId        String
   user          User     @relation(fields: [userId], references: [id])
   createdAt     DateTime @default(now())
