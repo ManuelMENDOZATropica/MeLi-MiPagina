@@ -7,6 +7,13 @@ import jwt from 'jsonwebtoken';
 import { v2 as cloudinary } from 'cloudinary';
 dotenv.config();
 
+// ── Fail fast si faltan secretos críticos ──────────────────────────────────
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error('❌ FATAL: JWT_SECRET no está configurado. El servidor no puede arrancar de forma segura.');
+  process.exit(1);
+}
+
 const app = express();
 const prisma = new PrismaClient();
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -23,8 +30,13 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Permitir requests sin origin (Postman, server-to-server)
-    if (!origin) return callback(null, true);
+    // En producción, bloquear requests sin origin (curl, scripts)
+    if (!origin) {
+      if (process.env.NODE_ENV === 'production') {
+        return callback(new Error('Requests sin origin bloqueados en producción'));
+      }
+      return callback(null, true); // Permitir en desarrollo (Postman, etc.)
+    }
     const allowed = allowedOrigins.some(o =>
       typeof o === 'string' ? o === origin : o.test(origin)
     );
@@ -33,8 +45,16 @@ app.use(cors({
   },
   credentials: true
 }));
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Límite global reducido. El endpoint de upload tiene su propio límite.
+app.use((req, res, next) => {
+  if (req.path === '/api/upload') {
+    express.json({ limit: '15mb' })(req, res, next);
+  } else {
+    express.json({ limit: '1mb' })(req, res, next);
+  }
+});
+app.use(express.urlencoded({ limit: '1mb', extended: true }));
 
 // Middleware para verificar Token JWT
 const authenticateToken = (req, res, next) => {
@@ -43,7 +63,7 @@ const authenticateToken = (req, res, next) => {
   
   if (!token) return res.status(401).json({ error: 'No token provided' });
 
-  jwt.verify(token, process.env.JWT_SECRET || 'tropica_super_secret_2026', (err, user) => {
+  jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) return res.status(403).json({ error: 'Token invalid or expired' });
     req.user = user;
     next();
@@ -59,8 +79,11 @@ app.post('/api/auth/google', async (req, res) => {
   try {
     let email, name, picture;
 
-    // Para desarrollo local rápido sin configurar Google Cloud Console
+    // Mock login — solo permitido fuera de producción
     if (mockEmail) {
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ error: 'Mock login deshabilitado en producción' });
+      }
       email = mockEmail;
       name = "Developer Tropica";
       picture = "https://ui-avatars.com/api/?name=Dev";
@@ -90,8 +113,8 @@ app.post('/api/auth/google', async (req, res) => {
 
     // Generar Token JWT propio
     const token = jwt.sign(
-      { id: user.id, email: user.email }, 
-      process.env.JWT_SECRET || 'tropica_super_secret_2026', 
+      { id: user.id, email: user.email },
+      JWT_SECRET,
       { expiresIn: '7d' }
     );
     
@@ -230,11 +253,8 @@ app.post('/api/projects/:id/publish', authenticateToken, async (req, res) => {
 app.get('/api/public/projects/:key', async (req, res) => {
   try {
     const key = req.params.key;
-    // Detectar si es UUID (36 chars con guiones) o slug corto
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(key);
-    const project = isUUID
-      ? await prisma.project.findUnique({ where: { id: key } })
-      : await prisma.project.findUnique({ where: { slug: key } });
+    // Solo acceso por slug corto — no exponemos IDs internos en rutas públicas
+    const project = await prisma.project.findUnique({ where: { slug: key } });
 
     if (!project || !project.isPublished) {
       return res.status(404).json({ error: 'Este proyecto no está publicado o no existe.' });
