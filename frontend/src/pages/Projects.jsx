@@ -89,27 +89,41 @@ function Projects() {
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
         
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px', backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-            <img src="https://http2.mlstatic.com/frontend-assets/ml-web-navigation/ui-navigation/6.6.73/mercadolibre/logo__small_v2.png" alt="Logo" style={{ height: '30px' }} />
-            <h1 style={{ fontSize: '24px', color: '#333', margin: 0 }}>Mis Proyectos</h1>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px', backgroundColor: 'white', padding: '20px 28px', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.07)', borderBottom: '3px solid #fff159' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: '8px', height: '32px', borderRadius: '4px', background: 'linear-gradient(180deg, #fff159 0%, #3483fa 100%)' }} />
+            <h1 style={{ fontSize: '24px', color: '#1a1a1a', margin: 0, fontWeight: '800', letterSpacing: '-0.3px' }}>Mis Proyectos</h1>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              {user.avatar ? (
-                <img src={user.avatar} alt="Avatar" style={{ width: '35px', height: '35px', borderRadius: '50%' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              {/* User avatar: real photo or initial */}
+              {(user.user?.picture || user.user?.avatar || user.avatar) ? (
+                <img
+                  src={user.user?.picture || user.user?.avatar || user.avatar}
+                  alt={user.user?.name || user.name || 'Avatar'}
+                  style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover', border: '2.5px solid #fff159', boxShadow: '0 0 0 2px #3483fa22' }}
+                />
               ) : (
-                <div style={{ width: '35px', height: '35px', borderRadius: '50%', backgroundColor: '#3483fa', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
-                  {user.name ? user.name.charAt(0) : 'U'}
+                <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: 'linear-gradient(135deg, #fff159, #3483fa)', color: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '18px', border: '2.5px solid #fff159' }}>
+                  {(user.user?.name || user.name || user.email || 'U').charAt(0).toUpperCase()}
                 </div>
               )}
-              <span style={{ color: '#666', fontWeight: '500' }}>{user.email}</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                <span style={{ color: '#1a1a1a', fontWeight: '700', fontSize: '14px', lineHeight: 1.2 }}>
+                  {user.user?.name || user.name || ''}
+                </span>
+                <span style={{ color: '#999', fontSize: '12px', lineHeight: 1.2 }}>
+                  {user.user?.email || user.email}
+                </span>
+              </div>
             </div>
-            <button 
+            <button
               onClick={handleLogout}
-              style={{ background: 'transparent', border: 'none', color: '#ff4d4f', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 'bold' }}
+              style={{ background: 'transparent', border: '1px solid #ffe4e4', color: '#e74c3c', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '600', fontSize: '14px', padding: '8px 14px', borderRadius: '8px', transition: 'all 0.2s' }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#fff0f0'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
             >
-              <LogOut size={18} /> Salir
+              <LogOut size={16} /> Salir
             </button>
           </div>
         </div>
