@@ -13,6 +13,9 @@ if (!JWT_SECRET) {
   console.error('❌ FATAL: JWT_SECRET no está configurado. El servidor no puede arrancar de forma segura.');
   process.exit(1);
 }
+if (!process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID.includes('TU_GOOGLE')) {
+  console.warn('⚠️  ADVERTENCIA: GOOGLE_CLIENT_ID no está configurado. El login con Google no funcionará.');
+}
 
 const app = express();
 const prisma = new PrismaClient();
@@ -74,29 +77,22 @@ const authenticateToken = (req, res, next) => {
 // RUTAS DE AUTENTICACIÓN
 // =======================
 app.post('/api/auth/google', async (req, res) => {
-  const { credential, mockEmail } = req.body;
-  
-  try {
-    let email, name, picture;
+  const { credential } = req.body;
 
-    // Mock login — solo permitido fuera de producción
-    if (mockEmail) {
-      if (process.env.NODE_ENV === 'production') {
-        return res.status(403).json({ error: 'Mock login deshabilitado en producción' });
-      }
-      email = mockEmail;
-      name = "Developer Tropica";
-      picture = "https://ui-avatars.com/api/?name=Dev";
-    } else {
-      const ticket = await googleClient.verifyIdToken({
-        idToken: credential,
-        audience: process.env.GOOGLE_CLIENT_ID,
-      });
-      const payload = ticket.getPayload();
-      email = payload.email;
-      name = payload.name;
-      picture = payload.picture;
-    }
+  if (!credential) {
+    return res.status(400).json({ error: 'Se requiere un credential de Google.' });
+  }
+
+  try {
+    // Verificar el ID token con Google
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    const email   = payload.email;
+    const name    = payload.name;
+    const picture = payload.picture;
 
     // Validación estricta del dominio @tropica.me
     if (!email.endsWith('@tropica.me')) {
@@ -109,22 +105,29 @@ app.post('/api/auth/google', async (req, res) => {
       user = await prisma.user.create({
         data: { email, name, avatar: picture }
       });
+    } else {
+      // Actualizar nombre/foto en cada login por si cambiaron en Google
+      user = await prisma.user.update({
+        where: { email },
+        data: { name, avatar: picture }
+      });
     }
 
-    // Generar Token JWT propio
+    // Emitir JWT propio
     const token = jwt.sign(
       { id: user.id, email: user.email },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
-    
+
     res.json({ token, user });
 
   } catch (error) {
-    console.error('Error en Login Google:', error);
-    res.status(500).json({ error: 'Error verificando el token de Google' });
+    console.error('Error verificando token de Google:', error.message);
+    res.status(401).json({ error: 'Token de Google inválido o expirado.' });
   }
 });
+
 
 
 // =======================

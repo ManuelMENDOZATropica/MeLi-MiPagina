@@ -1,36 +1,80 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
 import '../index.css';
 import API_URL from '../api';
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 function Login() {
   const navigate = useNavigate();
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [gsiReady, setGsiReady] = useState(false);
+  const btnRef = useRef(null);
 
-  const handleLogin = async () => {
+  // Callback que Google llama con el credential JWT
+  const handleCredentialResponse = async (response) => {
     setIsLoading(true);
     setError('');
     try {
-      const response = await fetch(`${API_URL}/api/auth/google`, {
+      const res = await fetch(`${API_URL}/api/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mockEmail: 'manu@tropica.me' })
+        body: JSON.stringify({ credential: response.credential })
       });
-      const data = await response.json();
-      if (response.ok) {
+      const data = await res.json();
+      if (res.ok) {
         localStorage.setItem('tropica_user', JSON.stringify({ token: data.token, user: data.user }));
-        setTimeout(() => navigate('/projects'), 700);
+        navigate('/projects');
       } else {
-        setIsLoading(false);
         setError(data.error || 'Acceso denegado');
+        setIsLoading(false);
       }
     } catch (err) {
-      setIsLoading(false);
       setError('Sin conexión al servidor');
+      setIsLoading(false);
     }
   };
+
+  // Cargar Google Identity Services y renderizar el botón nativo
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID) {
+      setError('VITE_GOOGLE_CLIENT_ID no configurado.');
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+      window.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: handleCredentialResponse,
+        auto_select: false,
+        cancel_on_tap_outside: true,
+      });
+      // Renderizar el botón oficial de Google dentro de nuestro contenedor
+      if (btnRef.current) {
+        window.google.accounts.id.renderButton(btnRef.current, {
+          type: 'standard',
+          theme: 'outline',
+          size: 'large',
+          text: 'signin_with',
+          shape: 'rectangular',
+          logo_alignment: 'left',
+          width: btnRef.current.offsetWidth || 332,
+        });
+        setGsiReady(true);
+      }
+    };
+    script.onerror = () => setError('No se pudo cargar Google Sign-In.');
+    document.head.appendChild(script);
+
+    return () => {
+      if (document.head.contains(script)) document.head.removeChild(script);
+    };
+  }, []);
 
   return (
     <>
@@ -54,7 +98,6 @@ function Login() {
           box-shadow: 0 8px 32px rgba(0,0,0,0.08);
         }
 
-        /* Same as editor top bar */
         .ln-card-header {
           background: #1a1f2e;
           padding: 18px 24px;
@@ -120,6 +163,7 @@ function Login() {
           font-weight: 600;
           margin-bottom: 16px;
           animation: ln-shake 0.3s ease;
+          line-height: 1.5;
         }
 
         @keyframes ln-shake {
@@ -128,52 +172,46 @@ function Login() {
           75%      { transform: translateX(5px); }
         }
 
-        /* Same button style as editor "Publicar" */
-        .ln-btn {
+        /* Contenedor del botón de Google — ocupa ancho completo */
+        .ln-google-btn-wrap {
           width: 100%;
-          padding: 16px 20px;
-          background: #1a1f2e;
-          color: #fff159;
-          border: none;
-          font-family: 'Inter', sans-serif;
-          font-size: 11px;
-          font-weight: 800;
-          letter-spacing: 0.12em;
-          text-transform: uppercase;
-          cursor: pointer;
+          min-height: 44px;
           display: flex;
           align-items: center;
-          justify-content: space-between;
-          transition: background 0.18s, transform 0.15s;
+          justify-content: center;
+          /* Mientras carga el script de Google */
           position: relative;
-          overflow: hidden;
         }
 
-        .ln-btn:hover:not(:disabled) { background: #252c3f; transform: translateY(-1px); }
-        .ln-btn:active:not(:disabled) { transform: translateY(0); }
-        .ln-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-
-        .ln-btn.loading::after {
+        /* Skeleton mientras GSI carga */
+        .ln-google-btn-wrap:not(.ready)::before {
           content: '';
           position: absolute;
           inset: 0;
-          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.07), transparent);
-          transform: translateX(-100%);
-          animation: ln-shimmer 1s infinite;
+          background: #f4f6fb;
+          border: 1px solid #e0e5ef;
+          border-radius: 4px;
+          animation: ln-pulse 1.5s ease-in-out infinite;
         }
 
-        @keyframes ln-shimmer { to { transform: translateX(100%); } }
-
-        .ln-spinner {
-          width: 14px; height: 14px;
-          border: 2px solid rgba(255,241,89,0.2);
-          border-top-color: #fff159;
-          border-radius: 50%;
-          animation: ln-spin 0.65s linear infinite;
-          flex-shrink: 0;
+        @keyframes ln-pulse {
+          0%, 100% { opacity: 1; }
+          50%       { opacity: 0.5; }
         }
 
-        @keyframes ln-spin { to { transform: rotate(360deg); } }
+        /* Hacer que el iframe de Google ocupe el ancho completo */
+        .ln-google-btn-wrap iframe {
+          width: 100% !important;
+        }
+
+        .ln-loading-indicator {
+          font-size: 12px;
+          color: #9ba3b5;
+          font-weight: 600;
+          letter-spacing: 0.06em;
+          padding: 10px 0;
+          text-align: center;
+        }
 
         .ln-footer {
           border-top: 1px solid #e0e5ef;
@@ -187,13 +225,12 @@ function Login() {
           justify-content: space-between;
         }
 
-        .ln-footer strong { color: rgba(255,241,89,0.7); }
+        .ln-footer strong { color: rgba(26,31,46,0.5); }
       `}</style>
 
       <div className="ln-root">
         <div className="ln-card">
 
-          {/* Header — same dark bar as editor top nav */}
           <div className="ln-card-header">
             <div className="ln-bar" />
             <span className="ln-header-title">Landing Builder</span>
@@ -205,15 +242,15 @@ function Login() {
 
             {error && <div className="ln-error">{error}</div>}
 
-            <button
-              id="btn-login-tropica"
-              onClick={handleLogin}
-              disabled={isLoading}
-              className={`ln-btn${isLoading ? ' loading' : ''}`}
-            >
-              <span>{isLoading ? 'Accediendo…' : 'Entrar con @tropica.me'}</span>
-              {isLoading ? <div className="ln-spinner" /> : <ArrowRight size={16} strokeWidth={2.5} />}
-            </button>
+            {isLoading ? (
+              <p className="ln-loading-indicator">Verificando acceso…</p>
+            ) : (
+              /* Botón oficial de Google — se inyecta aquí por el SDK */
+              <div
+                ref={btnRef}
+                className={`ln-google-btn-wrap${gsiReady ? ' ready' : ''}`}
+              />
+            )}
           </div>
 
           <div className="ln-footer">
