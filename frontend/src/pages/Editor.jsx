@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Monitor, Smartphone, GripVertical, Trash2, Image as ImageIcon, Layout, Type, Video, Search, MapPin, Tag, ChevronDown, Bell, ShoppingCart, User, AlignCenter, MoveHorizontal, ListMinus, AlignJustify, CornerDownLeft, ArrowLeft, CheckCircle2, Play, Edit3, Eye, EyeOff, Layers } from 'lucide-react';
+import { Monitor, Smartphone, GripVertical, Trash2, Image as ImageIcon, Layout, Type, Video, Search, MapPin, Tag, ChevronDown, Bell, ShoppingCart, User, AlignCenter, MoveHorizontal, ListMinus, AlignJustify, CornerDownLeft, ArrowLeft, CheckCircle2, Play, Edit3, Eye, EyeOff, Layers, Grid, Settings, ArrowRight } from 'lucide-react';
 import { componentsList } from '../componentsData';
 import API_URL from '../api';
 import '../index.css';
@@ -863,19 +863,22 @@ function Editor() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', fontFamily: "'Inter', sans-serif" }}>
 
-      {/* Editor Top Navigation Bar */}
-      <div style={{ height: '60px', backgroundColor: 'white', borderBottom: '1px solid #e6e6e6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', zIndex: 100 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+      {/* ── TOP BAR ── */}
+      <div style={{ height: '56px', background: '#1a1f2e', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', zIndex: 100, flexShrink: 0 }}>
+        {/* Left */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <button
             onClick={() => navigate('/projects')}
-            style={{ background: 'none', border: 'none', color: '#3483fa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 'bold' }}
+            style={{ background: 'rgba(255,255,255,0.08)', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '600', padding: '6px 12px', borderRadius: '6px', transition: 'all 0.18s' }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.14)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
           >
-            <ArrowLeft size={18} /> Volver a Proyectos
+            <ArrowLeft size={15} /> Proyectos
           </button>
 
-          <div style={{ width: '1px', height: '30px', backgroundColor: '#e6e6e6' }}></div>
+          <div style={{ width: '1px', height: '24px', background: 'rgba(255,255,255,0.1)' }} />
 
           {isEditingTitle ? (
             <input
@@ -884,51 +887,36 @@ function Editor() {
               onChange={(e) => setProjectTitle(e.target.value)}
               onBlur={() => setIsEditingTitle(false)}
               onKeyDown={(e) => e.key === 'Enter' && setIsEditingTitle(false)}
-              style={{ fontSize: '18px', color: '#333', margin: 0, border: '1px solid #3483fa', borderRadius: '4px', padding: '4px 8px', outline: 'none' }}
+              style={{ fontSize: '14px', fontWeight: '700', color: '#fff', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: '6px', padding: '4px 10px', outline: 'none', width: '220px' }}
             />
           ) : (
             <h2
               onDoubleClick={() => setIsEditingTitle(true)}
-              title="Doble clic para editar nombre"
-              style={{ fontSize: '18px', color: '#333', margin: 0, cursor: 'text' }}
+              title="Doble clic para editar"
+              style={{ fontSize: '14px', fontWeight: '700', color: '#ffffff', margin: 0, cursor: 'text', letterSpacing: '-0.2px' }}
             >
               {projectTitle}
             </h2>
           )}
 
-          {/* Indicador de Autoguardado */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginLeft: '10px' }}>
-            {isSaving ? (
-              <span style={{ fontSize: '12px', color: '#888', fontStyle: 'italic' }}>Guardando cambios...</span>
-            ) : lastSaved ? (
-              <span style={{ fontSize: '12px', color: '#4caf50', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <CheckCircle2 size={14} /> Guardado
-              </span>
-            ) : null}
-          </div>
+          {isSaving ? (
+            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', fontStyle: 'italic' }}>Guardando…</span>
+          ) : lastSaved ? (
+            <span style={{ fontSize: '11px', color: '#4ade80', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <CheckCircle2 size={12} /> Guardado
+            </span>
+          ) : null}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+        {/* Right */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <button
             onClick={() => setIsPreviewMode(!isPreviewMode)}
-            style={{
-              background: isPreviewMode ? '#10b981' : '#f0f0f0',
-              color: isPreviewMode ? 'white' : '#333',
-              border: 'none',
-              padding: '6px 12px',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontWeight: 'bold',
-              transition: 'all 0.2s'
-            }}
+            style={{ background: isPreviewMode ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.08)', color: isPreviewMode ? '#34d399' : 'rgba(255,255,255,0.65)', border: `1px solid ${isPreviewMode ? 'rgba(52,211,153,0.4)' : 'rgba(255,255,255,0.12)'}`, padding: '6px 14px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '700', fontSize: '12px', transition: 'all 0.2s', textTransform: 'uppercase', letterSpacing: '0.06em' }}
           >
-            {isPreviewMode ? <><Edit3 size={16} /> Volver al Editor</> : <><Play size={16} /> Go Live (Preview)</>}
+            {isPreviewMode ? <><Edit3 size={14} /> Editor</> : <><Play size={14} /> Preview</>}
           </button>
 
-          {/* Botón Publish */}
           <button
             onClick={async () => {
               setIsPublishing(true);
@@ -944,30 +932,19 @@ function Editor() {
               } catch (e) { console.error(e); }
               setIsPublishing(false);
             }}
-            style={{
-              background: isPublished ? '#7c3aed' : '#f5f0ff',
-              color: isPublished ? 'white' : '#7c3aed',
-              border: '1.5px solid #7c3aed',
-              padding: '6px 14px',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontWeight: 'bold',
-              fontSize: '13px',
-              transition: 'all 0.2s'
-            }}
+            style={{ background: isPublished ? '#fff159' : '#fff159', color: '#1a1f2e', border: 'none', padding: '7px 18px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '800', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.06em', transition: 'all 0.18s' }}
+            onMouseEnter={e => e.currentTarget.style.background = '#ffe800'}
+            onMouseLeave={e => e.currentTarget.style.background = '#fff159'}
           >
-            {isPublishing ? '...' : isPublished ? '✓ Publicado' : '🔗 Publicar'}
+            {isPublishing ? '...' : isPublished ? '✓ Publicado' : 'Publicar'}
           </button>
 
-          {/* Modal Publish */}
+          {/* Publish Modal */}
           {showPublishModal && (() => {
             const publicUrl = `${window.location.origin}/view/${publishedSlug || id}`;
             const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(publicUrl)}`;
             return (
-              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowPublishModal(false)}>
+              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowPublishModal(false)}>
                 <div style={{ background: 'white', borderRadius: '16px', padding: '32px', maxWidth: '480px', width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', position: 'relative' }} onClick={e => e.stopPropagation()}>
                   <button onClick={() => setShowPublishModal(false)} style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: '#888' }}>✕</button>
                   <div style={{ textAlign: 'center', marginBottom: '24px' }}>
@@ -976,14 +953,14 @@ function Editor() {
                     <p style={{ color: '#888', fontSize: '14px', margin: 0 }}>Cualquier persona con el enlace puede verla</p>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
-                    <img src={qrUrl} alt="QR Code" style={{ width: '160px', height: '160px', borderRadius: '12px', border: '3px solid #7c3aed', padding: '6px' }} />
+                    <img src={qrUrl} alt="QR Code" style={{ width: '160px', height: '160px', borderRadius: '12px', border: '3px solid #1a1f2e', padding: '6px' }} />
                   </div>
-                  <div style={{ background: '#f8f5ff', border: '1px solid #e0d5ff', borderRadius: '8px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                  <div style={{ background: '#f4f6fb', border: '1px solid #e0e5ef', borderRadius: '8px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
                     <span style={{ flex: 1, fontSize: '13px', color: '#444', wordBreak: 'break-all', fontFamily: 'monospace' }}>{publicUrl}</span>
-                    <button onClick={() => { navigator.clipboard.writeText(publicUrl); }} style={{ background: '#7c3aed', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>Copiar</button>
+                    <button onClick={() => { navigator.clipboard.writeText(publicUrl); }} style={{ background: '#1a1f2e', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>Copiar</button>
                   </div>
                   <div style={{ display: 'flex', gap: '10px' }}>
-                    <a href={publicUrl} target="_blank" rel="noreferrer" style={{ flex: 1, background: '#7c3aed', color: 'white', border: 'none', borderRadius: '8px', padding: '10px', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold', textAlign: 'center', textDecoration: 'none', display: 'block' }}>Abrir enlace</a>
+                    <a href={publicUrl} target="_blank" rel="noreferrer" style={{ flex: 1, background: '#1a1f2e', color: 'white', border: 'none', borderRadius: '8px', padding: '10px', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold', textAlign: 'center', textDecoration: 'none', display: 'block' }}>Abrir enlace</a>
                     <button onClick={async () => {
                       const res = await fetch(`${API_URL}/api/projects/${id}/publish`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
                       const data = await res.json();
@@ -997,38 +974,44 @@ function Editor() {
           })()}
 
           {user && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ color: '#666', fontSize: '14px', fontWeight: '500' }}>{user.email}</span>
-              {user.avatar ? (
-                <img src={user.avatar} alt="Avatar" style={{ width: '35px', height: '35px', borderRadius: '50%', border: '2px solid #f0f0f0' }} />
-              ) : (
-                <div style={{ width: '35px', height: '35px', borderRadius: '50%', backgroundColor: '#3483fa', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
-                  {user.name ? user.name.charAt(0) : 'U'}
-                </div>
-              )}
-            </div>
+            <div style={{ width: '1px', height: '24px', background: 'rgba(255,255,255,0.1)', margin: '0 2px' }} />
+          )}
+          {user && (
+            (user.picture || user.avatar) ? (
+              <img src={user.picture || user.avatar} alt={user.name || 'Avatar'} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #fff159' }} />
+            ) : (
+              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#fff159', color: '#1a1f2e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '14px' }}>
+                {(user.name || user.email || 'U').charAt(0).toUpperCase()}
+              </div>
+            )
           )}
         </div>
       </div>
 
-      <div className="builder-layout" style={{ height: 'calc(100vh - 60px)' }} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
-        {/* Sidebar */}
+      <div className="builder-layout" style={{ height: 'calc(100vh - 56px)' }} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
+        {/* ── SIDEBAR ── */}
         {!isPreviewMode && (
           <div className="sidebar">
             <div className="sidebar-header">
-              <h2>Elementos Mercado Libre</h2>
+              <h2>Componentes</h2>
             </div>
             <div className="sidebar-content">
-              {componentsList.filter(comp => viewMode === 'desktop' ? comp.desktopSize : comp.mobileSize).map((comp) => (
-                <div key={comp.id} className="draggable-item" draggable onDragStart={(e) => handleDragStartSidebar(e, comp)}>
-                  <GripVertical size={16} color="#ccc" />
-                  <div className="item-icon">{getIcon(comp.type)}</div>
-                  <div className="item-details">
-                    <h4>{comp.name}</h4>
-                    <p>D: {comp.desktopSize.width}x{comp.desktopSize.height} | M: {comp.mobileSize ? `${comp.mobileSize.width}x${comp.mobileSize.height}` : 'N/A'}</p>
-                  </div>
-                </div>
-              ))}
+              <div className="comp-grid">
+                {componentsList
+                  .filter(comp => viewMode === 'desktop' ? comp.desktopSize : comp.mobileSize)
+                  .map((comp) => (
+                    <div
+                      key={comp.id}
+                      className="comp-card"
+                      draggable
+                      onDragStart={(e) => handleDragStartSidebar(e, comp)}
+                      title={comp.notes || comp.name}
+                    >
+                      <div className="comp-card-icon">{getIcon(comp.type)}</div>
+                      <span className="comp-card-label">{comp.name}</span>
+                    </div>
+                  ))}
+              </div>
             </div>
           </div>
         )}
