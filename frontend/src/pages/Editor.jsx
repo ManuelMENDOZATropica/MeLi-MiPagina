@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Monitor, Smartphone, GripVertical, Trash2, Image as ImageIcon, Layout, Type, Video, Search, MapPin, Tag, ChevronDown, Bell, ShoppingCart, User, AlignCenter, MoveHorizontal, ListMinus, AlignJustify, CornerDownLeft, ArrowLeft, CheckCircle2, Play, Edit3, Eye, EyeOff, Layers, Grid, Settings, ArrowRight } from 'lucide-react';
+import { Monitor, Smartphone, GripVertical, Trash2, Image as ImageIcon, Layout, Type, Video, Search, MapPin, Tag, ChevronDown, Bell, ShoppingCart, User, AlignCenter, MoveHorizontal, ListMinus, AlignJustify, CornerDownLeft, ArrowLeft, CheckCircle2, Play, Edit3, Eye, EyeOff, Layers, Grid, Settings, ArrowRight, FileDown } from 'lucide-react';
 import { componentsList } from '../componentsData';
 import API_URL from '../api';
 import '../index.css';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 // Paleta de colores por colaborador (owner = índice 0)
 const COLLAB_COLORS = [
@@ -281,6 +283,8 @@ function Editor() {
   const [uploadTargetId, setUploadTargetId] = useState(null);
   const [uploadIndex, setUploadIndex] = useState(0);
   const fileInputRef = useRef(null);
+  const pdfCanvasRef = useRef(null); // ref al contenido del canvas para exportar
+  const [isExporting, setIsExporting] = useState(false);
 
   const [isHoveringText, setIsHoveringText] = useState(false);
   const [editingField, setEditingField] = useState({ id: null, field: null });
@@ -389,6 +393,34 @@ function Editor() {
     projectCollabs.find(c => c.id === userId)?.color ?? null;
 
   const unreadCount = notifications.filter(n => !n.read).length;
+
+  // Exportar el canvas como PDF
+  const exportToPdf = async () => {
+    if (!pdfCanvasRef.current || isExporting) return;
+    setIsExporting(true);
+    try {
+      const el = pdfCanvasRef.current;
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+      });
+      const imgData = canvas.toDataURL('image/jpeg', 0.92);
+      const pdf = new jsPDF({
+        orientation: el.offsetWidth > el.offsetHeight ? 'landscape' : 'portrait',
+        unit: 'px',
+        format: [el.offsetWidth, el.offsetHeight],
+        hotfixes: ['px_scaling']
+      });
+      pdf.addImage(imgData, 'JPEG', 0, 0, el.offsetWidth, el.offsetHeight);
+      pdf.save(`${projectTitle.replace(/\s+/g, '_')}_maqueta.pdf`);
+    } catch (e) {
+      console.error('Error exportando PDF:', e);
+    }
+    setIsExporting(false);
+  };
 
   // Renderiza texto con @menciones resaltadas
   const renderCommentText = (text) => {
@@ -1253,6 +1285,20 @@ function Editor() {
             {isPreviewMode ? <><Edit3 size={14} /> Editor</> : <><Play size={14} /> Preview</>}
           </button>
 
+          {/* Botón Exportar PDF — solo en preview */}
+          {isPreviewMode && (
+            <button
+              onClick={exportToPdf}
+              disabled={isExporting}
+              style={{ background: isExporting ? 'rgba(16,185,129,0.1)' : 'rgba(16,185,129,0.15)', color: '#34d399', border: '1px solid rgba(52,211,153,0.35)', padding: '6px 14px', borderRadius: '6px', cursor: isExporting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '700', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.06em', transition: 'all 0.2s', opacity: isExporting ? 0.6 : 1 }}
+              onMouseEnter={e => { if (!isExporting) e.currentTarget.style.background = 'rgba(16,185,129,0.25)'; }}
+              onMouseLeave={e => { if (!isExporting) e.currentTarget.style.background = 'rgba(16,185,129,0.15)'; }}
+            >
+              <FileDown size={14} />
+              {isExporting ? 'Exportando…' : 'Exportar PDF'}
+            </button>
+          )}
+
           <button
             onClick={async () => {
               setIsPublishing(true);
@@ -1436,7 +1482,7 @@ function Editor() {
 
           <div className="canvas-container" onMouseDown={handleMouseDown} ref={containerRef}>
             <div style={{ width: (viewMode === 'desktop' ? 1920 : 375) * scale, display: 'flex', justifyContent: 'center', transition: 'width 0.3s ease' }}>
-              <div className={`canvas-wrapper ${viewMode}`} style={{ transform: `scale(${scale})`, transformOrigin: 'top center' }}>
+              <div className={`canvas-wrapper ${viewMode}`} ref={pdfCanvasRef} style={{ transform: `scale(${scale})`, transformOrigin: 'top center' }}>
                 <div className={`meli-header-container ${viewMode === 'mobile' ? 'mobile-header' : ''}`}>
                   <div className="meli-header-top">
                     <div className="meli-logo"><img src="https://http2.mlstatic.com/frontend-assets/ml-web-navigation/ui-navigation/6.6.73/mercadolibre/logo_large_25years_v2.png" alt="Mercado Libre" /></div>
