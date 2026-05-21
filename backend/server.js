@@ -131,6 +131,30 @@ app.post('/api/auth/google', async (req, res) => {
 
 
 // =======================
+// RUTAS DE USUARIOS
+// =======================
+app.get('/api/users', authenticateToken, async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      where: {
+        id: { not: req.user.id }
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        avatar: true
+      },
+      orderBy: { name: 'asc' }
+    });
+    res.json(users);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error fetching users' });
+  }
+});
+
+// =======================
 // RUTAS DE PROYECTOS (API REST)
 // =======================
 
@@ -138,11 +162,25 @@ app.post('/api/auth/google', async (req, res) => {
 app.get('/api/projects', authenticateToken, async (req, res) => {
   try {
     const projects = await prisma.project.findMany({
-      where: { userId: req.user.id },
+      where: {
+        OR: [
+          { userId: req.user.id },
+          { editors: { some: { userId: req.user.id } } }
+        ]
+      },
+      include: {
+        user: { select: { id: true, name: true, email: true, avatar: true } },
+        editors: {
+          include: {
+            user: { select: { id: true, name: true, email: true, avatar: true } }
+          }
+        }
+      },
       orderBy: { updatedAt: 'desc' }
     });
     res.json(projects);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: 'Error fetching projects' });
   }
 });
@@ -150,18 +188,30 @@ app.get('/api/projects', authenticateToken, async (req, res) => {
 // 2. Crear un nuevo proyecto en blanco
 app.post('/api/projects', authenticateToken, async (req, res) => {
   try {
-    const { title } = req.body;
+    const { title, editorIds } = req.body;
     const newProject = await prisma.project.create({
       data: {
         title: title || 'Nuevo Proyecto de Landing',
         desktopLayout: [],
         mobileLayout: [],
         canvasNodes: {},
-        userId: req.user.id
+        userId: req.user.id,
+        editors: {
+          create: Array.isArray(editorIds) ? editorIds.map(userId => ({ userId })) : []
+        }
+      },
+      include: {
+        user: { select: { id: true, name: true, email: true, avatar: true } },
+        editors: {
+          include: {
+            user: { select: { id: true, name: true, email: true, avatar: true } }
+          }
+        }
       }
     });
     res.json(newProject);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: 'Error creating project' });
   }
 });
@@ -169,13 +219,28 @@ app.post('/api/projects', authenticateToken, async (req, res) => {
 // 3. Obtener un proyecto específico (para el Editor)
 app.get('/api/projects/:id', authenticateToken, async (req, res) => {
   try {
-    const project = await prisma.project.findUnique({
-      where: { id: req.params.id, userId: req.user.id }
+    const project = await prisma.project.findFirst({
+      where: {
+        id: req.params.id,
+        OR: [
+          { userId: req.user.id },
+          { editors: { some: { userId: req.user.id } } }
+        ]
+      },
+      include: {
+        user: { select: { id: true, name: true, email: true, avatar: true } },
+        editors: {
+          include: {
+            user: { select: { id: true, name: true, email: true, avatar: true } }
+          }
+        }
+      }
     });
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    if (!project) return res.status(404).json({ error: 'Project not found or unauthorized' });
     
     res.json(project);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: 'Error fetching project' });
   }
 });
@@ -191,8 +256,19 @@ app.patch('/api/projects/:id', authenticateToken, async (req, res) => {
     if (canvasNodes !== undefined) updateData.canvasNodes = canvasNodes;
     if (title !== undefined) updateData.title = title;
 
+    const existingProject = await prisma.project.findFirst({
+      where: {
+        id: req.params.id,
+        OR: [
+          { userId: req.user.id },
+          { editors: { some: { userId: req.user.id } } }
+        ]
+      }
+    });
+    if (!existingProject) return res.status(404).json({ error: 'Project not found or unauthorized' });
+
     const project = await prisma.project.update({
-      where: { id: req.params.id, userId: req.user.id },
+      where: { id: req.params.id },
       data: updateData
     });
     
@@ -206,11 +282,19 @@ app.patch('/api/projects/:id', authenticateToken, async (req, res) => {
 // 5. Eliminar proyecto
 app.delete('/api/projects/:id', authenticateToken, async (req, res) => {
   try {
+    const project = await prisma.project.findUnique({
+      where: { id: req.params.id }
+    });
+    
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    if (project.userId !== req.user.id) return res.status(403).json({ error: 'Only the project owner can delete it' });
+
     await prisma.project.delete({
-      where: { id: req.params.id, userId: req.user.id }
+      where: { id: req.params.id }
     });
     res.json({ success: true });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: 'Error deleting project' });
   }
 });
@@ -230,10 +314,16 @@ const getUniqueSlug = async () => {
 
 app.post('/api/projects/:id/publish', authenticateToken, async (req, res) => {
   try {
-    const project = await prisma.project.findUnique({
-      where: { id: req.params.id, userId: req.user.id }
+    const project = await prisma.project.findFirst({
+      where: {
+        id: req.params.id,
+        OR: [
+          { userId: req.user.id },
+          { editors: { some: { userId: req.user.id } } }
+        ]
+      }
     });
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    if (!project) return res.status(404).json({ error: 'Project not found or unauthorized' });
 
     const willPublish = !project.isPublished;
     // Generar slug solo si va a publicarse y aún no tiene uno

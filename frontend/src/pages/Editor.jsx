@@ -5,6 +5,18 @@ import { componentsList } from '../componentsData';
 import API_URL from '../api';
 import '../index.css';
 
+// Paleta de colores por colaborador (owner = índice 0)
+const COLLAB_COLORS = [
+  '#fff159', // owner → amarillo MeLi
+  '#3483fa', // azul
+  '#10b981', // verde
+  '#f59e0b', // naranja
+  '#ec4899', // rosa
+  '#8b5cf6', // violeta
+  '#06b6d4', // cyan
+  '#ef4444', // rojo
+];
+
 
 // Helper icon selector
 const getIcon = (type) => {
@@ -85,6 +97,7 @@ function Editor() {
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [textEditorPanel, setTextEditorPanel] = useState(null); // { item, x, y }
+  const [projectCollabs, setProjectCollabs] = useState([]); // [{id,name,email,avatar,color}]
 
   // Global Upload State
   const [uploadTargetId, setUploadTargetId] = useState(null);
@@ -125,6 +138,15 @@ function Editor() {
           });
           setIsPublished(data.isPublished || false);
           if (data.slug) setPublishedSlug(data.slug);
+          // Construir lista de colaboradores con colores asignados
+          const collabs = [
+            data.user ? { ...data.user, color: COLLAB_COLORS[0] } : null,
+            ...((data.editors || []).map((e, i) => ({
+              ...e.user,
+              color: COLLAB_COLORS[(i + 1) % COLLAB_COLORS.length]
+            })))
+          ].filter(Boolean);
+          setProjectCollabs(collabs);
           // Esperamos un momento para que el setState no dispare el AutoGuardado
           setTimeout(() => { isInitialLoad.current = false; }, 1000);
         })
@@ -173,6 +195,10 @@ function Editor() {
       return { ...prev, [viewMode]: newItems };
     });
   };
+
+  // Devuelve el color del colaborador que agregó un elemento
+  const getCollabColor = (userId) =>
+    projectCollabs.find(c => c.id === userId)?.color ?? null;
 
   const triggerUpload = (uniqueId) => {
     setUploadTargetId(uniqueId);
@@ -428,7 +454,7 @@ function Editor() {
     if (componentId) {
       const component = componentsList.find(c => c.id === componentId);
       if (component) {
-        const newItem = { ...component, uniqueId: 'comp-' + Date.now() + Math.random() };
+        const newItem = { ...component, uniqueId: 'comp-' + Date.now() + Math.random(), addedBy: user?.id };
 
         let itemsToAdd = [newItem];
         if (forceBottom) {
@@ -726,6 +752,20 @@ function Editor() {
             <Trash2 size={16} />
           </button>
         )}
+        {!isPreviewMode && item.addedBy && getCollabColor(item.addedBy) && (
+          <div
+            title={projectCollabs.find(c => c.id === item.addedBy)?.name || ''}
+            style={{
+              position: 'absolute', bottom: '6px', right: '8px',
+              width: '10px', height: '10px', borderRadius: '50%',
+              background: getCollabColor(item.addedBy),
+              border: '2px solid rgba(255,255,255,0.9)',
+              zIndex: 20,
+              boxShadow: '0 1px 4px rgba(0,0,0,0.35)',
+              pointerEvents: 'none'
+            }}
+          />
+        )}
         <div
           className="component-placeholder"
           style={{ height: `${height}px`, width: '100%', position: 'relative', padding: 0 }}
@@ -973,18 +1013,46 @@ function Editor() {
             );
           })()}
 
-          {user && (
+          {projectCollabs.length > 0 && (
             <div style={{ width: '1px', height: '24px', background: 'rgba(255,255,255,0.1)', margin: '0 2px' }} />
           )}
-          {user && (
-            (user.picture || user.avatar) ? (
-              <img src={user.picture || user.avatar} alt={user.name || 'Avatar'} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #fff159' }} />
-            ) : (
-              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#fff159', color: '#1a1f2e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '14px' }}>
-                {(user.name || user.email || 'U').charAt(0).toUpperCase()}
+          {/* Avatares de todos los colaboradores con anillo de color */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {projectCollabs.map((collab) => (
+              <div
+                key={collab.id}
+                title={collab.name || collab.email}
+                style={{
+                  width: '32px', height: '32px', borderRadius: '50%',
+                  border: `2.5px solid ${collab.color}`,
+                  overflow: 'hidden', flexShrink: 0,
+                  boxShadow: `0 0 0 1px rgba(0,0,0,0.3), 0 0 8px ${collab.color}55`,
+                  transition: 'transform 0.15s',
+                  cursor: 'default'
+                }}
+                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.12)'}
+                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+              >
+                {(collab.picture || collab.avatar) ? (
+                  <img
+                    src={collab.picture || collab.avatar}
+                    alt={collab.name || 'Avatar'}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <div style={{
+                    width: '100%', height: '100%',
+                    background: collab.color === '#fff159' ? '#fff159' : collab.color,
+                    color: collab.color === '#fff159' ? '#1a1f2e' : 'white',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontWeight: '800', fontSize: '13px'
+                  }}>
+                    {(collab.name || collab.email || 'U').charAt(0).toUpperCase()}
+                  </div>
+                )}
               </div>
-            )
-          )}
+            ))}
+          </div>
         </div>
       </div>
 

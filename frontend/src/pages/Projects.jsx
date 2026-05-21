@@ -14,6 +14,8 @@ function Projects() {
   const [newProjectName, setNewProjectName] = useState('');
   const [createError, setCreateError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [selectedEditors, setSelectedEditors] = useState([]);
 
   useEffect(() => {
     const savedUser = localStorage.getItem('tropica_user');
@@ -36,15 +38,48 @@ function Projects() {
     navigate('/login');
   };
 
+  const handleOpenCreateModal = async () => {
+    setNewProjectName('');
+    setCreateError('');
+    setSelectedEditors([]);
+    setShowCreateModal(true);
+
+    // Leer token directamente del localStorage para evitar problemas de estado
+    const saved = localStorage.getItem('tropica_user');
+    const parsed = saved ? JSON.parse(saved) : null;
+    const token = parsed?.token;
+
+    if (!token) {
+      console.error('No hay token en localStorage');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/api/users`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setUsers(data);
+      } else {
+        const err = await response.json().catch(() => ({}));
+        console.error('Error al obtener usuarios:', response.status, err);
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    }
+  };
+
   const handleNewProject = async () => {
     const name = newProjectName.trim();
     if (name.length < 2) { setCreateError('El nombre debe tener al menos 2 caracteres.'); return; }
     setIsCreating(true);
+    const token = JSON.parse(localStorage.getItem('tropica_user'))?.token;
     try {
       const response = await fetch(`${API_URL}/api/projects`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${user.token}` },
-        body: JSON.stringify({ title: name })
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ title: name, editorIds: selectedEditors })
       });
       const newProject = await response.json();
       navigate(`/editor/${newProject.id}`);
@@ -248,7 +283,7 @@ function Projects() {
 
           <div className="proj-grid">
             {/* New Project */}
-            <div className="proj-card-new" onClick={() => { setNewProjectName(''); setCreateError(''); setShowCreateModal(true); }}>
+            <div className="proj-card-new" onClick={handleOpenCreateModal}>
               <div className="proj-card-new-icon"><Plus size={22} /></div>
               <span className="proj-card-new-label">Nuevo Proyecto</span>
             </div>
@@ -259,17 +294,51 @@ function Projects() {
                 <div className="proj-card-thumb">
                   <div className="proj-card-thumb-pattern" />
                   <div className="proj-card-thumb-accent" />
-                  <button
-                    className="proj-card-delete"
-                    onClick={e => { e.stopPropagation(); setProjectToDelete(proj); setDeleteConfirmText(''); }}
-                    title="Eliminar proyecto"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                  {proj.userId === (user.user?.id || user.id) && (
+                    <button
+                      className="proj-card-delete"
+                      onClick={e => { e.stopPropagation(); setProjectToDelete(proj); setDeleteConfirmText(''); }}
+                      title="Eliminar proyecto"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                 </div>
                 <div className="proj-card-body">
                   <p className="proj-card-name">{proj.title}</p>
                   <p className="proj-card-meta">{getTypeLabel(proj)}</p>
+                  
+                  {/* Collaborators / Ownership info */}
+                  <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '24px' }}>
+                    {proj.userId === (user.user?.id || user.id) ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: '600', color: '#3483fa', background: '#e6f0ff', padding: '3px 8px', borderRadius: '10px' }}>Propietario</span>
+                        {proj.editors && proj.editors.length > 0 && (
+                          <div style={{ display: 'flex', marginLeft: '6px' }}>
+                            {proj.editors.slice(0, 3).map((ed, idx) => (
+                              <div key={ed.user.id} title={ed.user.name || ed.user.email} style={{ width: '20px', height: '20px', borderRadius: '50%', border: '2px solid white', marginLeft: idx > 0 ? '-8px' : '0', zIndex: 3 - idx, background: '#fff159', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: 'bold', overflow: 'hidden' }}>
+                                {ed.user.avatar ? <img src={ed.user.avatar} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (ed.user.name || ed.user.email || 'U').charAt(0).toUpperCase()}
+                              </div>
+                            ))}
+                            {proj.editors.length > 3 && <div style={{ width: '20px', height: '20px', borderRadius: '50%', border: '2px solid white', marginLeft: '-8px', background: '#e0e5ef', fontSize: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6b7280', zIndex: 0 }}>+{proj.editors.length - 3}</div>}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: '600', color: '#e74c3c', background: '#fcebea', padding: '3px 8px', borderRadius: '10px' }}>Editor</span>
+                        {proj.user && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#6b7280' }}>
+                            <span>de</span>
+                            <div title={proj.user.name || proj.user.email} style={{ width: '18px', height: '18px', borderRadius: '50%', background: '#fff159', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: 'bold', overflow: 'hidden' }}>
+                              {proj.user.avatar ? <img src={proj.user.avatar} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (proj.user.name || proj.user.email || 'U').charAt(0).toUpperCase()}
+                            </div>
+                            <span style={{ maxWidth: '60px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{proj.user.name || proj.user.email.split('@')[0]}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -325,6 +394,44 @@ function Projects() {
                 className="proj-modal-input"
               />
               {createError ? <p className="proj-modal-error">{createError}</p> : <p className="proj-modal-hint">Mínimo 2 · Máximo 80 caracteres</p>}
+              
+              <label className="proj-modal-label" style={{ marginTop: '20px' }}>Compartir con editores (Opcional)</label>
+              <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1.5px solid #e0e5ef', borderRadius: '8px', padding: '6px', background: '#f8f9fc', marginBottom: '8px' }}>
+                {users.length === 0 ? (
+                  <p style={{ fontSize: '12px', color: '#9ba3b5', textAlign: 'center', margin: '20px 0' }}>No hay otros usuarios disponibles.</p>
+                ) : (
+                  users.map(u => (
+                    <div 
+                      key={u.id}
+                      onClick={() => {
+                        setSelectedEditors(prev => 
+                          prev.includes(u.id) ? prev.filter(id => id !== u.id) : [...prev, u.id]
+                        );
+                      }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '10px', padding: '8px',
+                        cursor: 'pointer', borderRadius: '6px',
+                        background: selectedEditors.includes(u.id) ? '#e6f0ff' : 'transparent',
+                        border: selectedEditors.includes(u.id) ? '1px solid #3483fa' : '1px solid transparent',
+                        marginBottom: '4px', transition: 'all 0.15s'
+                      }}
+                    >
+                      {u.avatar ? (
+                        <img src={u.avatar} alt={u.name} style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} />
+                      ) : (
+                        <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#fff159', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold' }}>
+                          {(u.name || u.email || 'U').charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '13px', fontWeight: '600', color: '#1a1f2e' }}>{u.name || 'Usuario'}</span>
+                        <span style={{ fontSize: '11px', color: '#6b7280' }}>{u.email}</span>
+                      </div>
+                      {selectedEditors.includes(u.id) && <div style={{ marginLeft: 'auto', color: '#3483fa', fontWeight: 'bold' }}>✓</div>}
+                    </div>
+                  ))
+                )}
+              </div>
               <div className="proj-modal-actions">
                 <button onClick={() => setShowCreateModal(false)} className="proj-btn-secondary">Cancelar</button>
                 <button onClick={handleNewProject} disabled={isCreating} className="proj-btn-primary">
