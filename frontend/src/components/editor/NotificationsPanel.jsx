@@ -28,8 +28,8 @@ export function NotificationsPanel({
       {showNotifPanel && (
         <div style={{ position: 'absolute', top: '44px', right: 0, width: '300px', background: 'white', borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.18)', border: '1px solid #e0e5ef', zIndex: 9999, overflow: 'hidden' }}>
           <div style={{ padding: '12px 16px', background: '#1a1f2e', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ color: 'white', fontWeight: '800', fontSize: '13px' }}>🔔 Notificaciones</span>
-            <button onClick={() => setShowNotifPanel(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '16px' }}>✕</button>
+            <span style={{ color: 'white', fontWeight: '800', fontSize: '13px' }}>= Notificaciones</span>
+            <button onClick={() => setShowNotifPanel(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '16px' }}></button>
           </div>
           <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
             {notifications.length === 0 ? (
@@ -48,11 +48,11 @@ export function NotificationsPanel({
                 {!n.read && <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#3483fa', marginTop: '5px', flexShrink: 0 }} />}
                 <div style={{ flex: 1 }}>
                   <p style={{ margin: '0 0 2px', fontSize: '12px', fontWeight: '700', color: '#1a1f2e' }}>
-                    {n.comment.author.name} te mencionó
+                    {n.comment.author.name} te mencion�
                   </p>
                   <p style={{ margin: '0 0 2px', fontSize: '11px', color: '#6b7280' }}>en "{n.comment.project.title}"</p>
                   <p style={{ margin: 0, fontSize: '12px', color: '#4b5563', fontStyle: 'italic' }}>
-                    «{n.comment.text.slice(0, 60)}{n.comment.text.length > 60 ? '…' : ''}»
+                    �{n.comment.text.slice(0, 60)}{n.comment.text.length > 60 ? '&' : ''}�
                   </p>
                 </div>
               </div>

@@ -22,12 +22,12 @@ export function MaiaPanel({
           <p style={{ margin: 0, color: 'white', fontWeight: '800', fontSize: '13px' }}>Excepciones creativas</p>
           <p style={{ margin: 0, color: 'rgba(255,255,255,0.4)', fontSize: '10px' }}>Palabras que MAIA no marca como error</p>
         </div>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '16px' }}>✕</button>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '16px' }}></button>
       </div>
 
       {/* Form agregar */}
       <div style={{ padding: '12px 14px', borderBottom: '1px solid #f0f2f7', background: '#faf5ff' }}>
-        <p style={{ margin: '0 0 8px', fontSize: '10px', fontWeight: '700', color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.07em' }}>+ Agregar excepción</p>
+        <p style={{ margin: '0 0 8px', fontSize: '10px', fontWeight: '700', color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.07em' }}>+ Agregar excepci�n</p>
         <input value={newExWord} onChange={e => setNewExWord(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') addException(); }}
           placeholder='Palabra exacta (ej: "Ofertass")'
@@ -35,12 +35,12 @@ export function MaiaPanel({
           onFocus={e => e.target.style.borderColor = '#8b5cf6'} onBlur={e => e.target.style.borderColor = '#ddd6fe'} />
         <input value={newExReason} onChange={e => setNewExReason(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') addException(); }}
-          placeholder='Razón creativa (opcional)'
+          placeholder='Raz�n creativa (opcional)'
           style={{ width: '100%', fontSize: '12px', border: '1.5px solid #ddd6fe', borderRadius: '6px', padding: '6px 8px', outline: 'none', marginBottom: '8px', boxSizing: 'border-box', fontFamily: 'inherit', background: 'white' }}
           onFocus={e => e.target.style.borderColor = '#8b5cf6'} onBlur={e => e.target.style.borderColor = '#ddd6fe'} />
         <button disabled={!newExWord.trim() || newExLoading} onClick={addException}
           style={{ width: '100%', background: !newExWord.trim() ? '#ede9fe' : '#7c3aed', color: !newExWord.trim() ? '#a78bfa' : 'white', border: 'none', borderRadius: '6px', padding: '7px', fontSize: '12px', fontWeight: '800', cursor: newExWord.trim() ? 'pointer' : 'default', transition: 'all 0.15s' }}>
-          {newExLoading ? 'Guardando...' : 'Guardar excepción'}
+          {newExLoading ? 'Guardando...' : 'Guardar excepci�n'}
         </button>
       </div>
 
@@ -56,7 +56,7 @@ export function MaiaPanel({
                   onKeyDown={e => { if (e.key === 'Enter') editException(ex.id); if (e.key === 'Escape') setEditingExId(null); }}
                   style={{ width: '100%', fontSize: '12px', fontFamily: 'monospace', border: '1.5px solid #8b5cf6', borderRadius: '6px', padding: '5px 8px', outline: 'none', marginBottom: '5px', boxSizing: 'border-box' }} />
                 <input value={editReason} onChange={e => setEditReason(e.target.value)}
-                  placeholder='Razón creativa (opcional)'
+                  placeholder='Raz�n creativa (opcional)'
                   onKeyDown={e => { if (e.key === 'Enter') editException(ex.id); if (e.key === 'Escape') setEditingExId(null); }}
                   style={{ width: '100%', fontSize: '11px', border: '1.5px solid #ddd6fe', borderRadius: '6px', padding: '5px 8px', outline: 'none', marginBottom: '7px', boxSizing: 'border-box', fontFamily: 'inherit' }}
                   onFocus={e => e.target.style.borderColor = '#8b5cf6'} onBlur={e => e.target.style.borderColor = '#ddd6fe'} />
@@ -70,18 +70,18 @@ export function MaiaPanel({
             ) : (
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                 <div style={{ flex: 1 }}>
-                  <p style={{ margin: 0, fontSize: '13px', fontWeight: '700', color: '#1a1f2e', fontFamily: 'monospace' }}>«{ex.word}»</p>
+                  <p style={{ margin: 0, fontSize: '13px', fontWeight: '700', color: '#1a1f2e', fontFamily: 'monospace' }}>�{ex.word}�</p>
                   {ex.reason && <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#6b7280', fontStyle: 'italic' }}>{ex.reason}</p>}
                   <p style={{ margin: '2px 0 0', fontSize: '10px', color: '#b0b9cc' }}>{new Date(ex.createdAt).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
                 </div>
-                <button onClick={() => { setEditingExId(ex.id); setEditWord(ex.word); setEditReason(ex.reason || ''); }} title="Editar excepción"
+                <button onClick={() => { setEditingExId(ex.id); setEditWord(ex.word); setEditReason(ex.reason || ''); }} title="Editar excepci�n"
                   style={{ background: 'none', border: 'none', color: '#8b5cf6', cursor: 'pointer', fontSize: '13px', padding: '2px 4px', borderRadius: '4px', flexShrink: 0 }}
                   onMouseEnter={e => e.currentTarget.style.background = '#f5f3ff'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'none'}>✏</button>
-                <button onClick={() => deleteException(ex.id)} title="Eliminar excepción"
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}></button>
+                <button onClick={() => deleteException(ex.id)} title="Eliminar excepci�n"
                   style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '13px', padding: '2px 4px', flexShrink: 0, borderRadius: '4px' }}
                   onMouseEnter={e => e.currentTarget.style.background = '#fee2e2'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'none'}>🗑</button>
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}>=�</button>
               </div>
             )}
           </div>
