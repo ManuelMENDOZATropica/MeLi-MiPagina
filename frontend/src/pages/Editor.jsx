@@ -353,6 +353,13 @@ function Editor() {
   const [notifications, setNotifications] = useState([]);
   const [showNotifPanel, setShowNotifPanel] = useState(false);
 
+  // Excepciones creativas de MAIA
+  const [exceptions, setExceptions] = useState([]);
+  const [showMaiaPanel, setShowMaiaPanel] = useState(false);
+  const [newExWord, setNewExWord] = useState('');
+  const [newExReason, setNewExReason] = useState('');
+  const [newExLoading, setNewExLoading] = useState(false);
+
   // Global Upload State
   const [uploadTargetId, setUploadTargetId] = useState(null);
   const [uploadIndex, setUploadIndex] = useState(0);
@@ -421,6 +428,11 @@ function Editor() {
       fetch(`${API_URL}/api/notifications`, {
         headers: { 'Authorization': `Bearer ${parsed.token}` }
       }).then(r => r.ok ? r.json() : []).then(data => setNotifications(Array.isArray(data) ? data : []));
+
+      // Cargar excepciones creativas del proyecto
+      fetch(`${API_URL}/api/projects/${id}/exceptions`, {
+        headers: { 'Authorization': `Bearer ${parsed.token}` }
+      }).then(r => r.ok ? r.json() : []).then(data => setExceptions(Array.isArray(data) ? data : []));
 
       // Cargar todos los usuarios disponibles (para el + de colaboradores)
       fetch(`${API_URL}/api/users`, {
@@ -697,6 +709,9 @@ function Editor() {
       body: JSON.stringify({ word, reason, imageUrl, projectId: id, elementId })
     });
     const result = await res.json();
+    if (result.exception) {
+      setExceptions(prev => [result.exception, ...prev]);
+    }
     if (result.resolved) {
       // El backend resolvió el comentario porque ya no hay typos
       setComments(prev => prev.map(c => c.id === commentId ? { ...c, resolved: true } : c));
@@ -709,6 +724,31 @@ function Editor() {
       method: 'PATCH', headers: { 'Authorization': `Bearer ${tok}` }
     });
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  };
+
+  const addException = async () => {
+    if (!newExWord.trim()) return;
+    const tok = JSON.parse(localStorage.getItem('tropica_user'))?.token;
+    setNewExLoading(true);
+    const res = await fetch(`${API_URL}/api/projects/${id}/exceptions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tok}` },
+      body: JSON.stringify({ word: newExWord, reason: newExReason })
+    });
+    const ex = await res.json();
+    if (ex.id) {
+      setExceptions(prev => [ex, ...prev]);
+      setNewExWord(''); setNewExReason('');
+    }
+    setNewExLoading(false);
+  };
+
+  const deleteException = async (exId) => {
+    const tok = JSON.parse(localStorage.getItem('tropica_user'))?.token;
+    await fetch(`${API_URL}/api/exceptions/${exId}`, {
+      method: 'DELETE', headers: { 'Authorization': `Bearer ${tok}` }
+    });
+    setExceptions(prev => prev.filter(e => e.id !== exId));
   };
 
   const triggerUpload = (uniqueId) => {
@@ -1680,6 +1720,86 @@ function Editor() {
               </div>
             );
           })()}
+
+          {/* Botón MAIA — panel de excepciones creativas */}
+          <div style={{ position: 'relative' }}>
+            <button
+              id="maia-exceptions-btn"
+              onClick={() => setShowMaiaPanel(p => !p)}
+              title="Excepciones creativas de MAIA"
+              style={{ background: showMaiaPanel ? 'rgba(139,92,246,0.25)' : 'rgba(255,255,255,0.08)', border: showMaiaPanel ? '1px solid rgba(139,92,246,0.5)' : '1px solid transparent', color: 'white', cursor: 'pointer', padding: '3px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '34px', height: '34px', overflow: 'hidden', transition: 'all 0.18s', flexShrink: 0 }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(139,92,246,0.2)'}
+              onMouseLeave={e => e.currentTarget.style.background = showMaiaPanel ? 'rgba(139,92,246,0.25)' : 'rgba(255,255,255,0.08)'}
+            >
+              <img src="/MAIA.png" alt="MAIA" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+            </button>
+            {exceptions.length > 0 && (
+              <span style={{ position: 'absolute', top: '0px', right: '0px', background: '#8b5cf6', color: 'white', borderRadius: '50%', width: '14px', height: '14px', fontSize: '8px', fontWeight: '800', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid #1a1f2e' }}>{exceptions.length > 9 ? '9+' : exceptions.length}</span>
+            )}
+            {showMaiaPanel && (
+              <div style={{ position: 'absolute', top: '44px', right: 0, width: '320px', background: 'white', borderRadius: '14px', boxShadow: '0 8px 40px rgba(0,0,0,0.22)', border: '1px solid #e0e5ef', zIndex: 9999, overflow: 'hidden', fontFamily: "'Inter', sans-serif" }}>
+                {/* Header */}
+                <div style={{ background: '#1a1f2e', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <img src="/MAIA.png" alt="MAIA" style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #8b5cf6' }} />
+                  <div style={{ flex: 1 }}>
+                    <p style={{ margin: 0, color: 'white', fontWeight: '800', fontSize: '13px' }}>Excepciones creativas</p>
+                    <p style={{ margin: 0, color: 'rgba(255,255,255,0.4)', fontSize: '10px' }}>Palabras que MAIA no marca como error</p>
+                  </div>
+                  <button onClick={() => setShowMaiaPanel(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '16px' }}>✕</button>
+                </div>
+
+                {/* Form agregar */}
+                <div style={{ padding: '12px 14px', borderBottom: '1px solid #f0f2f7', background: '#faf5ff' }}>
+                  <p style={{ margin: '0 0 8px', fontSize: '10px', fontWeight: '700', color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.07em' }}>+ Agregar excepción</p>
+                  <input
+                    value={newExWord}
+                    onChange={e => setNewExWord(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') addException(); }}
+                    placeholder='Palabra exacta (ej: "Ofertass")'
+                    style={{ width: '100%', fontSize: '12px', border: '1.5px solid #ddd6fe', borderRadius: '6px', padding: '6px 8px', outline: 'none', marginBottom: '6px', boxSizing: 'border-box', fontFamily: 'inherit', background: 'white' }}
+                    onFocus={e => e.target.style.borderColor = '#8b5cf6'}
+                    onBlur={e => e.target.style.borderColor = '#ddd6fe'}
+                  />
+                  <input
+                    value={newExReason}
+                    onChange={e => setNewExReason(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') addException(); }}
+                    placeholder='Razón creativa (opcional)'
+                    style={{ width: '100%', fontSize: '12px', border: '1.5px solid #ddd6fe', borderRadius: '6px', padding: '6px 8px', outline: 'none', marginBottom: '8px', boxSizing: 'border-box', fontFamily: 'inherit', background: 'white' }}
+                    onFocus={e => e.target.style.borderColor = '#8b5cf6'}
+                    onBlur={e => e.target.style.borderColor = '#ddd6fe'}
+                  />
+                  <button
+                    disabled={!newExWord.trim() || newExLoading}
+                    onClick={addException}
+                    style={{ width: '100%', background: !newExWord.trim() ? '#ede9fe' : '#7c3aed', color: !newExWord.trim() ? '#a78bfa' : 'white', border: 'none', borderRadius: '6px', padding: '7px', fontSize: '12px', fontWeight: '800', cursor: newExWord.trim() ? 'pointer' : 'default', transition: 'all 0.15s' }}
+                  >{newExLoading ? 'Guardando...' : 'Guardar excepción'}</button>
+                </div>
+
+                {/* Lista */}
+                <div style={{ maxHeight: '280px', overflowY: 'auto' }}>
+                  {exceptions.length === 0 ? (
+                    <p style={{ color: '#9ba3b5', fontSize: '12px', textAlign: 'center', padding: '20px 16px', margin: 0 }}>Sin excepciones registradas</p>
+                  ) : exceptions.map(ex => (
+                    <div key={ex.id} style={{ padding: '10px 14px', borderBottom: '1px solid #f0f2f7', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                      <div style={{ flex: 1 }}>
+                        <p style={{ margin: 0, fontSize: '13px', fontWeight: '700', color: '#1a1f2e', fontFamily: 'monospace' }}">«{ex.word}»</p>
+                        {ex.reason && <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#6b7280', fontStyle: 'italic' }}>{ex.reason}</p>}
+                        <p style={{ margin: '2px 0 0', fontSize: '10px', color: '#b0b9cc' }}>{new Date(ex.createdAt).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                      </div>
+                      <button
+                        onClick={() => deleteException(ex.id)}
+                        title="Eliminar excepción"
+                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '14px', padding: '2px 4px', flexShrink: 0, borderRadius: '4px' }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#fee2e2'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                      >🗑</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Campana de notificaciones */}
           <div style={{ position: 'relative' }}>

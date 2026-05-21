@@ -546,8 +546,35 @@ app.post('/api/check-typos-only', authenticateToken, async (req, res) => {
 
 // GET excepciones de un proyecto
 app.get('/api/projects/:id/exceptions', authenticateToken, async (req, res) => {
-  const exceptions = await prisma.typoException.findMany({ where: { projectId: req.params.id } });
+  const exceptions = await prisma.typoException.findMany({
+    where: { projectId: req.params.id },
+    orderBy: { createdAt: 'desc' }
+  });
   res.json(exceptions);
+});
+
+// POST agregar excepción manualmente (desde el panel de gestión, sin comentario)
+app.post('/api/projects/:id/exceptions', authenticateToken, async (req, res) => {
+  const { word, reason } = req.body;
+  if (!word?.trim()) return res.status(400).json({ error: 'Falta la palabra' });
+  try {
+    const exception = await prisma.typoException.create({
+      data: { projectId: req.params.id, word: word.trim(), reason: reason?.trim() || null }
+    });
+    res.json(exception);
+  } catch (e) {
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// DELETE eliminar excepción
+app.delete('/api/exceptions/:id', authenticateToken, async (req, res) => {
+  try {
+    await prisma.typoException.delete({ where: { id: req.params.id } });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(404).json({ error: 'Excepción no encontrada' });
+  }
 });
 
 // POST crear excepción + re-verificar el comentario MAIA
