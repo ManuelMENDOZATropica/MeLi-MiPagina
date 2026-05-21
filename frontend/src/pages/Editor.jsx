@@ -7,6 +7,7 @@ import '../index.css';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import ReactMarkdown from 'react-markdown';
+import { io as socketIO } from 'socket.io-client';
 
 // Paleta de colores por colaborador (owner = índice 0)
 const COLLAB_COLORS = [
@@ -443,6 +444,60 @@ function Editor() {
       }).then(r => r.ok ? r.json() : []).then(data => setAllUsers(Array.isArray(data) ? data : []));
     }
   }, [id, navigate]);
+
+  // ── Socket.io: tiempo real ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (!id || !token) return;
+    const currentUserId = JSON.parse(localStorage.getItem('tropica_user'))?.user?.id;
+
+    const socket = socketIO(API_URL, { transports: ['websocket', 'polling'] });
+    socket.emit('join-project', id);
+
+    // ─ Comentarios ──────────────────────────────────────────────
+    socket.on('comment:new', (comment) => {
+      // Deduplicar: solo agregar si no existe (el autor ya lo tiene en su state)
+      setComments(prev => prev.some(c => c.id === comment.id) ? prev : [...prev, comment]);
+    });
+
+    socket.on('comment:resolved', (updated) => {
+      setComments(prev => prev.map(c => c.id === updated.id ? updated : c));
+    });
+
+    socket.on('comment:deleted', ({ id: deletedId, parentId }) => {
+      if (parentId) {
+        setComments(prev => prev.map(c =>
+          c.id === parentId ? { ...c, replies: (c.replies || []).filter(r => r.id !== deletedId) } : c
+        ));
+      } else {
+        setComments(prev => prev.filter(c => c.id !== deletedId));
+      }
+    });
+
+    // ─ Notificaciones ──────────────────────────────────────────
+    socket.on('notification:new', (notif) => {
+      // Solo mostrar si la notificación es para el usuario actual
+      if (notif.userId !== currentUserId) return;
+      setNotifications(prev => prev.some(n => n.id === notif.id) ? prev : [notif, ...prev]);
+    });
+
+    // ─ Excepciones ─────────────────────────────────────────────
+    socket.on('exception:new', (ex) => {
+      setExceptions(prev => prev.some(e => e.id === ex.id) ? prev : [ex, ...prev]);
+    });
+
+    socket.on('exception:updated', (ex) => {
+      setExceptions(prev => prev.map(e => e.id === ex.id ? ex : e));
+    });
+
+    socket.on('exception:deleted', ({ id: exId }) => {
+      setExceptions(prev => prev.filter(e => e.id !== exId));
+    });
+
+    return () => {
+      socket.emit('leave-project', id);
+      socket.disconnect();
+    };
+  }, [id, token]);
 
   // Autoguardado silencioso con Debounce (espera 1.5s sin cambios para guardar)
   useEffect(() => {
