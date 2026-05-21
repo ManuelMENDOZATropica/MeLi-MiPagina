@@ -359,6 +359,9 @@ function Editor() {
   const [newExWord, setNewExWord] = useState('');
   const [newExReason, setNewExReason] = useState('');
   const [newExLoading, setNewExLoading] = useState(false);
+  const [editingExId, setEditingExId] = useState(null);
+  const [editWord, setEditWord] = useState('');
+  const [editReason, setEditReason] = useState('');
 
   // Global Upload State
   const [uploadTargetId, setUploadTargetId] = useState(null);
@@ -749,6 +752,21 @@ function Editor() {
       method: 'DELETE', headers: { 'Authorization': `Bearer ${tok}` }
     });
     setExceptions(prev => prev.filter(e => e.id !== exId));
+  };
+
+  const editException = async (exId) => {
+    if (!editWord.trim()) return;
+    const tok = JSON.parse(localStorage.getItem('tropica_user'))?.token;
+    const res = await fetch(`${API_URL}/api/exceptions/${exId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tok}` },
+      body: JSON.stringify({ word: editWord, reason: editReason })
+    });
+    const updated = await res.json();
+    if (updated.id) {
+      setExceptions(prev => prev.map(e => e.id === exId ? updated : e));
+      setEditingExId(null);
+    }
   };
 
   const triggerUpload = (uniqueId) => {
@@ -1781,19 +1799,62 @@ function Editor() {
                   {exceptions.length === 0 ? (
                     <p style={{ color: '#9ba3b5', fontSize: '12px', textAlign: 'center', padding: '20px 16px', margin: 0 }}>Sin excepciones registradas</p>
                   ) : exceptions.map(ex => (
-                    <div key={ex.id} style={{ padding: '10px 14px', borderBottom: '1px solid #f0f2f7', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                      <div style={{ flex: 1 }}>
-                        <p style={{ margin: 0, fontSize: '13px', fontWeight: '700', color: '#1a1f2e', fontFamily: 'monospace' }}>«{ex.word}»</p>
-                        {ex.reason && <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#6b7280', fontStyle: 'italic' }}>{ex.reason}</p>}
-                        <p style={{ margin: '2px 0 0', fontSize: '10px', color: '#b0b9cc' }}>{new Date(ex.createdAt).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
-                      </div>
-                      <button
-                        onClick={() => deleteException(ex.id)}
-                        title="Eliminar excepción"
-                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '14px', padding: '2px 4px', flexShrink: 0, borderRadius: '4px' }}
-                        onMouseEnter={e => e.currentTarget.style.background = '#fee2e2'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'none'}
-                      >🗑</button>
+                    <div key={ex.id} style={{ padding: '10px 14px', borderBottom: '1px solid #f0f2f7' }}>
+                      {editingExId === ex.id ? (
+                        /* ── Modo edición ── */
+                        <div>
+                          <input
+                            value={editWord}
+                            onChange={e => setEditWord(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') editException(ex.id); if (e.key === 'Escape') setEditingExId(null); }}
+                            autoFocus
+                            style={{ width: '100%', fontSize: '12px', fontFamily: 'monospace', border: '1.5px solid #8b5cf6', borderRadius: '6px', padding: '5px 8px', outline: 'none', marginBottom: '5px', boxSizing: 'border-box' }}
+                          />
+                          <input
+                            value={editReason}
+                            onChange={e => setEditReason(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') editException(ex.id); if (e.key === 'Escape') setEditingExId(null); }}
+                            placeholder='Razón creativa (opcional)'
+                            style={{ width: '100%', fontSize: '11px', border: '1.5px solid #ddd6fe', borderRadius: '6px', padding: '5px 8px', outline: 'none', marginBottom: '7px', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                            onFocus={e => e.target.style.borderColor = '#8b5cf6'}
+                            onBlur={e => e.target.style.borderColor = '#ddd6fe'}
+                          />
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button
+                              onClick={() => editException(ex.id)}
+                              disabled={!editWord.trim()}
+                              style={{ flex: 1, background: '#7c3aed', color: 'white', border: 'none', borderRadius: '6px', padding: '6px', fontSize: '11px', fontWeight: '800', cursor: 'pointer' }}
+                            >Guardar</button>
+                            <button
+                              onClick={() => setEditingExId(null)}
+                              style={{ flex: 1, background: '#f0f2f7', color: '#6b7280', border: 'none', borderRadius: '6px', padding: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                            >Cancelar</button>
+                          </div>
+                        </div>
+                      ) : (
+                        /* ── Modo lectura ── */
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                          <div style={{ flex: 1 }}>
+                            <p style={{ margin: 0, fontSize: '13px', fontWeight: '700', color: '#1a1f2e', fontFamily: 'monospace' }}>«{ex.word}»</p>
+                            {ex.reason && <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#6b7280', fontStyle: 'italic' }}>{ex.reason}</p>}
+                            <p style={{ margin: '2px 0 0', fontSize: '10px', color: '#b0b9cc' }}>{new Date(ex.createdAt).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                          </div>
+                          <button
+                            onClick={() => { setEditingExId(ex.id); setEditWord(ex.word); setEditReason(ex.reason || ''); }}
+                            title="Editar excepción"
+                            style={{ background: 'none', border: 'none', color: '#8b5cf6', cursor: 'pointer', fontSize: '13px', padding: '2px 4px', borderRadius: '4px', flexShrink: 0 }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#f5f3ff'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                          >✏</button>
+                          <button
+                            onClick={() => deleteException(ex.id)}
+                            title="Eliminar excepción"
+                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '13px', padding: '2px 4px', flexShrink: 0, borderRadius: '4px' }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#fee2e2'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                          >🗑</button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

@@ -577,6 +577,21 @@ app.delete('/api/exceptions/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// PATCH editar excepción (palabra y/o razón)
+app.patch('/api/exceptions/:id', authenticateToken, async (req, res) => {
+  const { word, reason } = req.body;
+  if (!word?.trim()) return res.status(400).json({ error: 'Falta la palabra' });
+  try {
+    const updated = await prisma.typoException.update({
+      where: { id: req.params.id },
+      data: { word: word.trim(), reason: reason?.trim() || null }
+    });
+    res.json(updated);
+  } catch (e) {
+    res.status(404).json({ error: 'Excepción no encontrada' });
+  }
+});
+
 // POST crear excepción + re-verificar el comentario MAIA
 // Si ya no hay typos en la imagen → resuelve el comentario automáticamente
 app.post('/api/comments/:commentId/exception', authenticateToken, async (req, res) => {
