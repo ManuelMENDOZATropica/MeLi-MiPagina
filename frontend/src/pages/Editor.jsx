@@ -452,47 +452,72 @@ function Editor() {
     });
     collect([...(canvases.desktop || []), ...(canvases.mobile || [])]);
 
-    // Solo items con imagen y tamaño esperado
-    const itemsToCheck = allItems.filter(item => {
-      const img = item.uploadedImages?.[0];
-      const size = viewMode === 'desktop' ? item.desktopSize : item.mobileSize;
-      return img && size?.width && size?.height;
-    });
+    // Solo items con imagen subida
+    const itemsToCheck = allItems.filter(item => item.uploadedImages?.[0]);
 
     if (itemsToCheck.length === 0) { resolve({ errors: [] }); return; }
 
-    const initial = itemsToCheck.map(item => ({ id: item.uniqueId, name: item.name || 'Elemento', status: 'pending', msg: '' }));
+    const tok = JSON.parse(localStorage.getItem('tropica_user'))?.token;
+    const initial = itemsToCheck.map(item => ({
+      id: item.uniqueId, name: item.name || 'Elemento', status: 'pending', msg: ''
+    }));
     setMaiaCheckItems(initial);
 
-    let done = 0;
     const errors = [];
 
-    itemsToCheck.forEach((item, idx) => {
-      const size = viewMode === 'desktop' ? item.desktopSize : item.mobileSize;
-      const imgEl = new window.Image();
-      imgEl.onload = () => {
-        const actualW = imgEl.naturalWidth;
-        const actualH = imgEl.naturalHeight;
-        const tol = 0.05;
-        const ok = Math.abs(actualW - size.width) / size.width <= tol &&
-                   Math.abs(actualH - size.height) / size.height <= tol;
+    // Procesar en serie para que la animación se vea secuencial
+    (async () => {
+      for (let idx = 0; idx < itemsToCheck.length; idx++) {
+        const item = itemsToCheck[idx];
+        const imageUrl = item.uploadedImages[0];
+        const size = viewMode === 'desktop' ? item.desktopSize : item.mobileSize;
+        const itemErrors = [];
 
-        const status = ok ? 'ok' : 'error';
-        const msg = ok ? '' : `Imagen ${actualW}×${actualH}px — esperado ${size.width}×${size.height}px`;
-        if (!ok) errors.push({ name: item.name || 'Elemento', msg });
+        // ── Check 1: dimensiones ──
+        if (size?.width && size?.height) {
+          await new Promise(res2 => {
+            const imgEl = new window.Image();
+            imgEl.onload = () => {
+              const tol = 0.05;
+              const ok = Math.abs(imgEl.naturalWidth - size.width) / size.width <= tol &&
+                         Math.abs(imgEl.naturalHeight - size.height) / size.height <= tol;
+              if (!ok) itemErrors.push(`Dimensiones: ${imgEl.naturalWidth}×${imgEl.naturalHeight}px (esperado ${size.width}×${size.height}px)`);
+              res2();
+            };
+            imgEl.onerror = () => res2();
+            imgEl.src = imageUrl;
+          });
+        }
 
-        setMaiaCheckItems(prev => prev.map((p, i) => i === idx ? { ...p, status, msg } : p));
-        done++;
-        if (done === itemsToCheck.length) setTimeout(() => resolve({ errors }), 600);
-      };
-      imgEl.onerror = () => {
-        setMaiaCheckItems(prev => prev.map((p, i) => i === idx ? { ...p, status: 'ok' } : p));
-        done++;
-        if (done === itemsToCheck.length) setTimeout(() => resolve({ errors }), 600);
-      };
-      // Escalonar checks para que la animación se vea
-      setTimeout(() => { imgEl.src = item.uploadedImages[0]; }, idx * 350);
-    });
+        // ── Check 2: typos con Gemini (re-verificación fresca) ──
+        try {
+          const typoRes = await fetch(`${API_URL}/api/check-typos-only`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tok}` },
+            body: JSON.stringify({ imageUrl })
+          });
+          const typoData = await typoRes.json();
+          if (typoData.hasTypos) {
+            const desc = typoData.errors?.length ? typoData.errors.join(', ') : 'Typos detectados en el texto';
+            itemErrors.push(`Typos: ${desc}`);
+          }
+        } catch (e) {
+          // Si Gemini falla, no bloqueamos por esto
+        }
+
+        const hasError = itemErrors.length > 0;
+        const msg = itemErrors.join(' | ');
+        if (hasError) errors.push({ name: item.name || 'Elemento', msg });
+
+        setMaiaCheckItems(prev => prev.map((p, i) =>
+          i === idx ? { ...p, status: hasError ? 'error' : 'ok', msg } : p
+        ));
+
+        // Pausa entre elementos para que la animación sea legible
+        await new Promise(r => setTimeout(r, 400));
+      }
+      setTimeout(() => resolve({ errors }), 500);
+    })();
   });
 
   // Agregar colaborador al proyecto

@@ -492,6 +492,46 @@ app.post('/api/maia-comment', authenticateToken, async (req, res) => {
   }
 });
 
+// Verifica typos en una imagen SIN crear comentario (dry-run para pre-publicación)
+app.post('/api/check-typos-only', authenticateToken, async (req, res) => {
+  const { imageUrl } = req.body;
+  if (!imageUrl) return res.status(400).json({ error: 'Falta imageUrl' });
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return res.json({ hasTypos: false });
+  try {
+    const imgResponse = await fetch(imageUrl);
+    if (!imgResponse.ok) return res.json({ hasTypos: false });
+    const imgBuffer = await imgResponse.arrayBuffer();
+    const base64Image = Buffer.from(imgBuffer).toString('base64');
+    const mimeType = imgResponse.headers.get('content-type') || 'image/jpeg';
+
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: `Eres un corrector de pruebas profesional. Analiza el texto visible en esta imagen de un banner o elemento de marketing.\nBusca únicamente errores ortográficos, tipográficos, palabras mal escritas o errores gramaticales evidentes en español o inglés.\nSi encuentras errores responde SOLO con JSON válido: {"found": true, "errors": ["descripción 1"]}\nSi NO hay errores responde SOLO: {"found": false}\nSin texto adicional fuera del JSON.` },
+              { inline_data: { mime_type: mimeType, data: base64Image } }
+            ]
+          }],
+          generationConfig: { temperature: 0.1 }
+        })
+      }
+    );
+    const geminiData = await geminiRes.json();
+    const rawText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || '{"found":false}';
+    const cleaned = rawText.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(cleaned);
+    res.json({ hasTypos: parsed.found === true, errors: parsed.errors || [] });
+  } catch (e) {
+    console.error('Error en check-typos-only:', e);
+    res.json({ hasTypos: false });
+  }
+});
+
 // =======================
 // RUTAS DE COMENTARIOS
 // =======================
