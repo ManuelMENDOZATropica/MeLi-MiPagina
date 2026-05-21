@@ -1783,7 +1783,7 @@ function Editor() {
                   ) : exceptions.map(ex => (
                     <div key={ex.id} style={{ padding: '10px 14px', borderBottom: '1px solid #f0f2f7', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                       <div style={{ flex: 1 }}>
-                        <p style={{ margin: 0, fontSize: '13px', fontWeight: '700', color: '#1a1f2e', fontFamily: 'monospace' }}">«{ex.word}»</p>
+                        <p style={{ margin: 0, fontSize: '13px', fontWeight: '700', color: '#1a1f2e', fontFamily: 'monospace' }}>«{ex.word}»</p>
                         {ex.reason && <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#6b7280', fontStyle: 'italic' }}>{ex.reason}</p>}
                         <p style={{ margin: '2px 0 0', fontSize: '10px', color: '#b0b9cc' }}>{new Date(ex.createdAt).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
                       </div>
