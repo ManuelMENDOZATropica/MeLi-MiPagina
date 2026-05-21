@@ -1,9 +1,259 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Monitor, Smartphone, GripVertical, Trash2, Image as ImageIcon, Layout, Type, Video, Search, MapPin, Tag, ChevronDown, Bell, ShoppingCart, User, AlignCenter, MoveHorizontal, ListMinus, AlignJustify, CornerDownLeft, ArrowLeft, CheckCircle2, Play, Edit3, Eye, EyeOff, Layers, Grid, Settings, ArrowRight } from 'lucide-react';
+import { Monitor, Smartphone, GripVertical, Trash2, Image as ImageIcon, Layout, Type, Video, Search, MapPin, Tag, ChevronDown, Bell, ShoppingCart, User, AlignCenter, MoveHorizontal, ListMinus, AlignJustify, CornerDownLeft, ArrowLeft, CheckCircle2, Play, Edit3, Eye, EyeOff, Layers, Grid, Settings, ArrowRight, FileDown } from 'lucide-react';
 import { componentsList } from '../componentsData';
 import API_URL from '../api';
 import '../index.css';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
+import ReactMarkdown from 'react-markdown';
+
+// Paleta de colores por colaborador (owner = índice 0)
+const COLLAB_COLORS = [
+  '#fff159', // owner → amarillo MeLi
+  '#3483fa', // azul
+  '#10b981', // verde
+  '#f59e0b', // naranja
+  '#ec4899', // rosa
+  '#8b5cf6', // violeta
+  '#06b6d4', // cyan
+  '#ef4444', // rojo
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CommentPanel: componente externo (NO dentro de Editor) para evitar remount
+// ─────────────────────────────────────────────────────────────────────────────
+function CommentPanel({
+  elementId, elementName,
+  comments, projectCollabs, replyingTo, setReplyingTo,
+  commentInputs, setCommentInputs,
+  mentionQuery, setMentionQuery,
+  onClose, onSubmit, onResolve, onDelete, onException,
+  getCollabColor,
+}) {
+  const elComments = comments.filter(c => c.elementId === elementId);
+  const inputKey = 'new_' + elementId;
+  const inputVal = commentInputs[inputKey] || '';
+  const currentUserId = JSON.parse(localStorage.getItem('tropica_user'))?.user?.id;
+  const [exceptionForm, setExceptionForm] = useState(null); // commentId | null
+  const [exWord, setExWord] = useState('');
+  const [exReason, setExReason] = useState('');
+  const [exLoading, setExLoading] = useState(false);
+
+  const handleInput = (e) => {
+    const val = e.target.value;
+    setCommentInputs(prev => ({ ...prev, [inputKey]: val }));
+    const match = val.match(/@([\w\s]*)$/);
+    if (match) setMentionQuery({ field: inputKey, query: match[1] });
+    else setMentionQuery(null);
+  };
+
+  const filteredCollabs = mentionQuery && mentionQuery.field === inputKey
+    ? projectCollabs.filter(c =>
+        c.id !== currentUserId &&
+        (c.name || '').toLowerCase().includes(mentionQuery.query.toLowerCase())
+      )
+    : [];
+
+  const insertMention = (collab) => {
+    const val = inputVal.replace(/@([\w\s]*)$/, `@${collab.name} `);
+    setCommentInputs(prev => ({ ...prev, [inputKey]: val }));
+    setMentionQuery(null);
+  };
+
+  return (
+    <div style={{
+      position: 'absolute',
+      top: '12px', left: '12px',
+      width: '320px',
+      background: 'rgba(255,255,255,0.97)',
+      borderRadius: '14px',
+      boxShadow: '0 16px 48px rgba(0,0,0,0.28), 0 2px 8px rgba(0,0,0,0.12)',
+      border: '1px solid rgba(224,229,239,0.8)',
+      backdropFilter: 'blur(12px)',
+      zIndex: 500, overflow: 'hidden',
+      fontFamily: "'Inter', sans-serif"
+    }}>
+      {/* Header */}
+      <div style={{ background: '#1a1f2e', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em' }}>💬 {elementName}</span>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '16px', lineHeight: 1, padding: '0 2px' }}>✕</button>
+      </div>
+
+      {/* Lista de comentarios */}
+      <div style={{ maxHeight: '340px', overflowY: 'auto', padding: '10px' }}>
+        {elComments.length === 0 && (
+          <p style={{ color: '#9ba3b5', fontSize: '12px', textAlign: 'center', margin: '16px 0' }}>Sin comentarios aún</p>
+        )}
+        {elComments.map(comment => (
+          <div key={comment.id} style={{
+            marginBottom: '12px', opacity: comment.resolved ? 0.55 : 1,
+            background: comment.resolved ? '#f4f6fb' : 'white',
+            borderRadius: '8px', border: '1px solid #e8ecf4', padding: '10px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '6px' }}>
+              <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: getCollabColor(comment.author.id) || '#ddd', color: '#1a1f2e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '800', overflow: 'hidden', flexShrink: 0 }}>
+                {comment.author.avatar ? <img src={comment.author.avatar} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : (comment.author.name || 'U').charAt(0).toUpperCase()}
+              </div>
+              <span style={{ fontSize: '12px', fontWeight: '700', color: '#1a1f2e' }}>{comment.author.name || comment.author.email}</span>
+              <span style={{ fontSize: '10px', color: '#b0b9cc', marginLeft: 'auto' }}>
+                {new Date(comment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </div>
+            <div style={{ fontSize: '13px', color: '#2d3548', margin: '0 0 8px', lineHeight: '1.5' }}>
+              <ReactMarkdown
+                components={{
+                  p: ({children}) => <p style={{ margin: '0 0 4px' }}>{children}</p>,
+                  strong: ({children}) => <strong style={{ fontWeight: '700', color: '#1a1f2e' }}>{children}</strong>,
+                  ol: ({children}) => <ol style={{ margin: '4px 0', paddingLeft: '18px' }}>{children}</ol>,
+                  ul: ({children}) => <ul style={{ margin: '4px 0', paddingLeft: '18px' }}>{children}</ul>,
+                  li: ({children}) => <li style={{ marginBottom: '2px' }}>{children}</li>,
+                }}
+              >{comment.text}</ReactMarkdown>
+            </div>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              <button onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
+                style={{ fontSize: '11px', color: '#3483fa', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600', padding: '2px 0' }}>↩ Responder</button>
+              <button onClick={() => onResolve(comment.id)}
+                style={{ fontSize: '11px', color: comment.resolved ? '#10b981' : '#6b7280', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600', padding: '2px 0' }}>
+                {comment.resolved ? '✓ Resuelto' : '✓ Resolver'}
+              </button>
+              {/* Botón Crear excepción — solo en comentarios de MAIA */}
+              {comment.author.email === 'maia@tropica.me' && !comment.resolved && (
+                <button
+                  onClick={() => { setExceptionForm(exceptionForm === comment.id ? null : comment.id); setExWord(''); setExReason(''); }}
+                  style={{ fontSize: '11px', color: '#8b5cf6', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600', padding: '2px 0' }}
+                >✦ Excepción</button>
+              )}
+              {comment.author.id === currentUserId && (
+                <button onClick={() => onDelete(comment.id)}
+                  style={{ fontSize: '11px', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600', padding: '2px 0', marginLeft: 'auto' }}>🗑</button>
+              )}
+            </div>
+
+            {/* Formulario inline de excepción */}
+            {exceptionForm === comment.id && (
+              <div style={{ marginTop: '10px', background: '#faf5ff', border: '1px solid #ddd6fe', borderRadius: '8px', padding: '10px' }}>
+                <p style={{ margin: '0 0 6px', fontSize: '11px', fontWeight: '700', color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.06em' }}>✦ Crear excepción creativa</p>
+                <input
+                  value={exWord}
+                  onChange={e => setExWord(e.target.value)}
+                  placeholder='Palabra/frase exacta (ej: "Protecciónn")'
+                  style={{ width: '100%', fontSize: '12px', border: '1.5px solid #ddd6fe', borderRadius: '6px', padding: '6px 8px', outline: 'none', marginBottom: '6px', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                  onFocus={e => e.target.style.borderColor = '#8b5cf6'}
+                  onBlur={e => e.target.style.borderColor = '#ddd6fe'}
+                />
+                <input
+                  value={exReason}
+                  onChange={e => setExReason(e.target.value)}
+                  placeholder='Razón creativa (opcional)'
+                  style={{ width: '100%', fontSize: '12px', border: '1.5px solid #ddd6fe', borderRadius: '6px', padding: '6px 8px', outline: 'none', marginBottom: '8px', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                  onFocus={e => e.target.style.borderColor = '#8b5cf6'}
+                  onBlur={e => e.target.style.borderColor = '#ddd6fe'}
+                />
+                <button
+                  disabled={!exWord.trim() || exLoading}
+                  onClick={async () => {
+                    if (!exWord.trim()) return;
+                    setExLoading(true);
+                    await onException(comment.id, exWord, exReason);
+                    setExLoading(false);
+                    setExceptionForm(null);
+                  }}
+                  style={{ width: '100%', background: exLoading ? '#c4b5fd' : '#7c3aed', color: 'white', border: 'none', borderRadius: '6px', padding: '7px', fontSize: '12px', fontWeight: '800', cursor: exLoading ? 'wait' : 'pointer', letterSpacing: '0.04em' }}
+                >{exLoading ? 'Verificando con MAIA...' : 'Guardar excepción'}</button>
+              </div>
+            )}
+
+            {/* Respuestas */}
+            {(comment.replies || []).length > 0 && (
+              <div style={{ marginTop: '8px', paddingLeft: '10px', borderLeft: '2px solid #e8ecf4' }}>
+                {comment.replies.map(reply => (
+                  <div key={reply.id} style={{ marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
+                      <div style={{ width: '18px', height: '18px', borderRadius: '50%', background: getCollabColor(reply.author.id) || '#ddd', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: '800', overflow: 'hidden', flexShrink: 0 }}>
+                        {reply.author.avatar ? <img src={reply.author.avatar} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : (reply.author.name || 'U').charAt(0).toUpperCase()}
+                      </div>
+                      <span style={{ fontSize: '11px', fontWeight: '700', color: '#1a1f2e' }}>{reply.author.name || reply.author.email}</span>
+                      {reply.author.id === currentUserId && (
+                        <button onClick={() => onDelete(reply.id, comment.id)}
+                          style={{ fontSize: '10px', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', marginLeft: 'auto', padding: 0 }}>🗑</button>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#2d3548', margin: 0, lineHeight: '1.4' }}>
+                      <ReactMarkdown
+                        components={{
+                          p: ({children}) => <p style={{ margin: '0 0 2px' }}>{children}</p>,
+                          strong: ({children}) => <strong style={{ fontWeight: '700' }}>{children}</strong>,
+                          ol: ({children}) => <ol style={{ margin: '2px 0', paddingLeft: '16px' }}>{children}</ol>,
+                          ul: ({children}) => <ul style={{ margin: '2px 0', paddingLeft: '16px' }}>{children}</ul>,
+                          li: ({children}) => <li style={{ marginBottom: '1px' }}>{children}</li>,
+                        }}
+                      >{reply.text}</ReactMarkdown>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Input de respuesta */}
+            {replyingTo === comment.id && (
+              <div style={{ marginTop: '8px', display: 'flex', gap: '6px' }}>
+                <input
+                  autoFocus
+                  value={commentInputs[comment.id] || ''}
+                  onChange={e => setCommentInputs(prev => ({ ...prev, [comment.id]: e.target.value }))}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSubmit(elementId, comment.id); } }}
+                  placeholder="Responder..."
+                  style={{ flex: 1, fontSize: '12px', border: '1.5px solid #3483fa', borderRadius: '6px', padding: '5px 8px', outline: 'none', fontFamily: 'inherit' }}
+                />
+                <button onClick={() => onSubmit(elementId, comment.id)}
+                  style={{ background: '#3483fa', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px', fontWeight: '700' }}>↩</button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Input nuevo comentario */}
+      <div style={{ padding: '10px', borderTop: '1px solid #e8ecf4', position: 'relative' }}>
+        {filteredCollabs.length > 0 && (
+          <div style={{ position: 'absolute', bottom: '100%', left: '10px', right: '10px', background: 'white', border: '1px solid #e0e5ef', borderRadius: '8px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 600 }}>
+            {filteredCollabs.map(c => (
+              <div key={c.id} onClick={() => insertMention(c)}
+                style={{ padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}
+                onMouseEnter={e => e.currentTarget.style.background = '#f4f6fb'}
+                onMouseLeave={e => e.currentTarget.style.background = 'white'}>
+                <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: '800', color: c.color === '#fff159' ? '#1a1f2e' : 'white' }}>
+                  {(c.name || 'U').charAt(0).toUpperCase()}
+                </div>
+                <span style={{ fontWeight: '600', color: '#1a1f2e' }}>{c.name}</span>
+                <span style={{ color: '#9ba3b5', fontSize: '11px' }}>{c.email}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <textarea
+          value={inputVal}
+          onChange={handleInput}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSubmit(elementId); } }}
+          placeholder="Comentar... (@ para mencionar, Enter para enviar)"
+          rows={2}
+          style={{ width: '100%', fontSize: '13px', border: '1.5px solid #e0e5ef', borderRadius: '8px', padding: '8px 10px', outline: 'none', resize: 'none', fontFamily: 'inherit', boxSizing: 'border-box', transition: 'border-color 0.15s' }}
+          onFocus={e => e.target.style.borderColor = '#3483fa'}
+          onBlur={e => e.target.style.borderColor = '#e0e5ef'}
+        />
+        <button onClick={() => onSubmit(elementId)}
+          style={{ marginTop: '6px', width: '100%', background: '#1a1f2e', color: '#fff159', border: 'none', borderRadius: '7px', padding: '8px', fontSize: '12px', fontWeight: '800', cursor: 'pointer', letterSpacing: '0.05em', textTransform: 'uppercase', transition: 'background 0.15s' }}
+          onMouseEnter={e => e.currentTarget.style.background = '#252c3f'}
+          onMouseLeave={e => e.currentTarget.style.background = '#1a1f2e'}
+        >Enviar comentario</button>
+      </div>
+    </div>
+  );
+}
+
+
 
 
 // Helper icon selector
@@ -84,12 +334,42 @@ function Editor() {
   const [publishedSlug, setPublishedSlug] = useState(null);
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [maiaCheckState, setMaiaCheckState] = useState(null); // null | 'checking' | { errors } | 'ok'
+  const [maiaCheckItems, setMaiaCheckItems] = useState([]); // [{name, status:'pending'|'ok'|'error', msg}]
   const [textEditorPanel, setTextEditorPanel] = useState(null); // { item, x, y }
+  const [projectCollabs, setProjectCollabs] = useState([]); // [{id,name,email,avatar,color}]
+  const [showAddCollab, setShowAddCollab] = useState(false);
+  const [allUsers, setAllUsers] = useState([]);
+  const [collabSearch, setCollabSearch] = useState('');
+
+  // Sistema de comentarios
+  const [comments, setComments] = useState([]);
+  const [activeCommentElId, setActiveCommentElId] = useState(null); // uniqueId del elemento con panel abierto
+  const [commentInputs, setCommentInputs] = useState({}); // { [commentId|'new']: text }
+  const [mentionQuery, setMentionQuery] = useState(null); // { field, query }
+  const [replyingTo, setReplyingTo] = useState(null); // commentId
+
+  // Notificaciones
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifPanel, setShowNotifPanel] = useState(false);
+
+  // Excepciones creativas de MAIA
+  const [exceptions, setExceptions] = useState([]);
+  const [showMaiaPanel, setShowMaiaPanel] = useState(false);
+  const [newExWord, setNewExWord] = useState('');
+  const [newExReason, setNewExReason] = useState('');
+  const [newExLoading, setNewExLoading] = useState(false);
+  const [editingExId, setEditingExId] = useState(null);
+  const [editWord, setEditWord] = useState('');
+  const [editReason, setEditReason] = useState('');
 
   // Global Upload State
   const [uploadTargetId, setUploadTargetId] = useState(null);
   const [uploadIndex, setUploadIndex] = useState(0);
   const fileInputRef = useRef(null);
+  const pdfCanvasRef = useRef(null);
+  const canvasScrollRef = useRef(null); // scroll container del canvas
+  const [isExporting, setIsExporting] = useState(false);
 
   const [isHoveringText, setIsHoveringText] = useState(false);
   const [editingField, setEditingField] = useState({ id: null, field: null });
@@ -125,6 +405,15 @@ function Editor() {
           });
           setIsPublished(data.isPublished || false);
           if (data.slug) setPublishedSlug(data.slug);
+          // Construir lista de colaboradores con colores asignados
+          const collabs = [
+            data.user ? { ...data.user, color: COLLAB_COLORS[0] } : null,
+            ...((data.editors || []).map((e, i) => ({
+              ...e.user,
+              color: COLLAB_COLORS[(i + 1) % COLLAB_COLORS.length]
+            })))
+          ].filter(Boolean);
+          setProjectCollabs(collabs);
           // Esperamos un momento para que el setState no dispare el AutoGuardado
           setTimeout(() => { isInitialLoad.current = false; }, 1000);
         })
@@ -132,6 +421,26 @@ function Editor() {
           console.error(err);
           navigate('/projects');
         });
+
+      // Cargar comentarios del proyecto
+      fetch(`${API_URL}/api/projects/${id}/comments`, {
+        headers: { 'Authorization': `Bearer ${parsed.token}` }
+      }).then(r => r.ok ? r.json() : []).then(data => setComments(Array.isArray(data) ? data : []));
+
+      // Cargar notificaciones
+      fetch(`${API_URL}/api/notifications`, {
+        headers: { 'Authorization': `Bearer ${parsed.token}` }
+      }).then(r => r.ok ? r.json() : []).then(data => setNotifications(Array.isArray(data) ? data : []));
+
+      // Cargar excepciones creativas del proyecto
+      fetch(`${API_URL}/api/projects/${id}/exceptions`, {
+        headers: { 'Authorization': `Bearer ${parsed.token}` }
+      }).then(r => r.ok ? r.json() : []).then(data => setExceptions(Array.isArray(data) ? data : []));
+
+      // Cargar todos los usuarios disponibles (para el + de colaboradores)
+      fetch(`${API_URL}/api/users`, {
+        headers: { 'Authorization': `Bearer ${parsed.token}` }
+      }).then(r => r.ok ? r.json() : []).then(data => setAllUsers(Array.isArray(data) ? data : []));
     }
   }, [id, navigate]);
 
@@ -174,6 +483,292 @@ function Editor() {
     });
   };
 
+  // Devuelve el color del colaborador que agregó un elemento
+  const getCollabColor = (userId) =>
+    projectCollabs.find(c => c.id === userId)?.color ?? null;
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  // Centra el elemento en la vista y abre su panel de comentarios
+  const scrollToElement = (elementId) => {
+    setActiveCommentElId(elementId);
+    setTimeout(() => {
+      const el = document.querySelector(`[data-id="${elementId}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.style.outline = '2px solid #3483fa';
+        el.style.outlineOffset = '3px';
+        setTimeout(() => { el.style.outline = ''; el.style.outlineOffset = ''; }, 2000);
+      }
+    }, 80);
+  };
+
+  // Verifica todos los elementos antes de publicar
+  const runMaiaPrePublishCheck = () => new Promise((resolve) => {
+    const allItems = [];
+    const collect = (items) => items.forEach(item => {
+      if (item.type === 'rowGroup' && item.items) item.items.forEach(c => allItems.push(c));
+      else allItems.push(item);
+    });
+    collect([...(canvases.desktop || []), ...(canvases.mobile || [])]);
+
+    // Solo items con imagen subida
+    const itemsToCheck = allItems.filter(item => item.uploadedImages?.[0]);
+
+    if (itemsToCheck.length === 0) { resolve({ errors: [] }); return; }
+
+    const tok = JSON.parse(localStorage.getItem('tropica_user'))?.token;
+    const initial = itemsToCheck.map(item => ({
+      id: item.uniqueId, name: item.name || 'Elemento', status: 'pending', msg: ''
+    }));
+    setMaiaCheckItems(initial);
+
+    const errors = [];
+
+    // Procesar en serie para que la animación se vea secuencial
+    (async () => {
+      for (let idx = 0; idx < itemsToCheck.length; idx++) {
+        const item = itemsToCheck[idx];
+        const imageUrl = item.uploadedImages[0];
+        const size = viewMode === 'desktop' ? item.desktopSize : item.mobileSize;
+        const itemErrors = [];
+
+        // ── Check 1: dimensiones ──
+        if (size?.width && size?.height) {
+          await new Promise(res2 => {
+            const imgEl = new window.Image();
+            imgEl.onload = () => {
+              const tol = 0.05;
+              const ok = Math.abs(imgEl.naturalWidth - size.width) / size.width <= tol &&
+                         Math.abs(imgEl.naturalHeight - size.height) / size.height <= tol;
+              if (!ok) itemErrors.push(`Dimensiones: ${imgEl.naturalWidth}×${imgEl.naturalHeight}px (esperado ${size.width}×${size.height}px)`);
+              res2();
+            };
+            imgEl.onerror = () => res2();
+            imgEl.src = imageUrl;
+          });
+        }
+
+        // ── Check 2: typos con Gemini (re-verificación fresca) ──
+        try {
+          const typoRes = await fetch(`${API_URL}/api/check-typos-only`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tok}` },
+            body: JSON.stringify({ imageUrl, projectId: id })
+          });
+          const typoData = await typoRes.json();
+          if (typoData.hasTypos) {
+            const desc = typoData.errors?.length ? typoData.errors.join(', ') : 'Typos detectados en el texto';
+            itemErrors.push(`Typos: ${desc}`);
+          }
+        } catch (e) {
+          // Si Gemini falla, no bloqueamos por esto
+        }
+
+        const hasError = itemErrors.length > 0;
+        const msg = itemErrors.join(' | ');
+        if (hasError) errors.push({ name: item.name || 'Elemento', msg });
+
+        setMaiaCheckItems(prev => prev.map((p, i) =>
+          i === idx ? { ...p, status: hasError ? 'error' : 'ok', msg } : p
+        ));
+
+        // Pausa entre elementos para que la animación sea legible
+        await new Promise(r => setTimeout(r, 400));
+      }
+      setTimeout(() => resolve({ errors }), 500);
+    })();
+  });
+
+  // Agregar colaborador al proyecto
+  const addCollaborator = async (userId) => {
+    const tok = JSON.parse(localStorage.getItem('tropica_user'))?.token;
+    const res = await fetch(`${API_URL}/api/projects/${id}/editors`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tok}` },
+      body: JSON.stringify({ userId })
+    });
+    if (!res.ok) return;
+    const updated = await res.json();
+    // Reconstruir lista de colaboradores
+    const collabs = [
+      updated.user ? { ...updated.user, color: COLLAB_COLORS[0] } : null,
+      ...((updated.editors || []).map((e, i) => ({ ...e.user, color: COLLAB_COLORS[(i + 1) % COLLAB_COLORS.length] })))
+    ].filter(Boolean);
+    setProjectCollabs(collabs);
+    setShowAddCollab(false);
+    setCollabSearch('');
+  };
+
+  // Exportar el canvas como PDF
+  const exportToPdf = async () => {
+    if (!pdfCanvasRef.current || isExporting) return;
+    setIsExporting(true);
+    try {
+      const el = pdfCanvasRef.current;
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+      });
+      const imgData = canvas.toDataURL('image/jpeg', 0.92);
+      const pdf = new jsPDF({
+        orientation: el.offsetWidth > el.offsetHeight ? 'landscape' : 'portrait',
+        unit: 'px',
+        format: [el.offsetWidth, el.offsetHeight],
+        hotfixes: ['px_scaling']
+      });
+      pdf.addImage(imgData, 'JPEG', 0, 0, el.offsetWidth, el.offsetHeight);
+      pdf.save(`${projectTitle.replace(/\s+/g, '_')}_maqueta.pdf`);
+    } catch (e) {
+      console.error('Error exportando PDF:', e);
+    }
+    setIsExporting(false);
+  };
+
+  // Renderiza texto con @menciones resaltadas
+  const renderCommentText = (text) => {
+    const parts = text.split(/(@[\w\s]+?)(?=\s|$|@)/g);
+    return parts.map((p, i) =>
+      p.startsWith('@')
+        ? <strong key={i} style={{ color: '#3483fa' }}>{p}</strong>
+        : <span key={i}>{p}</span>
+    );
+  };
+
+  // Submits a new comment or reply
+  const submitComment = async (elementId, parentId = null) => {
+    const key = parentId || 'new_' + elementId;
+    const text = (commentInputs[key] || '').trim();
+    if (!text) return;
+    const tok = JSON.parse(localStorage.getItem('tropica_user'))?.token;
+    const mentionedNames = [...text.matchAll(/@([\w\s]+?)(?=\s|$|@)/g)].map(m => m[1].trim());
+    const mentions = projectCollabs
+      .filter(c => mentionedNames.some(n => (c.name || '').toLowerCase().includes(n.toLowerCase())))
+      .map(c => c.id);
+
+    const res = await fetch(`${API_URL}/api/projects/${id}/comments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tok}` },
+      body: JSON.stringify({ elementId, text, mentions, parentId })
+    });
+    const newComment = await res.json();
+    if (parentId) {
+      setComments(prev => prev.map(c =>
+        c.id === parentId ? { ...c, replies: [...(c.replies || []), newComment] } : c
+      ));
+    } else {
+      setComments(prev => [...prev, newComment]);
+    }
+    setCommentInputs(prev => ({ ...prev, [key]: '' }));
+    setReplyingTo(null);
+  };
+
+  const resolveComment = async (commentId) => {
+    const tok = JSON.parse(localStorage.getItem('tropica_user'))?.token;
+    const res = await fetch(`${API_URL}/api/comments/${commentId}/resolve`, {
+      method: 'PATCH', headers: { 'Authorization': `Bearer ${tok}` }
+    });
+    const updated = await res.json();
+    setComments(prev => prev.map(c => c.id === commentId ? updated : c));
+  };
+
+  const deleteComment = async (commentId, parentId = null) => {
+    const tok = JSON.parse(localStorage.getItem('tropica_user'))?.token;
+    await fetch(`${API_URL}/api/comments/${commentId}`, {
+      method: 'DELETE', headers: { 'Authorization': `Bearer ${tok}` }
+    });
+    if (parentId) {
+      setComments(prev => prev.map(c =>
+        c.id === parentId ? { ...c, replies: (c.replies || []).filter(r => r.id !== commentId) } : c
+      ));
+    } else {
+      setComments(prev => prev.filter(c => c.id !== commentId));
+    }
+  };
+
+  // Crea una excepción creativa para un comentario de MAIA y re-verifica la imagen
+  const handleException = async (commentId, word, reason) => {
+    const tok = JSON.parse(localStorage.getItem('tropica_user'))?.token;
+    // Obtener la URL de imagen del elemento asociado al comentario
+    const comment = comments.find(c => c.id === commentId);
+    const elementId = comment?.elementId;
+    let imageUrl = null;
+    if (elementId) {
+      const allItems = [];
+      const collect = (items) => items.forEach(item => {
+        if (item.type === 'rowGroup' && item.items) item.items.forEach(c => allItems.push(c));
+        else allItems.push(item);
+      });
+      collect([...(canvases.desktop || []), ...(canvases.mobile || [])]);
+      const found = allItems.find(i => i.uniqueId === elementId);
+      imageUrl = found?.uploadedImages?.[0] || null;
+    }
+    const res = await fetch(`${API_URL}/api/comments/${commentId}/exception`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tok}` },
+      body: JSON.stringify({ word, reason, imageUrl, projectId: id, elementId })
+    });
+    const result = await res.json();
+    if (result.exception) {
+      setExceptions(prev => [result.exception, ...prev]);
+    }
+    if (result.resolved) {
+      // El backend resolvió el comentario porque ya no hay typos
+      setComments(prev => prev.map(c => c.id === commentId ? { ...c, resolved: true } : c));
+    }
+  };
+
+  const markNotifsRead = async () => {
+    const tok = JSON.parse(localStorage.getItem('tropica_user'))?.token;
+    await fetch(`${API_URL}/api/notifications/read`, {
+      method: 'PATCH', headers: { 'Authorization': `Bearer ${tok}` }
+    });
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  };
+
+  const addException = async () => {
+    if (!newExWord.trim()) return;
+    const tok = JSON.parse(localStorage.getItem('tropica_user'))?.token;
+    setNewExLoading(true);
+    const res = await fetch(`${API_URL}/api/projects/${id}/exceptions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tok}` },
+      body: JSON.stringify({ word: newExWord, reason: newExReason })
+    });
+    const ex = await res.json();
+    if (ex.id) {
+      setExceptions(prev => [ex, ...prev]);
+      setNewExWord(''); setNewExReason('');
+    }
+    setNewExLoading(false);
+  };
+
+  const deleteException = async (exId) => {
+    const tok = JSON.parse(localStorage.getItem('tropica_user'))?.token;
+    await fetch(`${API_URL}/api/exceptions/${exId}`, {
+      method: 'DELETE', headers: { 'Authorization': `Bearer ${tok}` }
+    });
+    setExceptions(prev => prev.filter(e => e.id !== exId));
+  };
+
+  const editException = async (exId) => {
+    if (!editWord.trim()) return;
+    const tok = JSON.parse(localStorage.getItem('tropica_user'))?.token;
+    const res = await fetch(`${API_URL}/api/exceptions/${exId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tok}` },
+      body: JSON.stringify({ word: editWord, reason: editReason })
+    });
+    const updated = await res.json();
+    if (updated.id) {
+      setExceptions(prev => prev.map(e => e.id === exId ? updated : e));
+      setEditingExId(null);
+    }
+  };
+
   const triggerUpload = (uniqueId) => {
     setUploadTargetId(uniqueId);
     setUploadIndex(0);
@@ -182,7 +777,96 @@ function Editor() {
     }
   };
 
-  // Drag & Drop de archivos del sistema operativo sobre el componente
+  // Analiza una imagen subida con Gemini Vision para detectar typos
+  const analyzeImageForTypos = async (imageUrl, elementId) => {
+    const tok = JSON.parse(localStorage.getItem('tropica_user'))?.token;
+    let elementOwnerId = null;
+    const findOwner = (items) => {
+      for (const item of items) {
+        if (item.uniqueId === elementId) { elementOwnerId = item.addedBy || null; return; }
+        if (item.type === 'rowGroup' && item.items) {
+          for (const child of item.items) {
+            if (child.uniqueId === elementId) { elementOwnerId = child.addedBy || null; return; }
+          }
+        }
+      }
+    };
+    const allItems = [...(canvases.desktop || []), ...(canvases.mobile || [])];
+    findOwner(allItems);
+    try {
+      const res = await fetch(`${API_URL}/api/analyze-typos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tok}` },
+        body: JSON.stringify({ imageUrl, projectId: id, elementId, elementOwnerId })
+      });
+      const result = await res.json();
+      if (result.typos && result.comment) {
+        setComments(prev => [...prev, result.comment]);
+        if (result.notification) {
+          setNotifications(prev => [result.notification, ...prev]);
+        }
+      }
+    } catch (e) {
+      console.error('Error analizando imagen:', e);
+    }
+  };
+
+  // Verifica que las dimensiones de la imagen coincidan con las del elemento
+  const checkImageDimensions = (imageUrl, elementId) => {
+    const tok = JSON.parse(localStorage.getItem('tropica_user'))?.token;
+
+    // Encontrar el elemento en cualquiera de los dos canvases
+    let foundItem = null;
+    const searchItem = (items) => {
+      for (const item of items) {
+        if (item.uniqueId === elementId) { foundItem = item; return; }
+        if (item.type === 'rowGroup' && item.items) {
+          for (const child of item.items) {
+            if (child.uniqueId === elementId) { foundItem = child; return; }
+          }
+        }
+      }
+    };
+    searchItem([...(canvases.desktop || []), ...(canvases.mobile || [])]);
+    if (!foundItem) return;
+
+    const expectedSize = viewMode === 'desktop' ? foundItem.desktopSize : foundItem.mobileSize;
+    if (!expectedSize?.width || !expectedSize?.height) return;
+
+    const img = new window.Image();
+    img.onload = async () => {
+      const actualW = img.naturalWidth;
+      const actualH = img.naturalHeight;
+      const expW = expectedSize.width;
+      const expH = expectedSize.height;
+
+      // Tolerancia del 5% para evitar falsos positivos por compresión
+      const tol = 0.05;
+      const wOk = Math.abs(actualW - expW) / expW <= tol;
+      const hOk = Math.abs(actualH - expH) / expH <= tol;
+
+      if (!wOk || !hOk) {
+        const elementOwnerId = foundItem.addedBy || null;
+        const text = `**Aviso de dimensiones:**\n\nLa imagen subida mide **${actualW} × ${actualH} px** pero este elemento espera **${expW} × ${expH} px**.\n\nConsiderá reemplazarla con una imagen del tamaño correcto para evitar distorsión.`;
+        try {
+          const res = await fetch(`${API_URL}/api/maia-comment`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tok}` },
+            body: JSON.stringify({ imageUrl, projectId: id, elementId, elementOwnerId, text })
+          });
+          const result = await res.json();
+          if (result.comment) {
+            setComments(prev => [...prev, result.comment]);
+            if (result.notification) setNotifications(prev => [result.notification, ...prev]);
+          }
+        } catch (e) {
+          console.error('Error en checkImageDimensions:', e);
+        }
+      }
+    };
+    img.src = imageUrl;
+  };
+
   const handleFileDrop = (e, uniqueId) => {
     if (isPreviewMode) return;
     // Si es un archivo del SO (no un componente de la barra lateral)
@@ -224,6 +908,9 @@ function Editor() {
               }
               return item;
             }));
+            // Análisis IA en background
+            analyzeImageForTypos(data.url, uniqueId);
+            checkImageDimensions(data.url, uniqueId);
           }
         } catch (error) {
           console.error('Error subiendo imagen por drag:', error);
@@ -276,6 +963,9 @@ function Editor() {
               }
               return item;
             }));
+            // Análisis IA en background
+            analyzeImageForTypos(data.url, uploadTargetId);
+            checkImageDimensions(data.url, uploadTargetId);
           }
         } catch (error) {
           console.error('Error subiendo imagen a Cloudinary:', error);
@@ -428,7 +1118,7 @@ function Editor() {
     if (componentId) {
       const component = componentsList.find(c => c.id === componentId);
       if (component) {
-        const newItem = { ...component, uniqueId: 'comp-' + Date.now() + Math.random() };
+        const newItem = { ...component, uniqueId: 'comp-' + Date.now() + Math.random(), addedBy: user?.id };
 
         let itemsToAdd = [newItem];
         if (forceBottom) {
@@ -726,6 +1416,57 @@ function Editor() {
             <Trash2 size={16} />
           </button>
         )}
+        {!isPreviewMode && item.addedBy && getCollabColor(item.addedBy) && (
+          <div
+            title={projectCollabs.find(c => c.id === item.addedBy)?.name || ''}
+            style={{
+              position: 'absolute', bottom: '6px', right: '8px',
+              width: '10px', height: '10px', borderRadius: '50%',
+              background: getCollabColor(item.addedBy),
+              border: '2px solid rgba(255,255,255,0.9)',
+              zIndex: 20,
+              boxShadow: '0 1px 4px rgba(0,0,0,0.35)',
+              pointerEvents: 'none'
+            }}
+          />
+        )}
+        {/* Indicador de comentarios en el elemento */}
+        {!isPreviewMode && comments.some(c => c.elementId === item.uniqueId && !c.resolved) && (
+          <div
+            onClick={e => { e.stopPropagation(); setActiveCommentElId(item.uniqueId); }}
+            title="Ver comentarios"
+            style={{
+              position: 'absolute', top: '6px', right: '8px',
+              background: '#3483fa', color: 'white', borderRadius: '10px',
+              fontSize: '10px', fontWeight: '800', padding: '2px 7px',
+              zIndex: 20, cursor: 'pointer', boxShadow: '0 2px 8px rgba(52,131,250,0.4)',
+              display: 'flex', alignItems: 'center', gap: '3px'
+            }}
+          >
+            💬 {comments.filter(c => c.elementId === item.uniqueId && !c.resolved).length}
+          </div>
+        )}
+        {/* Panel de comentarios flotante */}
+        {!isPreviewMode && activeCommentElId === item.uniqueId && (
+          <CommentPanel
+            elementId={item.uniqueId}
+            elementName={item.name || 'Elemento'}
+            comments={comments}
+            projectCollabs={projectCollabs}
+            replyingTo={replyingTo}
+            setReplyingTo={setReplyingTo}
+            commentInputs={commentInputs}
+            setCommentInputs={setCommentInputs}
+            mentionQuery={mentionQuery}
+            setMentionQuery={setMentionQuery}
+            onClose={() => setActiveCommentElId(null)}
+            onSubmit={submitComment}
+            onResolve={resolveComment}
+            onDelete={deleteComment}
+            onException={handleException}
+            getCollabColor={getCollabColor}
+          />
+        )}
         <div
           className="component-placeholder"
           style={{ height: `${height}px`, width: '100%', position: 'relative', padding: 0 }}
@@ -917,8 +1658,32 @@ function Editor() {
             {isPreviewMode ? <><Edit3 size={14} /> Editor</> : <><Play size={14} /> Preview</>}
           </button>
 
+          {/* Botón Exportar PDF — solo en preview */}
+          {isPreviewMode && (
+            <button
+              onClick={exportToPdf}
+              disabled={isExporting}
+              style={{ background: isExporting ? 'rgba(16,185,129,0.1)' : 'rgba(16,185,129,0.15)', color: '#34d399', border: '1px solid rgba(52,211,153,0.35)', padding: '6px 14px', borderRadius: '6px', cursor: isExporting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '700', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.06em', transition: 'all 0.2s', opacity: isExporting ? 0.6 : 1 }}
+              onMouseEnter={e => { if (!isExporting) e.currentTarget.style.background = 'rgba(16,185,129,0.25)'; }}
+              onMouseLeave={e => { if (!isExporting) e.currentTarget.style.background = 'rgba(16,185,129,0.15)'; }}
+            >
+              <FileDown size={14} />
+              {isExporting ? 'Exportando…' : 'Exportar PDF'}
+            </button>
+          )}
+
           <button
             onClick={async () => {
+              // Paso 1: verificación MAIA
+              setMaiaCheckState('checking');
+              setMaiaCheckItems([]);
+              const { errors } = await runMaiaPrePublishCheck();
+              if (errors.length > 0) {
+                setMaiaCheckState({ errors });
+                return;
+              }
+              setMaiaCheckState('ok');
+              // Paso 2: publicar
               setIsPublishing(true);
               try {
                 const res = await fetch(`${API_URL}/api/projects/${id}/publish`, {
@@ -931,8 +1696,9 @@ function Editor() {
                 if (data.isPublished) setShowPublishModal(true);
               } catch (e) { console.error(e); }
               setIsPublishing(false);
+              setMaiaCheckState(null);
             }}
-            style={{ background: isPublished ? '#fff159' : '#fff159', color: '#1a1f2e', border: 'none', padding: '7px 18px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '800', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.06em', transition: 'all 0.18s' }}
+            style={{ background: '#fff159', color: '#1a1f2e', border: 'none', padding: '7px 18px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '800', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.06em', transition: 'all 0.18s' }}
             onMouseEnter={e => e.currentTarget.style.background = '#ffe800'}
             onMouseLeave={e => e.currentTarget.style.background = '#fff159'}
           >
@@ -973,17 +1739,292 @@ function Editor() {
             );
           })()}
 
-          {user && (
+          {/* Botón MAIA — panel de excepciones creativas */}
+          <div style={{ position: 'relative' }}>
+            <button
+              id="maia-exceptions-btn"
+              onClick={() => setShowMaiaPanel(p => !p)}
+              title="Excepciones creativas de MAIA"
+              style={{ background: showMaiaPanel ? 'rgba(139,92,246,0.25)' : 'rgba(255,255,255,0.08)', border: showMaiaPanel ? '1px solid rgba(139,92,246,0.5)' : '1px solid transparent', color: 'white', cursor: 'pointer', padding: '3px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '34px', height: '34px', overflow: 'hidden', transition: 'all 0.18s', flexShrink: 0 }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(139,92,246,0.2)'}
+              onMouseLeave={e => e.currentTarget.style.background = showMaiaPanel ? 'rgba(139,92,246,0.25)' : 'rgba(255,255,255,0.08)'}
+            >
+              <img src="/MAIA.png" alt="MAIA" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+            </button>
+            {exceptions.length > 0 && (
+              <span style={{ position: 'absolute', top: '0px', right: '0px', background: '#8b5cf6', color: 'white', borderRadius: '50%', width: '14px', height: '14px', fontSize: '8px', fontWeight: '800', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid #1a1f2e' }}>{exceptions.length > 9 ? '9+' : exceptions.length}</span>
+            )}
+            {showMaiaPanel && (
+              <div style={{ position: 'absolute', top: '44px', right: 0, width: '320px', background: 'white', borderRadius: '14px', boxShadow: '0 8px 40px rgba(0,0,0,0.22)', border: '1px solid #e0e5ef', zIndex: 9999, overflow: 'hidden', fontFamily: "'Inter', sans-serif" }}>
+                {/* Header */}
+                <div style={{ background: '#1a1f2e', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <img src="/MAIA.png" alt="MAIA" style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #8b5cf6' }} />
+                  <div style={{ flex: 1 }}>
+                    <p style={{ margin: 0, color: 'white', fontWeight: '800', fontSize: '13px' }}>Excepciones creativas</p>
+                    <p style={{ margin: 0, color: 'rgba(255,255,255,0.4)', fontSize: '10px' }}>Palabras que MAIA no marca como error</p>
+                  </div>
+                  <button onClick={() => setShowMaiaPanel(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '16px' }}>✕</button>
+                </div>
+
+                {/* Form agregar */}
+                <div style={{ padding: '12px 14px', borderBottom: '1px solid #f0f2f7', background: '#faf5ff' }}>
+                  <p style={{ margin: '0 0 8px', fontSize: '10px', fontWeight: '700', color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.07em' }}>+ Agregar excepción</p>
+                  <input
+                    value={newExWord}
+                    onChange={e => setNewExWord(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') addException(); }}
+                    placeholder='Palabra exacta (ej: "Ofertass")'
+                    style={{ width: '100%', fontSize: '12px', border: '1.5px solid #ddd6fe', borderRadius: '6px', padding: '6px 8px', outline: 'none', marginBottom: '6px', boxSizing: 'border-box', fontFamily: 'inherit', background: 'white' }}
+                    onFocus={e => e.target.style.borderColor = '#8b5cf6'}
+                    onBlur={e => e.target.style.borderColor = '#ddd6fe'}
+                  />
+                  <input
+                    value={newExReason}
+                    onChange={e => setNewExReason(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') addException(); }}
+                    placeholder='Razón creativa (opcional)'
+                    style={{ width: '100%', fontSize: '12px', border: '1.5px solid #ddd6fe', borderRadius: '6px', padding: '6px 8px', outline: 'none', marginBottom: '8px', boxSizing: 'border-box', fontFamily: 'inherit', background: 'white' }}
+                    onFocus={e => e.target.style.borderColor = '#8b5cf6'}
+                    onBlur={e => e.target.style.borderColor = '#ddd6fe'}
+                  />
+                  <button
+                    disabled={!newExWord.trim() || newExLoading}
+                    onClick={addException}
+                    style={{ width: '100%', background: !newExWord.trim() ? '#ede9fe' : '#7c3aed', color: !newExWord.trim() ? '#a78bfa' : 'white', border: 'none', borderRadius: '6px', padding: '7px', fontSize: '12px', fontWeight: '800', cursor: newExWord.trim() ? 'pointer' : 'default', transition: 'all 0.15s' }}
+                  >{newExLoading ? 'Guardando...' : 'Guardar excepción'}</button>
+                </div>
+
+                {/* Lista */}
+                <div style={{ maxHeight: '280px', overflowY: 'auto' }}>
+                  {exceptions.length === 0 ? (
+                    <p style={{ color: '#9ba3b5', fontSize: '12px', textAlign: 'center', padding: '20px 16px', margin: 0 }}>Sin excepciones registradas</p>
+                  ) : exceptions.map(ex => (
+                    <div key={ex.id} style={{ padding: '10px 14px', borderBottom: '1px solid #f0f2f7' }}>
+                      {editingExId === ex.id ? (
+                        /* ── Modo edición ── */
+                        <div>
+                          <input
+                            value={editWord}
+                            onChange={e => setEditWord(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') editException(ex.id); if (e.key === 'Escape') setEditingExId(null); }}
+                            autoFocus
+                            style={{ width: '100%', fontSize: '12px', fontFamily: 'monospace', border: '1.5px solid #8b5cf6', borderRadius: '6px', padding: '5px 8px', outline: 'none', marginBottom: '5px', boxSizing: 'border-box' }}
+                          />
+                          <input
+                            value={editReason}
+                            onChange={e => setEditReason(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') editException(ex.id); if (e.key === 'Escape') setEditingExId(null); }}
+                            placeholder='Razón creativa (opcional)'
+                            style={{ width: '100%', fontSize: '11px', border: '1.5px solid #ddd6fe', borderRadius: '6px', padding: '5px 8px', outline: 'none', marginBottom: '7px', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                            onFocus={e => e.target.style.borderColor = '#8b5cf6'}
+                            onBlur={e => e.target.style.borderColor = '#ddd6fe'}
+                          />
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button
+                              onClick={() => editException(ex.id)}
+                              disabled={!editWord.trim()}
+                              style={{ flex: 1, background: '#7c3aed', color: 'white', border: 'none', borderRadius: '6px', padding: '6px', fontSize: '11px', fontWeight: '800', cursor: 'pointer' }}
+                            >Guardar</button>
+                            <button
+                              onClick={() => setEditingExId(null)}
+                              style={{ flex: 1, background: '#f0f2f7', color: '#6b7280', border: 'none', borderRadius: '6px', padding: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                            >Cancelar</button>
+                          </div>
+                        </div>
+                      ) : (
+                        /* ── Modo lectura ── */
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                          <div style={{ flex: 1 }}>
+                            <p style={{ margin: 0, fontSize: '13px', fontWeight: '700', color: '#1a1f2e', fontFamily: 'monospace' }}>«{ex.word}»</p>
+                            {ex.reason && <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#6b7280', fontStyle: 'italic' }}>{ex.reason}</p>}
+                            <p style={{ margin: '2px 0 0', fontSize: '10px', color: '#b0b9cc' }}>{new Date(ex.createdAt).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                          </div>
+                          <button
+                            onClick={() => { setEditingExId(ex.id); setEditWord(ex.word); setEditReason(ex.reason || ''); }}
+                            title="Editar excepción"
+                            style={{ background: 'none', border: 'none', color: '#8b5cf6', cursor: 'pointer', fontSize: '13px', padding: '2px 4px', borderRadius: '4px', flexShrink: 0 }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#f5f3ff'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                          >✏</button>
+                          <button
+                            onClick={() => deleteException(ex.id)}
+                            title="Eliminar excepción"
+                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '13px', padding: '2px 4px', flexShrink: 0, borderRadius: '4px' }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#fee2e2'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                          >🗑</button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Campana de notificaciones */}
+          <div style={{ position: 'relative' }}>
+            <button
+              id="notif-bell-btn"
+              onClick={() => { setShowNotifPanel(!showNotifPanel); if (!showNotifPanel) markNotifsRead(); }}
+              style={{ background: 'rgba(255,255,255,0.08)', border: 'none', color: 'rgba(255,255,255,0.65)', cursor: 'pointer', padding: '6px 10px', borderRadius: '6px', display: 'flex', alignItems: 'center', transition: 'all 0.18s', position: 'relative' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.14)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+            >
+              <Bell size={18} />
+              {unreadCount > 0 && (
+                <span style={{ position: 'absolute', top: '2px', right: '2px', background: '#ef4444', color: 'white', borderRadius: '50%', width: '16px', height: '16px', fontSize: '9px', fontWeight: '800', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid #1a1f2e' }}>{unreadCount > 9 ? '9+' : unreadCount}</span>
+              )}
+            </button>
+            {showNotifPanel && (
+              <div style={{ position: 'absolute', top: '44px', right: 0, width: '300px', background: 'white', borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.18)', border: '1px solid #e0e5ef', zIndex: 9999, overflow: 'hidden' }}>
+                <div style={{ padding: '12px 16px', background: '#1a1f2e', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'white', fontWeight: '800', fontSize: '13px' }}>🔔 Notificaciones</span>
+                  <button onClick={() => setShowNotifPanel(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '16px' }}>✕</button>
+                </div>
+                <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
+                  {notifications.length === 0 ? (
+                    <p style={{ color: '#9ba3b5', fontSize: '13px', textAlign: 'center', padding: '24px 16px', margin: 0 }}>Sin notificaciones</p>
+                  ) : notifications.map(n => (
+                    <div key={n.id}
+                      onClick={() => {
+                        setShowNotifPanel(false);
+                        const elementId = n.comment?.elementId;
+                        if (elementId) scrollToElement(elementId);
+                      }}
+                      style={{ padding: '10px 14px', borderBottom: '1px solid #f0f2f7', cursor: 'pointer', background: n.read ? 'white' : '#eef4ff', display: 'flex', gap: '10px', alignItems: 'flex-start' }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#f4f6fb'}
+                      onMouseLeave={e => e.currentTarget.style.background = n.read ? 'white' : '#eef4ff'}
+                    >
+                      {!n.read && <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#3483fa', marginTop: '5px', flexShrink: 0 }} />}
+                      <div style={{ flex: 1 }}>
+                        <p style={{ margin: '0 0 2px', fontSize: '12px', fontWeight: '700', color: '#1a1f2e' }}>
+                          {n.comment.author.name} te mencionó
+                        </p>
+                        <p style={{ margin: '0 0 2px', fontSize: '11px', color: '#6b7280' }}>en "{n.comment.project.title}"</p>
+                        <p style={{ margin: 0, fontSize: '12px', color: '#4b5563', fontStyle: 'italic' }}>«{n.comment.text.slice(0, 60)}{n.comment.text.length > 60 ? '…' : ''}»</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {projectCollabs.length > 0 && (
             <div style={{ width: '1px', height: '24px', background: 'rgba(255,255,255,0.1)', margin: '0 2px' }} />
           )}
-          {user && (
-            (user.picture || user.avatar) ? (
-              <img src={user.picture || user.avatar} alt={user.name || 'Avatar'} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #fff159' }} />
-            ) : (
-              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#fff159', color: '#1a1f2e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '14px' }}>
-                {(user.name || user.email || 'U').charAt(0).toUpperCase()}
+          {/* Avatares de todos los colaboradores con anillo de color */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {projectCollabs.map((collab) => (
+              <div
+                key={collab.id}
+                title={collab.name || collab.email}
+                style={{
+                  width: '32px', height: '32px', borderRadius: '50%',
+                  border: `2.5px solid ${collab.color}`,
+                  overflow: 'hidden', flexShrink: 0,
+                  boxShadow: `0 0 0 1px rgba(0,0,0,0.3), 0 0 8px ${collab.color}55`,
+                  transition: 'transform 0.15s',
+                  cursor: 'default'
+                }}
+                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.12)'}
+                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+              >
+                {(collab.picture || collab.avatar) ? (
+                  <img
+                    src={collab.picture || collab.avatar}
+                    alt={collab.name || 'Avatar'}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <div style={{
+                    width: '100%', height: '100%',
+                    background: collab.color === '#fff159' ? '#fff159' : collab.color,
+                    color: collab.color === '#fff159' ? '#1a1f2e' : 'white',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontWeight: '800', fontSize: '13px'
+                  }}>
+                    {(collab.name || collab.email || 'U').charAt(0).toUpperCase()}
+                  </div>
+                )}
               </div>
-            )
+            ))}
+          </div>
+
+          {/* Botón + para agregar colaborador (solo owner) */}
+          {user && projectCollabs.length > 0 && projectCollabs[0]?.id === user.id && (
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => { setShowAddCollab(!showAddCollab); setCollabSearch(''); }}
+                title="Agregar colaborador"
+                style={{
+                  width: '32px', height: '32px', borderRadius: '50%',
+                  background: 'rgba(255,255,255,0.1)', border: '2px dashed rgba(255,255,255,0.35)',
+                  color: 'rgba(255,255,255,0.7)', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '20px', fontWeight: '300', lineHeight: 1,
+                  transition: 'all 0.18s'
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.18)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.6)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.35)'; }}
+              >+</button>
+
+              {showAddCollab && (() => {
+                const collabIds = new Set(projectCollabs.map(c => c.id));
+                const available = allUsers.filter(u =>
+                  !collabIds.has(u.id) &&
+                  ((u.name || '').toLowerCase().includes(collabSearch.toLowerCase()) ||
+                   (u.email || '').toLowerCase().includes(collabSearch.toLowerCase()))
+                );
+                return (
+                  <div style={{
+                    position: 'absolute', top: '42px', right: 0,
+                    width: '240px', background: 'white', borderRadius: '12px',
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.2)', border: '1px solid #e0e5ef',
+                    zIndex: 9999, overflow: 'hidden'
+                  }}>
+                    <div style={{ padding: '10px 12px', background: '#1a1f2e', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'white', fontSize: '12px', fontWeight: '700' }}>Agregar colaborador</span>
+                      <button onClick={() => setShowAddCollab(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '14px' }}>✕</button>
+                    </div>
+                    <div style={{ padding: '8px' }}>
+                      <input
+                        autoFocus
+                        value={collabSearch}
+                        onChange={e => setCollabSearch(e.target.value)}
+                        placeholder="Buscar por nombre o email…"
+                        style={{ width: '100%', fontSize: '12px', border: '1.5px solid #e0e5ef', borderRadius: '7px', padding: '6px 10px', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                        onFocus={e => e.target.style.borderColor = '#3483fa'}
+                        onBlur={e => e.target.style.borderColor = '#e0e5ef'}
+                      />
+                    </div>
+                    <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                      {available.length === 0 ? (
+                        <p style={{ color: '#9ba3b5', fontSize: '12px', textAlign: 'center', padding: '16px', margin: 0 }}>Sin usuarios disponibles</p>
+                      ) : available.map(u => (
+                        <div
+                          key={u.id}
+                          onClick={() => addCollaborator(u.id)}
+                          style={{ padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '9px', borderBottom: '1px solid #f0f2f7' }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#f4f6fb'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'white'}
+                        >
+                          <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#3483fa', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '800', flexShrink: 0, overflow: 'hidden' }}>
+                            {u.avatar ? <img src={u.avatar} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : (u.name || 'U').charAt(0).toUpperCase()}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ margin: 0, fontSize: '12px', fontWeight: '700', color: '#1a1f2e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.name}</p>
+                            <p style={{ margin: 0, fontSize: '10px', color: '#9ba3b5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.email}</p>
+                          </div>
+                          <span style={{ fontSize: '18px', color: '#3483fa', fontWeight: '300' }}>+</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
           )}
         </div>
       </div>
@@ -1027,7 +2068,7 @@ function Editor() {
 
           <div className="canvas-container" onMouseDown={handleMouseDown} ref={containerRef}>
             <div style={{ width: (viewMode === 'desktop' ? 1920 : 375) * scale, display: 'flex', justifyContent: 'center', transition: 'width 0.3s ease' }}>
-              <div className={`canvas-wrapper ${viewMode}`} style={{ transform: `scale(${scale})`, transformOrigin: 'top center' }}>
+              <div className={`canvas-wrapper ${viewMode}`} ref={pdfCanvasRef} style={{ transform: `scale(${scale})`, transformOrigin: 'top center' }}>
                 <div className={`meli-header-container ${viewMode === 'mobile' ? 'mobile-header' : ''}`}>
                   <div className="meli-header-top">
                     <div className="meli-logo"><img src="https://http2.mlstatic.com/frontend-assets/ml-web-navigation/ui-navigation/6.6.73/mercadolibre/logo_large_25years_v2.png" alt="Mercado Libre" /></div>
@@ -1148,6 +2189,9 @@ function Editor() {
                       <Edit3 size={16} /> Editar Textos
                     </div>
                   )}
+                  <div className="context-menu-item" onClick={() => { setActiveCommentElId(contextMenu.targetId); setContextMenu(null); }} style={{ fontWeight: 'bold', color: '#6b7280' }}>
+                    💬 Comentar
+                  </div>
                   <div className="context-menu-item" onClick={() => { triggerUpload(contextMenu.targetId); setContextMenu(null); }} style={{ fontWeight: 'bold', color: '#3483fa' }}>
                     <ImageIcon size={16} /> {hasImage ? 'Cambiar Imagen' : 'Subir Imagen'}
                   </div>
@@ -1242,6 +2286,109 @@ function Editor() {
         onChange={handleGlobalImageUpload}
       />
 
+      {/* ── MAIA Pre-publish check overlay ── */}
+      {maiaCheckState && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 99998,
+          background: 'rgba(10,14,26,0.88)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          backdropFilter: 'blur(6px)',
+          animation: 'fadeIn 0.25s ease'
+        }}>
+          <div style={{
+            background: '#0f1420', borderRadius: '20px',
+            padding: '36px 40px', minWidth: '420px', maxWidth: '520px',
+            boxShadow: '0 32px 80px rgba(0,0,0,0.6)',
+            border: '1px solid rgba(255,255,255,0.06)',
+            fontFamily: "'Inter', sans-serif",
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px'
+          }}>
+
+            {/* MAIA avatar + título */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{
+                width: '52px', height: '52px', borderRadius: '50%',
+                overflow: 'hidden', flexShrink: 0,
+                boxShadow: maiaCheckState === 'checking'
+                  ? '0 0 0 3px #3483fa, 0 0 20px #3483fa88'
+                  : maiaCheckState === 'ok'
+                  ? '0 0 0 3px #10b981, 0 0 20px #10b98188'
+                  : '0 0 0 3px #ef4444, 0 0 20px #ef444488)',
+                animation: maiaCheckState === 'checking' ? 'pulse 1.4s infinite' : 'none'
+              }}>
+                <img src="/MAIA.png" alt="MAIA" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              </div>
+              <div>
+                <p style={{ margin: 0, fontWeight: '800', fontSize: '17px', color: '#ffffff' }}>
+                  {maiaCheckState === 'checking' ? 'Verificando maqueta...' :
+                   maiaCheckState === 'ok' ? '¡Todo en orden!' :
+                   'No se puede publicar'}
+                </p>
+                <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>
+                  {maiaCheckState === 'checking' ? 'MAIA está revisando cada elemento' :
+                   maiaCheckState === 'ok' ? 'Publicando...' :
+                   'Corregí los errores antes de publicar'}
+                </p>
+              </div>
+            </div>
+
+            {/* Lista de items verificados */}
+            {maiaCheckState === 'checking' && maiaCheckItems.length > 0 && (
+              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {maiaCheckItems.map((item, i) => (
+                  <div key={i} style={{
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                    background: 'rgba(255,255,255,0.04)', borderRadius: '8px',
+                    padding: '8px 12px',
+                    border: `1px solid ${item.status === 'ok' ? 'rgba(16,185,129,0.3)' : item.status === 'error' ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.06)'}`
+                  }}>
+                    <span style={{ fontSize: '16px', flexShrink: 0 }}>
+                      {item.status === 'pending' ? '⏳' : item.status === 'ok' ? '✅' : '❌'}
+                    </span>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ margin: 0, fontSize: '12px', fontWeight: '700', color: '#e2e8f0' }}>{item.name}</p>
+                      {item.msg && <p style={{ margin: '1px 0 0', fontSize: '10px', color: '#ef4444' }}>{item.msg}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Error screen */}
+            {maiaCheckState !== 'checking' && maiaCheckState !== 'ok' && maiaCheckState?.errors && (
+              <div style={{ width: '100%' }}>
+                <div style={{
+                  background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
+                  borderRadius: '10px', padding: '14px', marginBottom: '16px'
+                }}>
+                  {maiaCheckState.errors.map((err, i) => (
+                    <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: i < maiaCheckState.errors.length - 1 ? '8px' : 0 }}>
+                      <span style={{ fontSize: '14px', flexShrink: 0 }}>❌</span>
+                      <div>
+                        <p style={{ margin: 0, fontSize: '12px', fontWeight: '700', color: '#fca5a5' }}>{err.name}</p>
+                        <p style={{ margin: '1px 0 0', fontSize: '11px', color: 'rgba(252,165,165,0.7)' }}>{err.msg}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setMaiaCheckState(null)}
+                  style={{
+                    width: '100%', padding: '12px',
+                    background: '#fff159', color: '#1a1f2e',
+                    border: 'none', borderRadius: '10px',
+                    fontWeight: '800', fontSize: '13px', cursor: 'pointer',
+                    textTransform: 'uppercase', letterSpacing: '0.06em'
+                  }}
+                >
+                  Corregir y volver al editor
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Panel flotante de edición de textos */}
       {textEditorPanel && (() => {
         const panelItem = textEditorPanel.item;
@@ -1330,6 +2477,7 @@ function Editor() {
           </div>
         );
       })()}
+
     </div>
   );
 }

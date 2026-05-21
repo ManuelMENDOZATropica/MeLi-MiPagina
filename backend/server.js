@@ -131,6 +131,30 @@ app.post('/api/auth/google', async (req, res) => {
 
 
 // =======================
+// RUTAS DE USUARIOS
+// =======================
+app.get('/api/users', authenticateToken, async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      where: {
+        id: { not: req.user.id }
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        avatar: true
+      },
+      orderBy: { name: 'asc' }
+    });
+    res.json(users);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error fetching users' });
+  }
+});
+
+// =======================
 // RUTAS DE PROYECTOS (API REST)
 // =======================
 
@@ -138,11 +162,25 @@ app.post('/api/auth/google', async (req, res) => {
 app.get('/api/projects', authenticateToken, async (req, res) => {
   try {
     const projects = await prisma.project.findMany({
-      where: { userId: req.user.id },
+      where: {
+        OR: [
+          { userId: req.user.id },
+          { editors: { some: { userId: req.user.id } } }
+        ]
+      },
+      include: {
+        user: { select: { id: true, name: true, email: true, avatar: true } },
+        editors: {
+          include: {
+            user: { select: { id: true, name: true, email: true, avatar: true } }
+          }
+        }
+      },
       orderBy: { updatedAt: 'desc' }
     });
     res.json(projects);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: 'Error fetching projects' });
   }
 });
@@ -150,18 +188,30 @@ app.get('/api/projects', authenticateToken, async (req, res) => {
 // 2. Crear un nuevo proyecto en blanco
 app.post('/api/projects', authenticateToken, async (req, res) => {
   try {
-    const { title } = req.body;
+    const { title, editorIds } = req.body;
     const newProject = await prisma.project.create({
       data: {
         title: title || 'Nuevo Proyecto de Landing',
         desktopLayout: [],
         mobileLayout: [],
         canvasNodes: {},
-        userId: req.user.id
+        userId: req.user.id,
+        editors: {
+          create: Array.isArray(editorIds) ? editorIds.map(userId => ({ userId })) : []
+        }
+      },
+      include: {
+        user: { select: { id: true, name: true, email: true, avatar: true } },
+        editors: {
+          include: {
+            user: { select: { id: true, name: true, email: true, avatar: true } }
+          }
+        }
       }
     });
     res.json(newProject);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: 'Error creating project' });
   }
 });
@@ -169,13 +219,28 @@ app.post('/api/projects', authenticateToken, async (req, res) => {
 // 3. Obtener un proyecto específico (para el Editor)
 app.get('/api/projects/:id', authenticateToken, async (req, res) => {
   try {
-    const project = await prisma.project.findUnique({
-      where: { id: req.params.id, userId: req.user.id }
+    const project = await prisma.project.findFirst({
+      where: {
+        id: req.params.id,
+        OR: [
+          { userId: req.user.id },
+          { editors: { some: { userId: req.user.id } } }
+        ]
+      },
+      include: {
+        user: { select: { id: true, name: true, email: true, avatar: true } },
+        editors: {
+          include: {
+            user: { select: { id: true, name: true, email: true, avatar: true } }
+          }
+        }
+      }
     });
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    if (!project) return res.status(404).json({ error: 'Project not found or unauthorized' });
     
     res.json(project);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: 'Error fetching project' });
   }
 });
@@ -191,8 +256,19 @@ app.patch('/api/projects/:id', authenticateToken, async (req, res) => {
     if (canvasNodes !== undefined) updateData.canvasNodes = canvasNodes;
     if (title !== undefined) updateData.title = title;
 
+    const existingProject = await prisma.project.findFirst({
+      where: {
+        id: req.params.id,
+        OR: [
+          { userId: req.user.id },
+          { editors: { some: { userId: req.user.id } } }
+        ]
+      }
+    });
+    if (!existingProject) return res.status(404).json({ error: 'Project not found or unauthorized' });
+
     const project = await prisma.project.update({
-      where: { id: req.params.id, userId: req.user.id },
+      where: { id: req.params.id },
       data: updateData
     });
     
@@ -206,16 +282,558 @@ app.patch('/api/projects/:id', authenticateToken, async (req, res) => {
 // 5. Eliminar proyecto
 app.delete('/api/projects/:id', authenticateToken, async (req, res) => {
   try {
+    const project = await prisma.project.findUnique({
+      where: { id: req.params.id }
+    });
+    
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    if (project.userId !== req.user.id) return res.status(403).json({ error: 'Only the project owner can delete it' });
+
     await prisma.project.delete({
-      where: { id: req.params.id, userId: req.user.id }
+      where: { id: req.params.id }
     });
     res.json({ success: true });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: 'Error deleting project' });
   }
 });
 
+// Agregar editor a un proyecto (solo el owner puede hacerlo)
+app.post('/api/projects/:id/editors', authenticateToken, async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId requerido' });
+
+    const project = await prisma.project.findUnique({ where: { id: req.params.id } });
+    if (!project) return res.status(404).json({ error: 'Proyecto no encontrado' });
+    if (project.userId !== req.user.id) return res.status(403).json({ error: 'Solo el owner puede agregar colaboradores' });
+    if (project.userId === userId) return res.status(400).json({ error: 'El owner ya tiene acceso' });
+
+    await prisma.projectEditor.upsert({
+      where: { projectId_userId: { projectId: req.params.id, userId } },
+      create: { projectId: req.params.id, userId },
+      update: {}
+    });
+
+    const updatedProject = await prisma.project.findUnique({
+      where: { id: req.params.id },
+      include: {
+        user: { select: { id: true, name: true, email: true, avatar: true } },
+        editors: { include: { user: { select: { id: true, name: true, email: true, avatar: true } } } }
+      }
+    });
+    res.json(updatedProject);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error adding editor' });
+  }
+});
+
+// =======================
+// ANÁLISIS DE TYPOS CON IA
+// =======================
+
+// Helper: construye el prompt de typos con las excepciones del proyecto
+const buildTypoPrompt = (exceptions = []) => {
+  let base = `Eres un corrector de pruebas profesional de publicidad digital. Analiza el texto visible en esta imagen de un banner o elemento de marketing.
+Busca únicamente errores ortográficos, errores tipográficos, palabras mal escritas o errores gramaticales evidentes en español o inglés.`;
+  if (exceptions.length > 0) {
+    const list = exceptions.map(e => `"${e.word}"${e.reason ? ` (${e.reason})` : ''}`).join(', ');
+    base += `\n\nIMPORTANTE: Las siguientes palabras son decisiones creativas intencionales aprobadas para este proyecto y NO deben considerarse errores: ${list}.`;
+  }
+  base += `\nSi encuentras errores responde SOLO con JSON válido: {"found": true, "errors": ["descripción del error 1", "descripción del error 2"]}
+Si NO hay errores responde SOLO: {"found": false}
+Sin texto adicional fuera del JSON.`;
+  return base;
+};
+
+// POST /api/analyze-typos
+// Analiza una imagen con Gemini Vision para detectar errores ortográficos/tipográficos.
+// Si los encuentra, crea un comentario automático en el elemento y notifica al dueño.
+app.post('/api/analyze-typos', authenticateToken, async (req, res) => {
+  const { imageUrl, projectId, elementId, elementOwnerId } = req.body;
+  if (!imageUrl || !projectId || !elementId) {
+    return res.status(400).json({ error: 'imageUrl, projectId y elementId son requeridos' });
+  }
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return res.json({ typos: false, message: 'GEMINI_API_KEY no configurada' });
+  }
+
+  try {
+    // Cargar excepciones del proyecto
+    const exceptions = await prisma.typoException.findMany({ where: { projectId } });
+
+    // Descargar la imagen de Cloudinary y convertirla a base64
+    const imgResponse = await fetch(imageUrl);
+    if (!imgResponse.ok) throw new Error('No se pudo descargar la imagen de Cloudinary');
+    const imgBuffer = await imgResponse.arrayBuffer();
+    const base64Image = Buffer.from(imgBuffer).toString('base64');
+    const mimeType = imgResponse.headers.get('content-type') || 'image/jpeg';
+
+    // Llamada a Gemini Vision (gemini-2.5-flash)
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: buildTypoPrompt(exceptions) },
+              { inline_data: { mime_type: mimeType, data: base64Image } }
+            ]
+          }]
+        })
+      }
+    );
+
+    if (!geminiRes.ok) {
+      const errText = await geminiRes.text();
+      console.error('Gemini API error:', errText);
+      let errDetail = errText;
+      try { errDetail = JSON.parse(errText)?.error?.message || errText; } catch {}
+      return res.json({ typos: false, message: `Gemini error ${geminiRes.status}: ${errDetail}` });
+    }
+
+    const geminiData = await geminiRes.json();
+    const rawText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+
+    let parsed;
+    try {
+      // Extraer JSON de la respuesta (puede venir con ```json ... ```)
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : { found: false };
+    } catch {
+      parsed = { found: false };
+    }
+
+    if (parsed.found && parsed.errors?.length > 0) {
+      // Construir texto del comentario automático
+      const errorList = parsed.errors.map((e, i) => `${i + 1}. ${e}`).join('\n');
+      const commentText = `**Analisis de IA — Posibles typos detectados:**\n\n${errorList}`;
+
+      // Crear comentario como MAIA (usuario IA del sistema)
+      const authorIdToUse = maiaUserId || req.user.id;
+      const comment = await prisma.comment.create({
+        data: {
+          projectId,
+          elementId,
+          authorId: authorIdToUse,
+          text: commentText,
+          mentions: elementOwnerId ? [elementOwnerId] : [],
+          parentId: null
+        },
+        include: {
+          author: { select: { id: true, name: true, email: true, avatar: true } },
+          replies: { include: { author: { select: { id: true, name: true, email: true, avatar: true } } } }
+        }
+      });
+
+      // Notificar al dueño del elemento (si es diferente al que subió)
+      let notification = null;
+      if (elementOwnerId && elementOwnerId !== maiaUserId) {
+        notification = await prisma.notification.create({
+          data: { userId: elementOwnerId, commentId: comment.id, projectId },
+          include: {
+            comment: {
+              include: {
+                author: { select: { id: true, name: true, email: true, avatar: true } },
+                project: { select: { title: true } }
+              }
+            }
+          }
+        });
+      }
+
+      return res.json({ typos: true, errors: parsed.errors, comment, notification });
+    }
+
+    res.json({ typos: false });
+  } catch (error) {
+    console.error('Error en analyze-typos:', error);
+    res.json({ typos: false, message: 'Error interno' });
+  }
+});
+
+// Crea un comentario como MAIA (para checks automáticos: dimensiones, etc.)
+app.post('/api/maia-comment', authenticateToken, async (req, res) => {
+  const { projectId, elementId, elementOwnerId, text } = req.body;
+  if (!projectId || !elementId || !text) return res.status(400).json({ error: 'Faltan campos' });
+  try {
+    const authorIdToUse = maiaUserId || req.user.id;
+    const comment = await prisma.comment.create({
+      data: {
+        projectId, elementId,
+        authorId: authorIdToUse,
+        text,
+        mentions: elementOwnerId ? [elementOwnerId] : [],
+        parentId: null
+      },
+      include: {
+        author: { select: { id: true, name: true, email: true, avatar: true } },
+        replies: { include: { author: { select: { id: true, name: true, email: true, avatar: true } } } }
+      }
+    });
+    let notification = null;
+    if (elementOwnerId && elementOwnerId !== maiaUserId) {
+      notification = await prisma.notification.create({
+        data: { userId: elementOwnerId, commentId: comment.id, projectId },
+        include: {
+          comment: {
+            include: {
+              author: { select: { id: true, name: true, email: true, avatar: true } },
+              project: { select: { title: true } }
+            }
+          }
+        }
+      });
+    }
+    res.json({ ok: true, comment, notification });
+  } catch (e) {
+    console.error('Error en maia-comment:', e);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// Verifica typos en una imagen SIN crear comentario (dry-run para pre-publicación)
+// Acepta projectId opcional para incluir excepciones del proyecto
+app.post('/api/check-typos-only', authenticateToken, async (req, res) => {
+  const { imageUrl, projectId } = req.body;
+  if (!imageUrl) return res.status(400).json({ error: 'Falta imageUrl' });
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return res.json({ hasTypos: false });
+  try {
+    const exceptions = projectId
+      ? await prisma.typoException.findMany({ where: { projectId } })
+      : [];
+    const imgResponse = await fetch(imageUrl);
+    if (!imgResponse.ok) return res.json({ hasTypos: false });
+    const imgBuffer = await imgResponse.arrayBuffer();
+    const base64Image = Buffer.from(imgBuffer).toString('base64');
+    const mimeType = imgResponse.headers.get('content-type') || 'image/jpeg';
+
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [
+            { text: buildTypoPrompt(exceptions) },
+            { inline_data: { mime_type: mimeType, data: base64Image } }
+          ]}],
+          generationConfig: { temperature: 0.1 }
+        })
+      }
+    );
+    const geminiData = await geminiRes.json();
+    const rawText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || '{"found":false}';
+    const cleaned = rawText.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(cleaned);
+    res.json({ hasTypos: parsed.found === true, errors: parsed.errors || [] });
+  } catch (e) {
+    console.error('Error en check-typos-only:', e);
+    res.json({ hasTypos: false });
+  }
+});
+
+// =======================
+// EXCEPCIONES DE TYPOS
+// =======================
+
+// GET excepciones de un proyecto
+app.get('/api/projects/:id/exceptions', authenticateToken, async (req, res) => {
+  const exceptions = await prisma.typoException.findMany({
+    where: { projectId: req.params.id },
+    orderBy: { createdAt: 'desc' }
+  });
+  res.json(exceptions);
+});
+
+// POST agregar excepción manualmente (desde el panel de gestión, sin comentario)
+app.post('/api/projects/:id/exceptions', authenticateToken, async (req, res) => {
+  const { word, reason } = req.body;
+  if (!word?.trim()) return res.status(400).json({ error: 'Falta la palabra' });
+  try {
+    const exception = await prisma.typoException.create({
+      data: { projectId: req.params.id, word: word.trim(), reason: reason?.trim() || null }
+    });
+    res.json(exception);
+  } catch (e) {
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// DELETE eliminar excepción
+app.delete('/api/exceptions/:id', authenticateToken, async (req, res) => {
+  try {
+    await prisma.typoException.delete({ where: { id: req.params.id } });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(404).json({ error: 'Excepción no encontrada' });
+  }
+});
+
+// PATCH editar excepción (palabra y/o razón)
+app.patch('/api/exceptions/:id', authenticateToken, async (req, res) => {
+  const { word, reason } = req.body;
+  if (!word?.trim()) return res.status(400).json({ error: 'Falta la palabra' });
+  try {
+    const updated = await prisma.typoException.update({
+      where: { id: req.params.id },
+      data: { word: word.trim(), reason: reason?.trim() || null }
+    });
+    res.json(updated);
+  } catch (e) {
+    res.status(404).json({ error: 'Excepción no encontrada' });
+  }
+});
+
+// POST crear excepción + re-verificar el comentario MAIA
+// Si ya no hay typos en la imagen → resuelve el comentario automáticamente
+app.post('/api/comments/:commentId/exception', authenticateToken, async (req, res) => {
+  const { word, reason, imageUrl, projectId, elementId } = req.body;
+  if (!word || !projectId) return res.status(400).json({ error: 'Faltan campos' });
+
+  try {
+    // 1. Guardar la excepción
+    const exception = await prisma.typoException.create({
+      data: { projectId, word: word.trim(), reason: reason?.trim() || null, elementId: elementId || null }
+    });
+
+    // 2. Re-verificar la imagen con las excepciones actualizadas (si hay imageUrl)
+    let resolved = false;
+    if (imageUrl) {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (apiKey) {
+        const allExceptions = await prisma.typoException.findMany({ where: { projectId } });
+        const imgResponse = await fetch(imageUrl);
+        if (imgResponse.ok) {
+          const base64Image = Buffer.from(await imgResponse.arrayBuffer()).toString('base64');
+          const mimeType = imgResponse.headers.get('content-type') || 'image/jpeg';
+          const geminiRes = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [
+                  { text: buildTypoPrompt(allExceptions) },
+                  { inline_data: { mime_type: mimeType, data: base64Image } }
+                ]}],
+                generationConfig: { temperature: 0.1 }
+              })
+            }
+          );
+          const geminiData = await geminiRes.json();
+          const rawText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || '{"found":false}';
+          const parsed = JSON.parse(rawText.replace(/```json|```/g, '').trim());
+
+          if (!parsed.found) {
+            // Ya no hay typos → resolver el comentario
+            await prisma.comment.update({
+              where: { id: req.params.commentId },
+              data: { resolved: true }
+            });
+            resolved = true;
+          }
+        }
+      }
+    }
+
+    res.json({ ok: true, exception, resolved });
+  } catch (e) {
+    console.error('Error en exception:', e);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// =======================
+// RUTAS DE COMENTARIOS
+// =======================
+
+// GET todos los comentarios de un proyecto (sin resolver)
+app.get('/api/projects/:id/comments', authenticateToken, async (req, res) => {
+  try {
+    const project = await prisma.project.findFirst({
+      where: {
+        id: req.params.id,
+        OR: [{ userId: req.user.id }, { editors: { some: { userId: req.user.id } } }]
+      }
+    });
+    if (!project) return res.status(404).json({ error: 'Proyecto no encontrado o sin acceso' });
+
+    const comments = await prisma.comment.findMany({
+      where: { projectId: req.params.id, parentId: null }, // solo raíz
+      include: {
+        author: { select: { id: true, name: true, email: true, avatar: true } },
+        replies: {
+          include: {
+            author: { select: { id: true, name: true, email: true, avatar: true } }
+          },
+          orderBy: { createdAt: 'asc' }
+        }
+      },
+      orderBy: { createdAt: 'asc' }
+    });
+    res.json(comments);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error fetching comments' });
+  }
+});
+
+// POST crear comentario (dispara notificaciones a mencionados)
+app.post('/api/projects/:id/comments', authenticateToken, async (req, res) => {
+  try {
+    const { elementId, text, mentions = [], parentId } = req.body;
+    if (!elementId || !text?.trim()) return res.status(400).json({ error: 'elementId y text requeridos' });
+
+    const comment = await prisma.comment.create({
+      data: {
+        projectId: req.params.id,
+        elementId,
+        authorId: req.user.id,
+        text: text.trim(),
+        mentions,
+        parentId: parentId || null
+      },
+      include: {
+        author: { select: { id: true, name: true, email: true, avatar: true } },
+        replies: { include: { author: { select: { id: true, name: true, email: true, avatar: true } } } }
+      }
+    });
+
+    // Notificar a:
+    // 1. El dueño del elemento (addedBy en el canvas layout)
+    // 2. Los @mencionados explícitamente
+    // Siempre excluyendo al autor del comentario
+
+    const project = await prisma.project.findUnique({
+      where: { id: req.params.id },
+      select: { desktopLayout: true, mobileLayout: true }
+    });
+
+    // Buscar el elemento en ambos layouts para encontrar addedBy
+    let elementOwnerId = null;
+    const searchInLayout = (layout) => {
+      if (!Array.isArray(layout)) return;
+      for (const item of layout) {
+        if (item.uniqueId === elementId) { elementOwnerId = item.addedBy || null; return; }
+        if (item.type === 'rowGroup' && Array.isArray(item.items)) {
+          for (const child of item.items) {
+            if (child.uniqueId === elementId) { elementOwnerId = child.addedBy || null; return; }
+          }
+        }
+      }
+    };
+    searchInLayout(project.desktopLayout);
+    if (!elementOwnerId) searchInLayout(project.mobileLayout);
+
+    // Unir destinatarios: dueño del elemento + mencionados, sin duplicados, sin el autor
+    const recipientIds = [...new Set([
+      elementOwnerId,
+      ...mentions
+    ].filter(uid => uid && uid !== req.user.id))];
+
+    if (recipientIds.length > 0) {
+      await prisma.notification.createMany({
+        data: recipientIds.map(userId => ({
+          userId,
+          commentId: comment.id,
+          projectId: req.params.id
+        }))
+      });
+    }
+
+    res.json(comment);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error creating comment' });
+  }
+});
+
+// PATCH resolver/abrir un comentario
+app.patch('/api/comments/:id/resolve', authenticateToken, async (req, res) => {
+  try {
+    const comment = await prisma.comment.findUnique({ where: { id: req.params.id } });
+    if (!comment) return res.status(404).json({ error: 'Comment not found' });
+
+    // Solo el autor o dueño del proyecto puede resolver
+    const project = await prisma.project.findFirst({
+      where: { id: comment.projectId, OR: [{ userId: req.user.id }, { editors: { some: { userId: req.user.id } } }] }
+    });
+    if (!project) return res.status(403).json({ error: 'Sin permisos' });
+
+    const updated = await prisma.comment.update({
+      where: { id: req.params.id },
+      data: { resolved: !comment.resolved },
+      include: { author: { select: { id: true, name: true, email: true, avatar: true } }, replies: { include: { author: { select: { id: true, name: true, email: true, avatar: true } } } } }
+    });
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: 'Error resolving comment' });
+  }
+});
+
+// DELETE eliminar comentario (solo el autor)
+app.delete('/api/comments/:id', authenticateToken, async (req, res) => {
+  try {
+    const comment = await prisma.comment.findUnique({ where: { id: req.params.id } });
+    if (!comment) return res.status(404).json({ error: 'Comment not found' });
+    if (comment.authorId !== req.user.id) return res.status(403).json({ error: 'Solo el autor puede eliminar' });
+
+    await prisma.comment.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Error deleting comment' });
+  }
+});
+
+// =======================
+// RUTAS DE NOTIFICACIONES
+// =======================
+
+// GET notificaciones del usuario logueado
+app.get('/api/notifications', authenticateToken, async (req, res) => {
+  try {
+    const notifications = await prisma.notification.findMany({
+      where: { userId: req.user.id },
+      include: {
+        comment: {
+          include: {
+            author: { select: { id: true, name: true, email: true, avatar: true } },
+            project: { select: { id: true, title: true } }
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 30
+    });
+    res.json(notifications);
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching notifications' });
+  }
+});
+
+// PATCH marcar todas las notificaciones como leídas
+app.patch('/api/notifications/read', authenticateToken, async (req, res) => {
+  try {
+    await prisma.notification.updateMany({
+      where: { userId: req.user.id, read: false },
+      data: { read: true }
+    });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Error marking notifications as read' });
+  }
+});
+
 // 6. Publicar / despublicar proyecto
+
 // Genera slug corto único (7 chars, base62)
 const SLUG_CHARS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 const generateSlug = () => Array.from({ length: 7 }, () => SLUG_CHARS[Math.floor(Math.random() * SLUG_CHARS.length)]).join('');
@@ -230,10 +848,16 @@ const getUniqueSlug = async () => {
 
 app.post('/api/projects/:id/publish', authenticateToken, async (req, res) => {
   try {
-    const project = await prisma.project.findUnique({
-      where: { id: req.params.id, userId: req.user.id }
+    const project = await prisma.project.findFirst({
+      where: {
+        id: req.params.id,
+        OR: [
+          { userId: req.user.id },
+          { editors: { some: { userId: req.user.id } } }
+        ]
+      }
     });
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    if (!project) return res.status(404).json({ error: 'Project not found or unauthorized' });
 
     const willPublish = !project.isPublished;
     // Generar slug solo si va a publicarse y aún no tiene uno
@@ -297,10 +921,22 @@ app.post('/api/upload', authenticateToken, async (req, res) => {
 
 const PORT = process.env.PORT || 4000;
 
-// Siempre escuchar (Render lo necesita como servidor Node.js tradicional)
-// El export permite que Vercel lo use como serverless handler
-app.listen(PORT, () => {
+// Arrancar servidor + asegurar que el usuario MAIA existe en la BD
+let maiaUserId = null;
+
+app.listen(PORT, async () => {
   console.log(`🚀 Backend server running on port ${PORT}`);
+  try {
+    const maia = await prisma.user.upsert({
+      where: { email: 'maia@tropica.me' },
+      update: { name: 'MAIA', avatar: '/MAIA.png' },
+      create: { email: 'maia@tropica.me', name: 'MAIA', avatar: '/MAIA.png' }
+    });
+    maiaUserId = maia.id;
+    console.log(`🤖 Usuario MAIA listo (id: ${maiaUserId})`);
+  } catch (e) {
+    console.error('⚠️  No se pudo crear/encontrar el usuario MAIA:', e.message);
+  }
 });
 
 export default app;
