@@ -331,6 +331,110 @@ app.post('/api/projects/:id/editors', authenticateToken, async (req, res) => {
 });
 
 // =======================
+// ANÁLISIS DE TYPOS CON IA
+// =======================
+
+// POST /api/analyze-typos
+// Analiza una imagen con Gemini Vision para detectar errores ortográficos/tipográficos.
+// Si los encuentra, crea un comentario automático en el elemento y notifica al dueño.
+app.post('/api/analyze-typos', authenticateToken, async (req, res) => {
+  const { imageUrl, projectId, elementId, elementOwnerId } = req.body;
+  if (!imageUrl || !projectId || !elementId) {
+    return res.status(400).json({ error: 'imageUrl, projectId y elementId son requeridos' });
+  }
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return res.json({ typos: false, message: 'GEMINI_API_KEY no configurada' });
+  }
+
+  try {
+    // Llamada a Gemini Vision (gemini-1.5-flash)
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              {
+                text: `Eres un corrector de pruebas profesional de publicidad digital. Analiza el texto visible en esta imagen de un banner o elemento de marketing.
+Busca únicamente errores ortográficos, errores tipográficos, palabras mal escritas o errores gramaticales evidentes en español o inglés.
+Si encuentras errores responde SOLO con JSON válido: {"found": true, "errors": ["descripción del error 1", "descripción del error 2"]}
+Si NO hay errores responde SOLO: {"found": false}
+Sin texto adicional fuera del JSON.`
+              },
+              {
+                file_data: {
+                  mime_type: 'image/jpeg',
+                  file_uri: imageUrl
+                }
+              }
+            ]
+          }]
+        })
+      }
+    );
+
+    if (!geminiRes.ok) {
+      const errText = await geminiRes.text();
+      console.error('Gemini API error:', errText);
+      return res.json({ typos: false, message: 'Error en Gemini API' });
+    }
+
+    const geminiData = await geminiRes.json();
+    const rawText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+
+    let parsed;
+    try {
+      // Extraer JSON de la respuesta (puede venir con ```json ... ```)
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : { found: false };
+    } catch {
+      parsed = { found: false };
+    }
+
+    if (parsed.found && parsed.errors?.length > 0) {
+      // Construir texto del comentario automático
+      const errorList = parsed.errors.map((e, i) => `${i + 1}. ${e}`).join('\n');
+      const mentionText = elementOwnerId ? `@${elementOwnerId} ` : '';
+      const commentText = `🤖 **Análisis de IA — Posibles typos detectados:**\n${errorList}`;
+
+      // Crear comentario automático (autor = el usuario que subió la imagen)
+      const comment = await prisma.comment.create({
+        data: {
+          projectId,
+          elementId,
+          authorId: req.user.id,
+          text: commentText,
+          mentions: elementOwnerId ? [elementOwnerId] : [],
+          parentId: null
+        },
+        include: {
+          author: { select: { id: true, name: true, email: true, avatar: true } },
+          replies: { include: { author: { select: { id: true, name: true, email: true, avatar: true } } } }
+        }
+      });
+
+      // Notificar al dueño del elemento (si es diferente al que subió)
+      if (elementOwnerId && elementOwnerId !== req.user.id) {
+        await prisma.notification.create({
+          data: { userId: elementOwnerId, commentId: comment.id, projectId }
+        });
+      }
+
+      return res.json({ typos: true, errors: parsed.errors, comment });
+    }
+
+    res.json({ typos: false });
+  } catch (error) {
+    console.error('Error en analyze-typos:', error);
+    res.json({ typos: false, message: 'Error interno' });
+  }
+});
+
+// =======================
 // RUTAS DE COMENTARIOS
 // =======================
 

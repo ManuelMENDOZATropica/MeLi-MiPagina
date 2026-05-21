@@ -527,6 +527,41 @@ function Editor() {
     }
   };
 
+  // Analiza una imagen subida con Gemini Vision para detectar typos
+  const analyzeImageForTypos = async (imageUrl, elementId) => {
+    const tok = JSON.parse(localStorage.getItem('tropica_user'))?.token;
+    // Buscar el addedBy del elemento en el canvas actual
+    let elementOwnerId = null;
+    const findOwner = (items) => {
+      for (const item of items) {
+        if (item.uniqueId === elementId) { elementOwnerId = item.addedBy || null; return; }
+        if (item.type === 'rowGroup' && item.items) {
+          for (const child of item.items) {
+            if (child.uniqueId === elementId) { elementOwnerId = child.addedBy || null; return; }
+          }
+        }
+      }
+    };
+    const allItems = [...(canvases.desktop || []), ...(canvases.mobile || [])];
+    findOwner(allItems);
+
+    try {
+      const res = await fetch(`${API_URL}/api/analyze-typos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tok}` },
+        body: JSON.stringify({ imageUrl, projectId: id, elementId, elementOwnerId })
+      });
+      const result = await res.json();
+      if (result.typos && result.comment) {
+        // Refrescar comentarios para mostrar el auto-comment
+        setComments(prev => [...prev, result.comment]);
+      }
+    } catch (e) {
+      console.error('Error analizando imagen:', e);
+    }
+  };
+
+
   // Drag & Drop de archivos del sistema operativo sobre el componente
   const handleFileDrop = (e, uniqueId) => {
     if (isPreviewMode) return;
@@ -569,6 +604,8 @@ function Editor() {
               }
               return item;
             }));
+            // Analizar typos con IA en background
+            analyzeImageForTypos(data.url, uniqueId);
           }
         } catch (error) {
           console.error('Error subiendo imagen por drag:', error);
@@ -621,6 +658,8 @@ function Editor() {
               }
               return item;
             }));
+            // Analizar typos con IA en background
+            analyzeImageForTypos(data.url, uploadTargetId);
           }
         } catch (error) {
           console.error('Error subiendo imagen a Cloudinary:', error);
