@@ -305,7 +305,8 @@ function Editor() {
   const [uploadTargetId, setUploadTargetId] = useState(null);
   const [uploadIndex, setUploadIndex] = useState(0);
   const fileInputRef = useRef(null);
-  const pdfCanvasRef = useRef(null); // ref al contenido del canvas para exportar
+  const pdfCanvasRef = useRef(null);
+  const canvasScrollRef = useRef(null); // scroll container del canvas
   const [isExporting, setIsExporting] = useState(false);
 
   const [isHoveringText, setIsHoveringText] = useState(false);
@@ -420,6 +421,20 @@ function Editor() {
     projectCollabs.find(c => c.id === userId)?.color ?? null;
 
   const unreadCount = notifications.filter(n => !n.read).length;
+
+  // Centra el elemento en la vista y abre su panel de comentarios
+  const scrollToElement = (elementId) => {
+    setActiveCommentElId(elementId);
+    setTimeout(() => {
+      const el = document.querySelector(`[data-id="${elementId}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.style.outline = '2px solid #3483fa';
+        el.style.outlineOffset = '3px';
+        setTimeout(() => { el.style.outline = ''; el.style.outlineOffset = ''; }, 2000);
+      }
+    }, 80);
+  };
 
   // Agregar colaborador al proyecto
   const addCollaborator = async (userId) => {
@@ -571,6 +586,9 @@ function Editor() {
       const result = await res.json();
       if (result.typos && result.comment) {
         setComments(prev => [...prev, result.comment]);
+        if (result.notification) {
+          setNotifications(prev => [result.notification, ...prev]);
+        }
       }
     } catch (e) {
       console.error('Error analizando imagen:', e);
@@ -1462,7 +1480,11 @@ function Editor() {
                     <p style={{ color: '#9ba3b5', fontSize: '13px', textAlign: 'center', padding: '24px 16px', margin: 0 }}>Sin notificaciones</p>
                   ) : notifications.map(n => (
                     <div key={n.id}
-                      onClick={() => { setShowNotifPanel(false); setActiveCommentElId(n.comment.elementId); }}
+                      onClick={() => {
+                        setShowNotifPanel(false);
+                        const elementId = n.comment?.elementId;
+                        if (elementId) scrollToElement(elementId);
+                      }}
                       style={{ padding: '10px 14px', borderBottom: '1px solid #f0f2f7', cursor: 'pointer', background: n.read ? 'white' : '#eef4ff', display: 'flex', gap: '10px', alignItems: 'flex-start' }}
                       onMouseEnter={e => e.currentTarget.style.background = '#f4f6fb'}
                       onMouseLeave={e => e.currentTarget.style.background = n.read ? 'white' : '#eef4ff'}

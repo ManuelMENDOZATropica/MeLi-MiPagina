@@ -427,13 +427,22 @@ Sin texto adicional fuera del JSON.`
       });
 
       // Notificar al dueño del elemento (si es diferente al que subió)
-      if (elementOwnerId && elementOwnerId !== req.user.id) {
-        await prisma.notification.create({
-          data: { userId: elementOwnerId, commentId: comment.id, projectId }
+      let notification = null;
+      if (elementOwnerId && elementOwnerId !== maiaUserId) {
+        notification = await prisma.notification.create({
+          data: { userId: elementOwnerId, commentId: comment.id, projectId },
+          include: {
+            comment: {
+              include: {
+                author: { select: { id: true, name: true, email: true, avatar: true } },
+                project: { select: { title: true } }
+              }
+            }
+          }
         });
       }
 
-      return res.json({ typos: true, errors: parsed.errors, comment });
+      return res.json({ typos: true, errors: parsed.errors, comment, notification });
     }
 
     res.json({ typos: false });
