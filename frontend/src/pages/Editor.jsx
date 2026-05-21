@@ -99,6 +99,17 @@ function Editor() {
   const [textEditorPanel, setTextEditorPanel] = useState(null); // { item, x, y }
   const [projectCollabs, setProjectCollabs] = useState([]); // [{id,name,email,avatar,color}]
 
+  // Sistema de comentarios
+  const [comments, setComments] = useState([]);
+  const [activeCommentElId, setActiveCommentElId] = useState(null); // uniqueId del elemento con panel abierto
+  const [commentInputs, setCommentInputs] = useState({}); // { [commentId|'new']: text }
+  const [mentionQuery, setMentionQuery] = useState(null); // { field, query }
+  const [replyingTo, setReplyingTo] = useState(null); // commentId
+
+  // Notificaciones
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifPanel, setShowNotifPanel] = useState(false);
+
   // Global Upload State
   const [uploadTargetId, setUploadTargetId] = useState(null);
   const [uploadIndex, setUploadIndex] = useState(0);
@@ -154,6 +165,16 @@ function Editor() {
           console.error(err);
           navigate('/projects');
         });
+
+      // Cargar comentarios del proyecto
+      fetch(`${API_URL}/api/projects/${id}/comments`, {
+        headers: { 'Authorization': `Bearer ${parsed.token}` }
+      }).then(r => r.ok ? r.json() : []).then(data => setComments(Array.isArray(data) ? data : []));
+
+      // Cargar notificaciones
+      fetch(`${API_URL}/api/notifications`, {
+        headers: { 'Authorization': `Bearer ${parsed.token}` }
+      }).then(r => r.ok ? r.json() : []).then(data => setNotifications(Array.isArray(data) ? data : []));
     }
   }, [id, navigate]);
 
@@ -199,6 +220,241 @@ function Editor() {
   // Devuelve el color del colaborador que agregó un elemento
   const getCollabColor = (userId) =>
     projectCollabs.find(c => c.id === userId)?.color ?? null;
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  // Submits a new comment or reply
+  const submitComment = async (elementId, parentId = null) => {
+    const key = parentId || 'new_' + elementId;
+    const text = (commentInputs[key] || '').trim();
+    if (!text) return;
+    const tok = JSON.parse(localStorage.getItem('tropica_user'))?.token;
+    // Extraer menciones del texto (@nombre)
+    const mentionedNames = [...text.matchAll(/@([\w\s]+?)(?=\s|$|@)/g)].map(m => m[1].trim());
+    const mentions = projectCollabs
+      .filter(c => mentionedNames.some(n => (c.name || '').toLowerCase().includes(n.toLowerCase())))
+      .map(c => c.id);
+
+    const res = await fetch(`${API_URL}/api/projects/${id}/comments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tok}` },
+      body: JSON.stringify({ elementId, text, mentions, parentId })
+    });
+    const newComment = await res.json();
+    if (parentId) {
+      setComments(prev => prev.map(c =>
+        c.id === parentId ? { ...c, replies: [...(c.replies || []), newComment] } : c
+      ));
+    } else {
+      setComments(prev => [...prev, newComment]);
+    }
+    setCommentInputs(prev => ({ ...prev, [key]: '' }));
+    setReplyingTo(null);
+  };
+
+  const resolveComment = async (commentId) => {
+    const tok = JSON.parse(localStorage.getItem('tropica_user'))?.token;
+    const res = await fetch(`${API_URL}/api/comments/${commentId}/resolve`, {
+      method: 'PATCH', headers: { 'Authorization': `Bearer ${tok}` }
+    });
+    const updated = await res.json();
+    setComments(prev => prev.map(c => c.id === commentId ? updated : c));
+  };
+
+  const deleteComment = async (commentId, parentId = null) => {
+    const tok = JSON.parse(localStorage.getItem('tropica_user'))?.token;
+    await fetch(`${API_URL}/api/comments/${commentId}`, {
+      method: 'DELETE', headers: { 'Authorization': `Bearer ${tok}` }
+    });
+    if (parentId) {
+      setComments(prev => prev.map(c =>
+        c.id === parentId ? { ...c, replies: (c.replies || []).filter(r => r.id !== commentId) } : c
+      ));
+    } else {
+      setComments(prev => prev.filter(c => c.id !== commentId));
+    }
+  };
+
+  const markNotifsRead = async () => {
+    const tok = JSON.parse(localStorage.getItem('tropica_user'))?.token;
+    await fetch(`${API_URL}/api/notifications/read`, {
+      method: 'PATCH', headers: { 'Authorization': `Bearer ${tok}` }
+    });
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  };
+
+  // Renderiza texto con @menciones resaltadas
+  const renderCommentText = (text) => {
+    const parts = text.split(/(@[\w\s]+?)(?=\s|$|@)/g);
+    return parts.map((p, i) =>
+      p.startsWith('@')
+        ? <strong key={i} style={{ color: '#3483fa' }}>{p}</strong>
+        : <span key={i}>{p}</span>
+    );
+  };
+
+  // CommentPanel flotante
+  const CommentPanel = ({ elementId, elementName }) => {
+    const elComments = comments.filter(c => c.elementId === elementId);
+    const inputKey = 'new_' + elementId;
+    const inputVal = commentInputs[inputKey] || '';
+    const currentUserId = JSON.parse(localStorage.getItem('tropica_user'))?.user?.id;
+
+    const handleInput = (e) => {
+      const val = e.target.value;
+      setCommentInputs(prev => ({ ...prev, [inputKey]: val }));
+      // Detectar @
+      const match = val.match(/@([\w\s]*)$/);
+      if (match) {
+        setMentionQuery({ field: inputKey, query: match[1] });
+      } else {
+        setMentionQuery(null);
+      }
+    };
+
+    const filteredCollabs = mentionQuery && mentionQuery.field === inputKey
+      ? projectCollabs.filter(c =>
+          c.id !== currentUserId &&
+          (c.name || '').toLowerCase().includes(mentionQuery.query.toLowerCase())
+        )
+      : [];
+
+    const insertMention = (collab) => {
+      const val = inputVal.replace(/@([\w\s]*)$/, `@${collab.name} `);
+      setCommentInputs(prev => ({ ...prev, [inputKey]: val }));
+      setMentionQuery(null);
+    };
+
+    return (
+      <div style={{
+        position: 'absolute', right: '-320px', top: 0,
+        width: '300px', background: 'white', borderRadius: '12px',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.1)',
+        border: '1px solid #e0e5ef', zIndex: 500, overflow: 'hidden',
+        fontFamily: "'Inter', sans-serif"
+      }}>
+        {/* Header */}
+        <div style={{ background: '#1a1f2e', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em' }}>💬 {elementName}</span>
+          <button onClick={() => setActiveCommentElId(null)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '16px', lineHeight: 1, padding: '0 2px' }}>✕</button>
+        </div>
+
+        {/* Lista de comentarios */}
+        <div style={{ maxHeight: '340px', overflowY: 'auto', padding: '10px' }}>
+          {elComments.length === 0 && (
+            <p style={{ color: '#9ba3b5', fontSize: '12px', textAlign: 'center', margin: '16px 0' }}>Sin comentarios aún</p>
+          )}
+          {elComments.map(comment => (
+            <div key={comment.id} style={{
+              marginBottom: '12px', opacity: comment.resolved ? 0.55 : 1,
+              background: comment.resolved ? '#f4f6fb' : 'white',
+              borderRadius: '8px', border: '1px solid #e8ecf4', padding: '10px'
+            }}>
+              {/* Autor */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '6px' }}>
+                <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: getCollabColor(comment.author.id) || '#ddd', color: '#1a1f2e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '800', overflow: 'hidden', flexShrink: 0 }}>
+                  {comment.author.avatar ? <img src={comment.author.avatar} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (comment.author.name || 'U').charAt(0).toUpperCase()}
+                </div>
+                <span style={{ fontSize: '12px', fontWeight: '700', color: '#1a1f2e' }}>{comment.author.name || comment.author.email}</span>
+                <span style={{ fontSize: '10px', color: '#b0b9cc', marginLeft: 'auto' }}>
+                  {new Date(comment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+              {/* Texto */}
+              <p style={{ fontSize: '13px', color: '#2d3548', margin: '0 0 8px', lineHeight: '1.5' }}>
+                {renderCommentText(comment.text)}
+              </p>
+              {/* Acciones */}
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                <button onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
+                  style={{ fontSize: '11px', color: '#3483fa', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600', padding: '2px 0' }}>↩ Responder</button>
+                <button onClick={() => resolveComment(comment.id)}
+                  style={{ fontSize: '11px', color: comment.resolved ? '#10b981' : '#6b7280', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600', padding: '2px 0' }}>
+                  {comment.resolved ? '✓ Resuelto' : '✓ Resolver'}
+                </button>
+                {comment.author.id === currentUserId && (
+                  <button onClick={() => deleteComment(comment.id)}
+                    style={{ fontSize: '11px', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600', padding: '2px 0', marginLeft: 'auto' }}>🗑</button>
+                )}
+              </div>
+
+              {/* Respuestas */}
+              {(comment.replies || []).length > 0 && (
+                <div style={{ marginTop: '8px', paddingLeft: '10px', borderLeft: '2px solid #e8ecf4' }}>
+                  {comment.replies.map(reply => (
+                    <div key={reply.id} style={{ marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
+                        <div style={{ width: '18px', height: '18px', borderRadius: '50%', background: getCollabColor(reply.author.id) || '#ddd', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: '800', overflow: 'hidden', flexShrink: 0 }}>
+                          {reply.author.avatar ? <img src={reply.author.avatar} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (reply.author.name || 'U').charAt(0).toUpperCase()}
+                        </div>
+                        <span style={{ fontSize: '11px', fontWeight: '700', color: '#1a1f2e' }}>{reply.author.name || reply.author.email}</span>
+                        {reply.author.id === currentUserId && (
+                          <button onClick={() => deleteComment(reply.id, comment.id)}
+                            style={{ fontSize: '10px', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', marginLeft: 'auto', padding: 0 }}>🗑</button>
+                        )}
+                      </div>
+                      <p style={{ fontSize: '12px', color: '#2d3548', margin: 0, lineHeight: '1.4' }}>{renderCommentText(reply.text)}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Input de respuesta */}
+              {replyingTo === comment.id && (
+                <div style={{ marginTop: '8px', display: 'flex', gap: '6px' }}>
+                  <input
+                    autoFocus
+                    value={commentInputs[comment.id] || ''}
+                    onChange={e => setCommentInputs(prev => ({ ...prev, [comment.id]: e.target.value }))}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComment(elementId, comment.id); } }}
+                    placeholder="Responder..."
+                    style={{ flex: 1, fontSize: '12px', border: '1.5px solid #3483fa', borderRadius: '6px', padding: '5px 8px', outline: 'none', fontFamily: 'inherit' }}
+                  />
+                  <button onClick={() => submitComment(elementId, comment.id)}
+                    style={{ background: '#3483fa', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px', fontWeight: '700' }}>↩</button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Input nuevo comentario */}
+        <div style={{ padding: '10px', borderTop: '1px solid #e8ecf4', position: 'relative' }}>
+          {filteredCollabs.length > 0 && (
+            <div style={{ position: 'absolute', bottom: '100%', left: '10px', right: '10px', background: 'white', border: '1px solid #e0e5ef', borderRadius: '8px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 600 }}>
+              {filteredCollabs.map(c => (
+                <div key={c.id} onClick={() => insertMention(c)}
+                  style={{ padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#f4f6fb'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'white'}>
+                  <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: '800', color: c.color === '#fff159' ? '#1a1f2e' : 'white' }}>
+                    {(c.name || 'U').charAt(0).toUpperCase()}
+                  </div>
+                  <span style={{ fontWeight: '600', color: '#1a1f2e' }}>{c.name}</span>
+                  <span style={{ color: '#9ba3b5', fontSize: '11px' }}>{c.email}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <textarea
+            value={inputVal}
+            onChange={handleInput}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComment(elementId); } }}
+            placeholder={`Comentar... (@ para mencionar, Enter para enviar)`}
+            rows={2}
+            style={{ width: '100%', fontSize: '13px', border: '1.5px solid #e0e5ef', borderRadius: '8px', padding: '8px 10px', outline: 'none', resize: 'none', fontFamily: 'inherit', boxSizing: 'border-box', transition: 'border-color 0.15s' }}
+            onFocus={e => e.target.style.borderColor = '#3483fa'}
+            onBlur={e => e.target.style.borderColor = '#e0e5ef'}
+          />
+          <button onClick={() => submitComment(elementId)}
+            style={{ marginTop: '6px', width: '100%', background: '#1a1f2e', color: '#fff159', border: 'none', borderRadius: '7px', padding: '8px', fontSize: '12px', fontWeight: '800', cursor: 'pointer', letterSpacing: '0.05em', textTransform: 'uppercase', transition: 'background 0.15s' }}
+            onMouseEnter={e => e.currentTarget.style.background = '#252c3f'}
+            onMouseLeave={e => e.currentTarget.style.background = '#1a1f2e'}
+          >Enviar comentario</button>
+        </div>
+      </div>
+    );
+  };
 
   const triggerUpload = (uniqueId) => {
     setUploadTargetId(uniqueId);
@@ -766,6 +1022,26 @@ function Editor() {
             }}
           />
         )}
+        {/* Indicador de comentarios en el elemento */}
+        {!isPreviewMode && comments.some(c => c.elementId === item.uniqueId && !c.resolved) && (
+          <div
+            onClick={e => { e.stopPropagation(); setActiveCommentElId(item.uniqueId); }}
+            title="Ver comentarios"
+            style={{
+              position: 'absolute', top: '6px', right: '8px',
+              background: '#3483fa', color: 'white', borderRadius: '10px',
+              fontSize: '10px', fontWeight: '800', padding: '2px 7px',
+              zIndex: 20, cursor: 'pointer', boxShadow: '0 2px 8px rgba(52,131,250,0.4)',
+              display: 'flex', alignItems: 'center', gap: '3px'
+            }}
+          >
+            💬 {comments.filter(c => c.elementId === item.uniqueId && !c.resolved).length}
+          </div>
+        )}
+        {/* Panel de comentarios flotante */}
+        {!isPreviewMode && activeCommentElId === item.uniqueId && (
+          <CommentPanel elementId={item.uniqueId} elementName={item.name || 'Elemento'} />
+        )}
         <div
           className="component-placeholder"
           style={{ height: `${height}px`, width: '100%', position: 'relative', padding: 0 }}
@@ -1013,6 +1289,51 @@ function Editor() {
             );
           })()}
 
+          {/* Campana de notificaciones */}
+          <div style={{ position: 'relative' }}>
+            <button
+              id="notif-bell-btn"
+              onClick={() => { setShowNotifPanel(!showNotifPanel); if (!showNotifPanel) markNotifsRead(); }}
+              style={{ background: 'rgba(255,255,255,0.08)', border: 'none', color: 'rgba(255,255,255,0.65)', cursor: 'pointer', padding: '6px 10px', borderRadius: '6px', display: 'flex', alignItems: 'center', transition: 'all 0.18s', position: 'relative' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.14)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+            >
+              <Bell size={18} />
+              {unreadCount > 0 && (
+                <span style={{ position: 'absolute', top: '2px', right: '2px', background: '#ef4444', color: 'white', borderRadius: '50%', width: '16px', height: '16px', fontSize: '9px', fontWeight: '800', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid #1a1f2e' }}>{unreadCount > 9 ? '9+' : unreadCount}</span>
+              )}
+            </button>
+            {showNotifPanel && (
+              <div style={{ position: 'absolute', top: '44px', right: 0, width: '300px', background: 'white', borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.18)', border: '1px solid #e0e5ef', zIndex: 9999, overflow: 'hidden' }}>
+                <div style={{ padding: '12px 16px', background: '#1a1f2e', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'white', fontWeight: '800', fontSize: '13px' }}>🔔 Notificaciones</span>
+                  <button onClick={() => setShowNotifPanel(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '16px' }}>✕</button>
+                </div>
+                <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
+                  {notifications.length === 0 ? (
+                    <p style={{ color: '#9ba3b5', fontSize: '13px', textAlign: 'center', padding: '24px 16px', margin: 0 }}>Sin notificaciones</p>
+                  ) : notifications.map(n => (
+                    <div key={n.id}
+                      onClick={() => { setShowNotifPanel(false); setActiveCommentElId(n.comment.elementId); }}
+                      style={{ padding: '10px 14px', borderBottom: '1px solid #f0f2f7', cursor: 'pointer', background: n.read ? 'white' : '#eef4ff', display: 'flex', gap: '10px', alignItems: 'flex-start' }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#f4f6fb'}
+                      onMouseLeave={e => e.currentTarget.style.background = n.read ? 'white' : '#eef4ff'}
+                    >
+                      {!n.read && <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#3483fa', marginTop: '5px', flexShrink: 0 }} />}
+                      <div style={{ flex: 1 }}>
+                        <p style={{ margin: '0 0 2px', fontSize: '12px', fontWeight: '700', color: '#1a1f2e' }}>
+                          {n.comment.author.name} te mencionó
+                        </p>
+                        <p style={{ margin: '0 0 2px', fontSize: '11px', color: '#6b7280' }}>en "{n.comment.project.title}"</p>
+                        <p style={{ margin: 0, fontSize: '12px', color: '#4b5563', fontStyle: 'italic' }}>«{n.comment.text.slice(0, 60)}{n.comment.text.length > 60 ? '…' : ''}»</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
           {projectCollabs.length > 0 && (
             <div style={{ width: '1px', height: '24px', background: 'rgba(255,255,255,0.1)', margin: '0 2px' }} />
           )}
@@ -1216,6 +1537,9 @@ function Editor() {
                       <Edit3 size={16} /> Editar Textos
                     </div>
                   )}
+                  <div className="context-menu-item" onClick={() => { setActiveCommentElId(contextMenu.targetId); setContextMenu(null); }} style={{ fontWeight: 'bold', color: '#6b7280' }}>
+                    💬 Comentar
+                  </div>
                   <div className="context-menu-item" onClick={() => { triggerUpload(contextMenu.targetId); setContextMenu(null); }} style={{ fontWeight: 'bold', color: '#3483fa' }}>
                     <ImageIcon size={16} /> {hasImage ? 'Cambiar Imagen' : 'Subir Imagen'}
                   </div>

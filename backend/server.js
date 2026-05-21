@@ -299,7 +299,159 @@ app.delete('/api/projects/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// =======================
+// RUTAS DE COMENTARIOS
+// =======================
+
+// GET todos los comentarios de un proyecto (sin resolver)
+app.get('/api/projects/:id/comments', authenticateToken, async (req, res) => {
+  try {
+    const project = await prisma.project.findFirst({
+      where: {
+        id: req.params.id,
+        OR: [{ userId: req.user.id }, { editors: { some: { userId: req.user.id } } }]
+      }
+    });
+    if (!project) return res.status(404).json({ error: 'Proyecto no encontrado o sin acceso' });
+
+    const comments = await prisma.comment.findMany({
+      where: { projectId: req.params.id, parentId: null }, // solo raíz
+      include: {
+        author: { select: { id: true, name: true, email: true, avatar: true } },
+        replies: {
+          include: {
+            author: { select: { id: true, name: true, email: true, avatar: true } }
+          },
+          orderBy: { createdAt: 'asc' }
+        }
+      },
+      orderBy: { createdAt: 'asc' }
+    });
+    res.json(comments);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error fetching comments' });
+  }
+});
+
+// POST crear comentario (dispara notificaciones a mencionados)
+app.post('/api/projects/:id/comments', authenticateToken, async (req, res) => {
+  try {
+    const { elementId, text, mentions = [], parentId } = req.body;
+    if (!elementId || !text?.trim()) return res.status(400).json({ error: 'elementId y text requeridos' });
+
+    const comment = await prisma.comment.create({
+      data: {
+        projectId: req.params.id,
+        elementId,
+        authorId: req.user.id,
+        text: text.trim(),
+        mentions,
+        parentId: parentId || null
+      },
+      include: {
+        author: { select: { id: true, name: true, email: true, avatar: true } },
+        replies: { include: { author: { select: { id: true, name: true, email: true, avatar: true } } } }
+      }
+    });
+
+    // Crear notificaciones para cada mencionado (excepto el autor)
+    const mentionedIds = mentions.filter(uid => uid !== req.user.id);
+    if (mentionedIds.length > 0) {
+      await prisma.notification.createMany({
+        data: mentionedIds.map(userId => ({
+          userId,
+          commentId: comment.id,
+          projectId: req.params.id
+        }))
+      });
+    }
+
+    res.json(comment);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error creating comment' });
+  }
+});
+
+// PATCH resolver/abrir un comentario
+app.patch('/api/comments/:id/resolve', authenticateToken, async (req, res) => {
+  try {
+    const comment = await prisma.comment.findUnique({ where: { id: req.params.id } });
+    if (!comment) return res.status(404).json({ error: 'Comment not found' });
+
+    // Solo el autor o dueño del proyecto puede resolver
+    const project = await prisma.project.findFirst({
+      where: { id: comment.projectId, OR: [{ userId: req.user.id }, { editors: { some: { userId: req.user.id } } }] }
+    });
+    if (!project) return res.status(403).json({ error: 'Sin permisos' });
+
+    const updated = await prisma.comment.update({
+      where: { id: req.params.id },
+      data: { resolved: !comment.resolved },
+      include: { author: { select: { id: true, name: true, email: true, avatar: true } }, replies: { include: { author: { select: { id: true, name: true, email: true, avatar: true } } } } }
+    });
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: 'Error resolving comment' });
+  }
+});
+
+// DELETE eliminar comentario (solo el autor)
+app.delete('/api/comments/:id', authenticateToken, async (req, res) => {
+  try {
+    const comment = await prisma.comment.findUnique({ where: { id: req.params.id } });
+    if (!comment) return res.status(404).json({ error: 'Comment not found' });
+    if (comment.authorId !== req.user.id) return res.status(403).json({ error: 'Solo el autor puede eliminar' });
+
+    await prisma.comment.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Error deleting comment' });
+  }
+});
+
+// =======================
+// RUTAS DE NOTIFICACIONES
+// =======================
+
+// GET notificaciones del usuario logueado
+app.get('/api/notifications', authenticateToken, async (req, res) => {
+  try {
+    const notifications = await prisma.notification.findMany({
+      where: { userId: req.user.id },
+      include: {
+        comment: {
+          include: {
+            author: { select: { id: true, name: true, email: true, avatar: true } },
+            project: { select: { id: true, title: true } }
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 30
+    });
+    res.json(notifications);
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching notifications' });
+  }
+});
+
+// PATCH marcar todas las notificaciones como leídas
+app.patch('/api/notifications/read', authenticateToken, async (req, res) => {
+  try {
+    await prisma.notification.updateMany({
+      where: { userId: req.user.id, read: false },
+      data: { read: true }
+    });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Error marking notifications as read' });
+  }
+});
+
 // 6. Publicar / despublicar proyecto
+
 // Genera slug corto único (7 chars, base62)
 const SLUG_CHARS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 const generateSlug = () => Array.from({ length: 7 }, () => SLUG_CHARS[Math.floor(Math.random() * SLUG_CHARS.length)]).join('');
