@@ -356,9 +356,9 @@ app.post('/api/analyze-typos', authenticateToken, async (req, res) => {
     const base64Image = Buffer.from(imgBuffer).toString('base64');
     const mimeType = imgResponse.headers.get('content-type') || 'image/jpeg';
 
-    // Llamada a Gemini Vision (gemini-2.0-flash)
+    // Llamada a Gemini Vision (gemini-2.0-flash-lite)
     const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -387,7 +387,9 @@ Sin texto adicional fuera del JSON.`
     if (!geminiRes.ok) {
       const errText = await geminiRes.text();
       console.error('Gemini API error:', errText);
-      return res.json({ typos: false, message: 'Error en Gemini API' });
+      let errDetail = errText;
+      try { errDetail = JSON.parse(errText)?.error?.message || errText; } catch {}
+      return res.json({ typos: false, message: `Gemini error ${geminiRes.status}: ${errDetail}` });
     }
 
     const geminiData = await geminiRes.json();
