@@ -355,11 +355,21 @@ app.post('/api/projects/:id/comments', authenticateToken, async (req, res) => {
       }
     });
 
-    // Crear notificaciones para cada mencionado (excepto el autor)
-    const mentionedIds = mentions.filter(uid => uid !== req.user.id);
-    if (mentionedIds.length > 0) {
+    // Notificar a TODOS los colaboradores del proyecto (excepto el autor)
+    const project = await prisma.project.findUnique({
+      where: { id: req.params.id },
+      include: {
+        editors: { select: { userId: true } }
+      }
+    });
+    const collaboratorIds = [
+      project.userId,
+      ...project.editors.map(e => e.userId)
+    ].filter(uid => uid !== req.user.id); // excluir al autor
+
+    if (collaboratorIds.length > 0) {
       await prisma.notification.createMany({
-        data: mentionedIds.map(userId => ({
+        data: collaboratorIds.map(userId => ({
           userId,
           commentId: comment.id,
           projectId: req.params.id
