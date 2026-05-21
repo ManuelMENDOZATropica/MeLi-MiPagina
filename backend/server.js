@@ -407,8 +407,7 @@ Sin texto adicional fuera del JSON.`
     if (parsed.found && parsed.errors?.length > 0) {
       // Construir texto del comentario automático
       const errorList = parsed.errors.map((e, i) => `${i + 1}. ${e}`).join('\n');
-      const mentionText = elementOwnerId ? `@${elementOwnerId} ` : '';
-      const commentText = `🤖 **Análisis de IA — Posibles typos detectados:**\n${errorList}`;
+      const commentText = `**Analisis de IA — Posibles typos detectados:**\n\n${errorList}`;
 
       // Crear comentario como MAIA (usuario IA del sistema)
       const authorIdToUse = maiaUserId || req.user.id;

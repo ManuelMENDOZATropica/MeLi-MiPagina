@@ -6,6 +6,7 @@ import API_URL from '../api';
 import '../index.css';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import ReactMarkdown from 'react-markdown';
 
 // Paleta de colores por colaborador (owner = índice 0)
 const COLLAB_COLORS = [
@@ -28,7 +29,7 @@ function CommentPanel({
   commentInputs, setCommentInputs,
   mentionQuery, setMentionQuery,
   onClose, onSubmit, onResolve, onDelete,
-  getCollabColor, renderCommentText,
+  getCollabColor,
 }) {
   const elComments = comments.filter(c => c.elementId === elementId);
   const inputKey = 'new_' + elementId;
@@ -90,9 +91,17 @@ function CommentPanel({
                 {new Date(comment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
             </div>
-            <p style={{ fontSize: '13px', color: '#2d3548', margin: '0 0 8px', lineHeight: '1.5' }}>
-              {renderCommentText(comment.text)}
-            </p>
+            <div style={{ fontSize: '13px', color: '#2d3548', margin: '0 0 8px', lineHeight: '1.5' }}>
+              <ReactMarkdown
+                components={{
+                  p: ({children}) => <p style={{ margin: '0 0 4px' }}>{children}</p>,
+                  strong: ({children}) => <strong style={{ fontWeight: '700', color: '#1a1f2e' }}>{children}</strong>,
+                  ol: ({children}) => <ol style={{ margin: '4px 0', paddingLeft: '18px' }}>{children}</ol>,
+                  ul: ({children}) => <ul style={{ margin: '4px 0', paddingLeft: '18px' }}>{children}</ul>,
+                  li: ({children}) => <li style={{ marginBottom: '2px' }}>{children}</li>,
+                }}
+              >{comment.text}</ReactMarkdown>
+            </div>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               <button onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
                 style={{ fontSize: '11px', color: '#3483fa', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600', padding: '2px 0' }}>↩ Responder</button>
@@ -121,7 +130,17 @@ function CommentPanel({
                           style={{ fontSize: '10px', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', marginLeft: 'auto', padding: 0 }}>🗑</button>
                       )}
                     </div>
-                    <p style={{ fontSize: '12px', color: '#2d3548', margin: 0, lineHeight: '1.4' }}>{renderCommentText(reply.text)}</p>
+                    <div style={{ fontSize: '12px', color: '#2d3548', margin: 0, lineHeight: '1.4' }}>
+                      <ReactMarkdown
+                        components={{
+                          p: ({children}) => <p style={{ margin: '0 0 2px' }}>{children}</p>,
+                          strong: ({children}) => <strong style={{ fontWeight: '700' }}>{children}</strong>,
+                          ol: ({children}) => <ol style={{ margin: '2px 0', paddingLeft: '16px' }}>{children}</ol>,
+                          ul: ({children}) => <ul style={{ margin: '2px 0', paddingLeft: '16px' }}>{children}</ul>,
+                          li: ({children}) => <li style={{ marginBottom: '1px' }}>{children}</li>,
+                        }}
+                      >{reply.text}</ReactMarkdown>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1183,7 +1202,6 @@ function Editor() {
             onResolve={resolveComment}
             onDelete={deleteComment}
             getCollabColor={getCollabColor}
-            renderCommentText={renderCommentText}
           />
         )}
         <div
