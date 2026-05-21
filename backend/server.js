@@ -349,9 +349,16 @@ app.post('/api/analyze-typos', authenticateToken, async (req, res) => {
   }
 
   try {
-    // Llamada a Gemini Vision (gemini-1.5-flash)
+    // Descargar la imagen de Cloudinary y convertirla a base64
+    const imgResponse = await fetch(imageUrl);
+    if (!imgResponse.ok) throw new Error('No se pudo descargar la imagen de Cloudinary');
+    const imgBuffer = await imgResponse.arrayBuffer();
+    const base64Image = Buffer.from(imgBuffer).toString('base64');
+    const mimeType = imgResponse.headers.get('content-type') || 'image/jpeg';
+
+    // Llamada a Gemini Vision (gemini-2.0-flash)
     const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -366,9 +373,9 @@ Si NO hay errores responde SOLO: {"found": false}
 Sin texto adicional fuera del JSON.`
               },
               {
-                file_data: {
-                  mime_type: 'image/jpeg',
-                  file_uri: imageUrl
+                inline_data: {
+                  mime_type: mimeType,
+                  data: base64Image
                 }
               }
             ]
