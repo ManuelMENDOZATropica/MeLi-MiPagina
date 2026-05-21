@@ -355,21 +355,41 @@ app.post('/api/projects/:id/comments', authenticateToken, async (req, res) => {
       }
     });
 
-    // Notificar a TODOS los colaboradores del proyecto (excepto el autor)
+    // Notificar a:
+    // 1. El dueño del elemento (addedBy en el canvas layout)
+    // 2. Los @mencionados explícitamente
+    // Siempre excluyendo al autor del comentario
+
     const project = await prisma.project.findUnique({
       where: { id: req.params.id },
-      include: {
-        editors: { select: { userId: true } }
-      }
+      select: { desktopLayout: true, mobileLayout: true }
     });
-    const collaboratorIds = [
-      project.userId,
-      ...project.editors.map(e => e.userId)
-    ].filter(uid => uid !== req.user.id); // excluir al autor
 
-    if (collaboratorIds.length > 0) {
+    // Buscar el elemento en ambos layouts para encontrar addedBy
+    let elementOwnerId = null;
+    const searchInLayout = (layout) => {
+      if (!Array.isArray(layout)) return;
+      for (const item of layout) {
+        if (item.uniqueId === elementId) { elementOwnerId = item.addedBy || null; return; }
+        if (item.type === 'rowGroup' && Array.isArray(item.items)) {
+          for (const child of item.items) {
+            if (child.uniqueId === elementId) { elementOwnerId = child.addedBy || null; return; }
+          }
+        }
+      }
+    };
+    searchInLayout(project.desktopLayout);
+    if (!elementOwnerId) searchInLayout(project.mobileLayout);
+
+    // Unir destinatarios: dueño del elemento + mencionados, sin duplicados, sin el autor
+    const recipientIds = [...new Set([
+      elementOwnerId,
+      ...mentions
+    ].filter(uid => uid && uid !== req.user.id))];
+
+    if (recipientIds.length > 0) {
       await prisma.notification.createMany({
-        data: collaboratorIds.map(userId => ({
+        data: recipientIds.map(userId => ({
           userId,
           commentId: comment.id,
           projectId: req.params.id
