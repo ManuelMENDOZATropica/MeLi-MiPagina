@@ -59,10 +59,16 @@ function CommentPanel({
 
   return (
     <div style={{
-      position: 'absolute', right: '-320px', top: 0,
-      width: '300px', background: 'white', borderRadius: '12px',
-      boxShadow: '0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.1)',
-      border: '1px solid #e0e5ef', zIndex: 500, overflow: 'hidden',
+      position: 'absolute',
+      top: '50%', left: '50%',
+      transform: 'translate(-50%, -50%)',
+      width: '320px',
+      background: 'rgba(255,255,255,0.97)',
+      borderRadius: '14px',
+      boxShadow: '0 16px 48px rgba(0,0,0,0.28), 0 2px 8px rgba(0,0,0,0.12)',
+      border: '1px solid rgba(224,229,239,0.8)',
+      backdropFilter: 'blur(12px)',
+      zIndex: 500, overflow: 'hidden',
       fontFamily: "'Inter', sans-serif"
     }}>
       {/* Header */}
