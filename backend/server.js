@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { createServer } from 'http';
+import { Server as SocketIOServer } from 'socket.io';
 import { PrismaClient } from '@prisma/client';
 import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
@@ -18,6 +20,7 @@ if (!process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID.includes('TU_G
 }
 
 const app = express();
+const httpServer = createServer(app);
 const prisma = new PrismaClient();
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -491,6 +494,10 @@ app.post('/api/maia-comment', authenticateToken, async (req, res) => {
         }
       });
     }
+    // Emitir en tiempo real
+    io.to(`project:${projectId}`).emit('comment:new', comment);
+    if (notification) io.to(`project:${projectId}`).emit('notification:new', notification);
+
     res.json({ ok: true, comment, notification });
   } catch (e) {
     console.error('Error en maia-comment:', e);
@@ -561,6 +568,7 @@ app.post('/api/projects/:id/exceptions', authenticateToken, async (req, res) => 
     const exception = await prisma.typoException.create({
       data: { projectId: req.params.id, word: word.trim(), reason: reason?.trim() || null }
     });
+    io.to(`project:${req.params.id}`).emit('exception:new', exception);
     res.json(exception);
   } catch (e) {
     res.status(500).json({ error: 'Error interno' });
@@ -570,7 +578,9 @@ app.post('/api/projects/:id/exceptions', authenticateToken, async (req, res) => 
 // DELETE eliminar excepción
 app.delete('/api/exceptions/:id', authenticateToken, async (req, res) => {
   try {
+    const ex = await prisma.typoException.findUnique({ where: { id: req.params.id } });
     await prisma.typoException.delete({ where: { id: req.params.id } });
+    if (ex) io.to(`project:${ex.projectId}`).emit('exception:deleted', { id: req.params.id });
     res.json({ ok: true });
   } catch (e) {
     res.status(404).json({ error: 'Excepción no encontrada' });
@@ -586,6 +596,7 @@ app.patch('/api/exceptions/:id', authenticateToken, async (req, res) => {
       where: { id: req.params.id },
       data: { word: word.trim(), reason: reason?.trim() || null }
     });
+    io.to(`project:${updated.projectId}`).emit('exception:updated', updated);
     res.json(updated);
   } catch (e) {
     res.status(404).json({ error: 'Excepción no encontrada' });
@@ -739,6 +750,7 @@ app.post('/api/projects/:id/comments', authenticateToken, async (req, res) => {
       ...mentions
     ].filter(uid => uid && uid !== req.user.id))];
 
+    let notifications = [];
     if (recipientIds.length > 0) {
       await prisma.notification.createMany({
         data: recipientIds.map(userId => ({
@@ -747,7 +759,21 @@ app.post('/api/projects/:id/comments', authenticateToken, async (req, res) => {
           projectId: req.params.id
         }))
       });
+      // Cargar las notificaciones recién creadas para emitirlas por socket
+      notifications = await prisma.notification.findMany({
+        where: { commentId: comment.id },
+        include: {
+          comment: { include: { author: { select: { id: true, name: true, email: true, avatar: true } }, project: { select: { id: true, title: true } } } }
+        }
+      });
     }
+
+    // Emitir comentario en tiempo real a toda la sala del proyecto
+    io.to(`project:${req.params.id}`).emit('comment:new', comment);
+    // Emitir notificaciones individuales a cada destinatario
+    notifications.forEach(notif => {
+      io.to(`project:${req.params.id}`).emit('notification:new', notif);
+    });
 
     res.json(comment);
   } catch (error) {
@@ -773,6 +799,10 @@ app.patch('/api/comments/:id/resolve', authenticateToken, async (req, res) => {
       data: { resolved: !comment.resolved },
       include: { author: { select: { id: true, name: true, email: true, avatar: true } }, replies: { include: { author: { select: { id: true, name: true, email: true, avatar: true } } } } }
     });
+
+    // Emitir en tiempo real
+    io.to(`project:${comment.projectId}`).emit('comment:resolved', updated);
+
     res.json(updated);
   } catch (error) {
     res.status(500).json({ error: 'Error resolving comment' });
@@ -786,7 +816,12 @@ app.delete('/api/comments/:id', authenticateToken, async (req, res) => {
     if (!comment) return res.status(404).json({ error: 'Comment not found' });
     if (comment.authorId !== req.user.id) return res.status(403).json({ error: 'Solo el autor puede eliminar' });
 
+    const { projectId, parentId } = comment;
     await prisma.comment.delete({ where: { id: req.params.id } });
+
+    // Emitir en tiempo real
+    io.to(`project:${projectId}`).emit('comment:deleted', { id: req.params.id, parentId: parentId || null });
+
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Error deleting comment' });
@@ -921,10 +956,29 @@ app.post('/api/upload', authenticateToken, async (req, res) => {
 
 const PORT = process.env.PORT || 4000;
 
+// ── Socket.io setup ──────────────────────────────────────────────────────────
+export const io = new SocketIOServer(httpServer, {
+  cors: {
+    origin: allowedOrigins,
+    credentials: true
+  }
+});
+
+io.on('connection', socket => {
+  // El cliente emite 'join-project' con el projectId al abrir el editor
+  socket.on('join-project', (projectId) => {
+    socket.join(`project:${projectId}`);
+  });
+
+  socket.on('leave-project', (projectId) => {
+    socket.leave(`project:${projectId}`);
+  });
+});
+
 // Arrancar servidor + asegurar que el usuario MAIA existe en la BD
 let maiaUserId = null;
 
-app.listen(PORT, async () => {
+httpServer.listen(PORT, async () => {
   console.log(`🚀 Backend server running on port ${PORT}`);
   try {
     const maia = await prisma.user.upsert({
