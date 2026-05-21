@@ -539,7 +539,7 @@ function Editor() {
           const typoRes = await fetch(`${API_URL}/api/check-typos-only`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tok}` },
-            body: JSON.stringify({ imageUrl })
+            body: JSON.stringify({ imageUrl, projectId: id })
           });
           const typoData = await typoRes.json();
           if (typoData.hasTypos) {
