@@ -299,6 +299,37 @@ app.delete('/api/projects/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// Agregar editor a un proyecto (solo el owner puede hacerlo)
+app.post('/api/projects/:id/editors', authenticateToken, async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId requerido' });
+
+    const project = await prisma.project.findUnique({ where: { id: req.params.id } });
+    if (!project) return res.status(404).json({ error: 'Proyecto no encontrado' });
+    if (project.userId !== req.user.id) return res.status(403).json({ error: 'Solo el owner puede agregar colaboradores' });
+    if (project.userId === userId) return res.status(400).json({ error: 'El owner ya tiene acceso' });
+
+    await prisma.projectEditor.upsert({
+      where: { projectId_userId: { projectId: req.params.id, userId } },
+      create: { projectId: req.params.id, userId },
+      update: {}
+    });
+
+    const updatedProject = await prisma.project.findUnique({
+      where: { id: req.params.id },
+      include: {
+        user: { select: { id: true, name: true, email: true, avatar: true } },
+        editors: { include: { user: { select: { id: true, name: true, email: true, avatar: true } } } }
+      }
+    });
+    res.json(updatedProject);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error adding editor' });
+  }
+});
+
 // =======================
 // RUTAS DE COMENTARIOS
 // =======================

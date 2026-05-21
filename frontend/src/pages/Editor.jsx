@@ -267,6 +267,9 @@ function Editor() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [textEditorPanel, setTextEditorPanel] = useState(null); // { item, x, y }
   const [projectCollabs, setProjectCollabs] = useState([]); // [{id,name,email,avatar,color}]
+  const [showAddCollab, setShowAddCollab] = useState(false);
+  const [allUsers, setAllUsers] = useState([]);
+  const [collabSearch, setCollabSearch] = useState('');
 
   // Sistema de comentarios
   const [comments, setComments] = useState([]);
@@ -346,6 +349,11 @@ function Editor() {
       fetch(`${API_URL}/api/notifications`, {
         headers: { 'Authorization': `Bearer ${parsed.token}` }
       }).then(r => r.ok ? r.json() : []).then(data => setNotifications(Array.isArray(data) ? data : []));
+
+      // Cargar todos los usuarios disponibles (para el + de colaboradores)
+      fetch(`${API_URL}/api/users`, {
+        headers: { 'Authorization': `Bearer ${parsed.token}` }
+      }).then(r => r.ok ? r.json() : []).then(data => setAllUsers(Array.isArray(data) ? data : []));
     }
   }, [id, navigate]);
 
@@ -393,6 +401,26 @@ function Editor() {
     projectCollabs.find(c => c.id === userId)?.color ?? null;
 
   const unreadCount = notifications.filter(n => !n.read).length;
+
+  // Agregar colaborador al proyecto
+  const addCollaborator = async (userId) => {
+    const tok = JSON.parse(localStorage.getItem('tropica_user'))?.token;
+    const res = await fetch(`${API_URL}/api/projects/${id}/editors`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tok}` },
+      body: JSON.stringify({ userId })
+    });
+    if (!res.ok) return;
+    const updated = await res.json();
+    // Reconstruir lista de colaboradores
+    const collabs = [
+      updated.user ? { ...updated.user, color: COLLAB_COLORS[0] } : null,
+      ...((updated.editors || []).map((e, i) => ({ ...e.user, color: COLLAB_COLORS[(i + 1) % COLLAB_COLORS.length] })))
+    ].filter(Boolean);
+    setProjectCollabs(collabs);
+    setShowAddCollab(false);
+    setCollabSearch('');
+  };
 
   // Exportar el canvas como PDF
   const exportToPdf = async () => {
@@ -1440,6 +1468,81 @@ function Editor() {
               </div>
             ))}
           </div>
+
+          {/* Botón + para agregar colaborador (solo owner) */}
+          {user && projectCollabs.length > 0 && projectCollabs[0]?.id === user.id && (
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => { setShowAddCollab(!showAddCollab); setCollabSearch(''); }}
+                title="Agregar colaborador"
+                style={{
+                  width: '32px', height: '32px', borderRadius: '50%',
+                  background: 'rgba(255,255,255,0.1)', border: '2px dashed rgba(255,255,255,0.35)',
+                  color: 'rgba(255,255,255,0.7)', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '20px', fontWeight: '300', lineHeight: 1,
+                  transition: 'all 0.18s'
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.18)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.6)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.35)'; }}
+              >+</button>
+
+              {showAddCollab && (() => {
+                const collabIds = new Set(projectCollabs.map(c => c.id));
+                const available = allUsers.filter(u =>
+                  !collabIds.has(u.id) &&
+                  ((u.name || '').toLowerCase().includes(collabSearch.toLowerCase()) ||
+                   (u.email || '').toLowerCase().includes(collabSearch.toLowerCase()))
+                );
+                return (
+                  <div style={{
+                    position: 'absolute', top: '42px', right: 0,
+                    width: '240px', background: 'white', borderRadius: '12px',
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.2)', border: '1px solid #e0e5ef',
+                    zIndex: 9999, overflow: 'hidden'
+                  }}>
+                    <div style={{ padding: '10px 12px', background: '#1a1f2e', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'white', fontSize: '12px', fontWeight: '700' }}>Agregar colaborador</span>
+                      <button onClick={() => setShowAddCollab(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '14px' }}>✕</button>
+                    </div>
+                    <div style={{ padding: '8px' }}>
+                      <input
+                        autoFocus
+                        value={collabSearch}
+                        onChange={e => setCollabSearch(e.target.value)}
+                        placeholder="Buscar por nombre o email…"
+                        style={{ width: '100%', fontSize: '12px', border: '1.5px solid #e0e5ef', borderRadius: '7px', padding: '6px 10px', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                        onFocus={e => e.target.style.borderColor = '#3483fa'}
+                        onBlur={e => e.target.style.borderColor = '#e0e5ef'}
+                      />
+                    </div>
+                    <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                      {available.length === 0 ? (
+                        <p style={{ color: '#9ba3b5', fontSize: '12px', textAlign: 'center', padding: '16px', margin: 0 }}>Sin usuarios disponibles</p>
+                      ) : available.map(u => (
+                        <div
+                          key={u.id}
+                          onClick={() => addCollaborator(u.id)}
+                          style={{ padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '9px', borderBottom: '1px solid #f0f2f7' }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#f4f6fb'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'white'}
+                        >
+                          <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#3483fa', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '800', flexShrink: 0, overflow: 'hidden' }}>
+                            {u.avatar ? <img src={u.avatar} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : (u.name || 'U').charAt(0).toUpperCase()}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ margin: 0, fontSize: '12px', fontWeight: '700', color: '#1a1f2e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.name}</p>
+                            <p style={{ margin: 0, fontSize: '10px', color: '#9ba3b5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.email}</p>
+                          </div>
+                          <span style={{ fontSize: '18px', color: '#3483fa', fontWeight: '300' }}>+</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
         </div>
       </div>
 
