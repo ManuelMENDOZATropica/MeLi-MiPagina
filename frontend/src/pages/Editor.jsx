@@ -28,13 +28,17 @@ function CommentPanel({
   comments, projectCollabs, replyingTo, setReplyingTo,
   commentInputs, setCommentInputs,
   mentionQuery, setMentionQuery,
-  onClose, onSubmit, onResolve, onDelete,
+  onClose, onSubmit, onResolve, onDelete, onException,
   getCollabColor,
 }) {
   const elComments = comments.filter(c => c.elementId === elementId);
   const inputKey = 'new_' + elementId;
   const inputVal = commentInputs[inputKey] || '';
   const currentUserId = JSON.parse(localStorage.getItem('tropica_user'))?.user?.id;
+  const [exceptionForm, setExceptionForm] = useState(null); // commentId | null
+  const [exWord, setExWord] = useState('');
+  const [exReason, setExReason] = useState('');
+  const [exLoading, setExLoading] = useState(false);
 
   const handleInput = (e) => {
     const val = e.target.value;
@@ -114,11 +118,52 @@ function CommentPanel({
                 style={{ fontSize: '11px', color: comment.resolved ? '#10b981' : '#6b7280', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600', padding: '2px 0' }}>
                 {comment.resolved ? '✓ Resuelto' : '✓ Resolver'}
               </button>
+              {/* Botón Crear excepción — solo en comentarios de MAIA */}
+              {comment.author.email === 'maia@tropica.me' && !comment.resolved && (
+                <button
+                  onClick={() => { setExceptionForm(exceptionForm === comment.id ? null : comment.id); setExWord(''); setExReason(''); }}
+                  style={{ fontSize: '11px', color: '#8b5cf6', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600', padding: '2px 0' }}
+                >✦ Excepción</button>
+              )}
               {comment.author.id === currentUserId && (
                 <button onClick={() => onDelete(comment.id)}
                   style={{ fontSize: '11px', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600', padding: '2px 0', marginLeft: 'auto' }}>🗑</button>
               )}
             </div>
+
+            {/* Formulario inline de excepción */}
+            {exceptionForm === comment.id && (
+              <div style={{ marginTop: '10px', background: '#faf5ff', border: '1px solid #ddd6fe', borderRadius: '8px', padding: '10px' }}>
+                <p style={{ margin: '0 0 6px', fontSize: '11px', fontWeight: '700', color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.06em' }}>✦ Crear excepción creativa</p>
+                <input
+                  value={exWord}
+                  onChange={e => setExWord(e.target.value)}
+                  placeholder='Palabra/frase exacta (ej: "Protecciónn")'
+                  style={{ width: '100%', fontSize: '12px', border: '1.5px solid #ddd6fe', borderRadius: '6px', padding: '6px 8px', outline: 'none', marginBottom: '6px', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                  onFocus={e => e.target.style.borderColor = '#8b5cf6'}
+                  onBlur={e => e.target.style.borderColor = '#ddd6fe'}
+                />
+                <input
+                  value={exReason}
+                  onChange={e => setExReason(e.target.value)}
+                  placeholder='Razón creativa (opcional)'
+                  style={{ width: '100%', fontSize: '12px', border: '1.5px solid #ddd6fe', borderRadius: '6px', padding: '6px 8px', outline: 'none', marginBottom: '8px', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                  onFocus={e => e.target.style.borderColor = '#8b5cf6'}
+                  onBlur={e => e.target.style.borderColor = '#ddd6fe'}
+                />
+                <button
+                  disabled={!exWord.trim() || exLoading}
+                  onClick={async () => {
+                    if (!exWord.trim()) return;
+                    setExLoading(true);
+                    await onException(comment.id, exWord, exReason);
+                    setExLoading(false);
+                    setExceptionForm(null);
+                  }}
+                  style={{ width: '100%', background: exLoading ? '#c4b5fd' : '#7c3aed', color: 'white', border: 'none', borderRadius: '6px', padding: '7px', fontSize: '12px', fontWeight: '800', cursor: exLoading ? 'wait' : 'pointer', letterSpacing: '0.04em' }}
+                >{exLoading ? 'Verificando con MAIA...' : 'Guardar excepción'}</button>
+              </div>
+            )}
 
             {/* Respuestas */}
             {(comment.replies || []).length > 0 && (
@@ -626,6 +671,35 @@ function Editor() {
       ));
     } else {
       setComments(prev => prev.filter(c => c.id !== commentId));
+    }
+  };
+
+  // Crea una excepción creativa para un comentario de MAIA y re-verifica la imagen
+  const handleException = async (commentId, word, reason) => {
+    const tok = JSON.parse(localStorage.getItem('tropica_user'))?.token;
+    // Obtener la URL de imagen del elemento asociado al comentario
+    const comment = comments.find(c => c.id === commentId);
+    const elementId = comment?.elementId;
+    let imageUrl = null;
+    if (elementId) {
+      const allItems = [];
+      const collect = (items) => items.forEach(item => {
+        if (item.type === 'rowGroup' && item.items) item.items.forEach(c => allItems.push(c));
+        else allItems.push(item);
+      });
+      collect([...(canvases.desktop || []), ...(canvases.mobile || [])]);
+      const found = allItems.find(i => i.uniqueId === elementId);
+      imageUrl = found?.uploadedImages?.[0] || null;
+    }
+    const res = await fetch(`${API_URL}/api/comments/${commentId}/exception`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tok}` },
+      body: JSON.stringify({ word, reason, imageUrl, projectId: id, elementId })
+    });
+    const result = await res.json();
+    if (result.resolved) {
+      // El backend resolvió el comentario porque ya no hay typos
+      setComments(prev => prev.map(c => c.id === commentId ? { ...c, resolved: true } : c));
     }
   };
 
@@ -1331,6 +1405,7 @@ function Editor() {
             onSubmit={submitComment}
             onResolve={resolveComment}
             onDelete={deleteComment}
+            onException={handleException}
             getCollabColor={getCollabColor}
           />
         )}

@@ -334,6 +334,20 @@ app.post('/api/projects/:id/editors', authenticateToken, async (req, res) => {
 // ANÁLISIS DE TYPOS CON IA
 // =======================
 
+// Helper: construye el prompt de typos con las excepciones del proyecto
+const buildTypoPrompt = (exceptions = []) => {
+  let base = `Eres un corrector de pruebas profesional de publicidad digital. Analiza el texto visible en esta imagen de un banner o elemento de marketing.
+Busca únicamente errores ortográficos, errores tipográficos, palabras mal escritas o errores gramaticales evidentes en español o inglés.`;
+  if (exceptions.length > 0) {
+    const list = exceptions.map(e => `"${e.word}"${e.reason ? ` (${e.reason})` : ''}`).join(', ');
+    base += `\n\nIMPORTANTE: Las siguientes palabras son decisiones creativas intencionales aprobadas para este proyecto y NO deben considerarse errores: ${list}.`;
+  }
+  base += `\nSi encuentras errores responde SOLO con JSON válido: {"found": true, "errors": ["descripción del error 1", "descripción del error 2"]}
+Si NO hay errores responde SOLO: {"found": false}
+Sin texto adicional fuera del JSON.`;
+  return base;
+};
+
 // POST /api/analyze-typos
 // Analiza una imagen con Gemini Vision para detectar errores ortográficos/tipográficos.
 // Si los encuentra, crea un comentario automático en el elemento y notifica al dueño.
@@ -349,6 +363,9 @@ app.post('/api/analyze-typos', authenticateToken, async (req, res) => {
   }
 
   try {
+    // Cargar excepciones del proyecto
+    const exceptions = await prisma.typoException.findMany({ where: { projectId } });
+
     // Descargar la imagen de Cloudinary y convertirla a base64
     const imgResponse = await fetch(imageUrl);
     if (!imgResponse.ok) throw new Error('No se pudo descargar la imagen de Cloudinary');
@@ -365,19 +382,8 @@ app.post('/api/analyze-typos', authenticateToken, async (req, res) => {
         body: JSON.stringify({
           contents: [{
             parts: [
-              {
-                text: `Eres un corrector de pruebas profesional de publicidad digital. Analiza el texto visible en esta imagen de un banner o elemento de marketing.
-Busca únicamente errores ortográficos, errores tipográficos, palabras mal escritas o errores gramaticales evidentes en español o inglés.
-Si encuentras errores responde SOLO con JSON válido: {"found": true, "errors": ["descripción del error 1", "descripción del error 2"]}
-Si NO hay errores responde SOLO: {"found": false}
-Sin texto adicional fuera del JSON.`
-              },
-              {
-                inline_data: {
-                  mime_type: mimeType,
-                  data: base64Image
-                }
-              }
+              { text: buildTypoPrompt(exceptions) },
+              { inline_data: { mime_type: mimeType, data: base64Image } }
             ]
           }]
         })
@@ -493,12 +499,16 @@ app.post('/api/maia-comment', authenticateToken, async (req, res) => {
 });
 
 // Verifica typos en una imagen SIN crear comentario (dry-run para pre-publicación)
+// Acepta projectId opcional para incluir excepciones del proyecto
 app.post('/api/check-typos-only', authenticateToken, async (req, res) => {
-  const { imageUrl } = req.body;
+  const { imageUrl, projectId } = req.body;
   if (!imageUrl) return res.status(400).json({ error: 'Falta imageUrl' });
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return res.json({ hasTypos: false });
   try {
+    const exceptions = projectId
+      ? await prisma.typoException.findMany({ where: { projectId } })
+      : [];
     const imgResponse = await fetch(imageUrl);
     if (!imgResponse.ok) return res.json({ hasTypos: false });
     const imgBuffer = await imgResponse.arrayBuffer();
@@ -511,12 +521,10 @@ app.post('/api/check-typos-only', authenticateToken, async (req, res) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: `Eres un corrector de pruebas profesional. Analiza el texto visible en esta imagen de un banner o elemento de marketing.\nBusca únicamente errores ortográficos, tipográficos, palabras mal escritas o errores gramaticales evidentes en español o inglés.\nSi encuentras errores responde SOLO con JSON válido: {"found": true, "errors": ["descripción 1"]}\nSi NO hay errores responde SOLO: {"found": false}\nSin texto adicional fuera del JSON.` },
-              { inline_data: { mime_type: mimeType, data: base64Image } }
-            ]
-          }],
+          contents: [{ parts: [
+            { text: buildTypoPrompt(exceptions) },
+            { inline_data: { mime_type: mimeType, data: base64Image } }
+          ]}],
           generationConfig: { temperature: 0.1 }
         })
       }
@@ -529,6 +537,75 @@ app.post('/api/check-typos-only', authenticateToken, async (req, res) => {
   } catch (e) {
     console.error('Error en check-typos-only:', e);
     res.json({ hasTypos: false });
+  }
+});
+
+// =======================
+// EXCEPCIONES DE TYPOS
+// =======================
+
+// GET excepciones de un proyecto
+app.get('/api/projects/:id/exceptions', authenticateToken, async (req, res) => {
+  const exceptions = await prisma.typoException.findMany({ where: { projectId: req.params.id } });
+  res.json(exceptions);
+});
+
+// POST crear excepción + re-verificar el comentario MAIA
+// Si ya no hay typos en la imagen → resuelve el comentario automáticamente
+app.post('/api/comments/:commentId/exception', authenticateToken, async (req, res) => {
+  const { word, reason, imageUrl, projectId, elementId } = req.body;
+  if (!word || !projectId) return res.status(400).json({ error: 'Faltan campos' });
+
+  try {
+    // 1. Guardar la excepción
+    const exception = await prisma.typoException.create({
+      data: { projectId, word: word.trim(), reason: reason?.trim() || null, elementId: elementId || null }
+    });
+
+    // 2. Re-verificar la imagen con las excepciones actualizadas (si hay imageUrl)
+    let resolved = false;
+    if (imageUrl) {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (apiKey) {
+        const allExceptions = await prisma.typoException.findMany({ where: { projectId } });
+        const imgResponse = await fetch(imageUrl);
+        if (imgResponse.ok) {
+          const base64Image = Buffer.from(await imgResponse.arrayBuffer()).toString('base64');
+          const mimeType = imgResponse.headers.get('content-type') || 'image/jpeg';
+          const geminiRes = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [
+                  { text: buildTypoPrompt(allExceptions) },
+                  { inline_data: { mime_type: mimeType, data: base64Image } }
+                ]}],
+                generationConfig: { temperature: 0.1 }
+              })
+            }
+          );
+          const geminiData = await geminiRes.json();
+          const rawText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || '{"found":false}';
+          const parsed = JSON.parse(rawText.replace(/```json|```/g, '').trim());
+
+          if (!parsed.found) {
+            // Ya no hay typos → resolver el comentario
+            await prisma.comment.update({
+              where: { id: req.params.commentId },
+              data: { resolved: true }
+            });
+            resolved = true;
+          }
+        }
+      }
+    }
+
+    res.json({ ok: true, exception, resolved });
+  } catch (e) {
+    console.error('Error en exception:', e);
+    res.status(500).json({ error: 'Error interno' });
   }
 });
 
