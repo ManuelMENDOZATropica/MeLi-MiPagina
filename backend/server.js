@@ -356,9 +356,9 @@ app.post('/api/analyze-typos', authenticateToken, async (req, res) => {
     const base64Image = Buffer.from(imgBuffer).toString('base64');
     const mimeType = imgResponse.headers.get('content-type') || 'image/jpeg';
 
-    // Llamada a Gemini Vision (gemini-2.0-flash-lite)
+    // Llamada a Gemini Vision (gemini-2.5-flash)
     const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
