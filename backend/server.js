@@ -33,13 +33,8 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, callback) => {
-    // En producción, bloquear requests sin origin (curl, scripts)
-    if (!origin) {
-      if (process.env.NODE_ENV === 'production') {
-        return callback(new Error('Requests sin origin bloqueados en producción'));
-      }
-      return callback(null, true); // Permitir en desarrollo (Postman, etc.)
-    }
+    // Sin origin = health check de Render, curl, server-to-server → permitir
+    if (!origin) return callback(null, true);
     const allowed = allowedOrigins.some(o =>
       typeof o === 'string' ? o === origin : o.test(origin)
     );
