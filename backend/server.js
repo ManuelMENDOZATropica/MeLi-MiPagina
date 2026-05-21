@@ -452,6 +452,46 @@ Sin texto adicional fuera del JSON.`
   }
 });
 
+// Crea un comentario como MAIA (para checks automáticos: dimensiones, etc.)
+app.post('/api/maia-comment', authenticateToken, async (req, res) => {
+  const { projectId, elementId, elementOwnerId, text } = req.body;
+  if (!projectId || !elementId || !text) return res.status(400).json({ error: 'Faltan campos' });
+  try {
+    const authorIdToUse = maiaUserId || req.user.id;
+    const comment = await prisma.comment.create({
+      data: {
+        projectId, elementId,
+        authorId: authorIdToUse,
+        text,
+        mentions: elementOwnerId ? [elementOwnerId] : [],
+        parentId: null
+      },
+      include: {
+        author: { select: { id: true, name: true, email: true, avatar: true } },
+        replies: { include: { author: { select: { id: true, name: true, email: true, avatar: true } } } }
+      }
+    });
+    let notification = null;
+    if (elementOwnerId && elementOwnerId !== maiaUserId) {
+      notification = await prisma.notification.create({
+        data: { userId: elementOwnerId, commentId: comment.id, projectId },
+        include: {
+          comment: {
+            include: {
+              author: { select: { id: true, name: true, email: true, avatar: true } },
+              project: { select: { title: true } }
+            }
+          }
+        }
+      });
+    }
+    res.json({ ok: true, comment, notification });
+  } catch (e) {
+    console.error('Error en maia-comment:', e);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
 // =======================
 // RUTAS DE COMENTARIOS
 // =======================

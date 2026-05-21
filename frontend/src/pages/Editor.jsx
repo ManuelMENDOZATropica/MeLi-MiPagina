@@ -600,8 +600,62 @@ function Editor() {
     }
   };
 
+  // Verifica que las dimensiones de la imagen coincidan con las del elemento
+  const checkImageDimensions = (imageUrl, elementId) => {
+    const tok = JSON.parse(localStorage.getItem('tropica_user'))?.token;
 
-  // Drag & Drop de archivos del sistema operativo sobre el componente
+    // Encontrar el elemento en cualquiera de los dos canvases
+    let foundItem = null;
+    const searchItem = (items) => {
+      for (const item of items) {
+        if (item.uniqueId === elementId) { foundItem = item; return; }
+        if (item.type === 'rowGroup' && item.items) {
+          for (const child of item.items) {
+            if (child.uniqueId === elementId) { foundItem = child; return; }
+          }
+        }
+      }
+    };
+    searchItem([...(canvases.desktop || []), ...(canvases.mobile || [])]);
+    if (!foundItem) return;
+
+    const expectedSize = viewMode === 'desktop' ? foundItem.desktopSize : foundItem.mobileSize;
+    if (!expectedSize?.width || !expectedSize?.height) return;
+
+    const img = new window.Image();
+    img.onload = async () => {
+      const actualW = img.naturalWidth;
+      const actualH = img.naturalHeight;
+      const expW = expectedSize.width;
+      const expH = expectedSize.height;
+
+      // Tolerancia del 5% para evitar falsos positivos por compresión
+      const tol = 0.05;
+      const wOk = Math.abs(actualW - expW) / expW <= tol;
+      const hOk = Math.abs(actualH - expH) / expH <= tol;
+
+      if (!wOk || !hOk) {
+        const elementOwnerId = foundItem.addedBy || null;
+        const text = `**Aviso de dimensiones:**\n\nLa imagen subida mide **${actualW} × ${actualH} px** pero este elemento espera **${expW} × ${expH} px**.\n\nConsiderá reemplazarla con una imagen del tamaño correcto para evitar distorsión.`;
+        try {
+          const res = await fetch(`${API_URL}/api/maia-comment`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tok}` },
+            body: JSON.stringify({ imageUrl, projectId: id, elementId, elementOwnerId, text })
+          });
+          const result = await res.json();
+          if (result.comment) {
+            setComments(prev => [...prev, result.comment]);
+            if (result.notification) setNotifications(prev => [result.notification, ...prev]);
+          }
+        } catch (e) {
+          console.error('Error en checkImageDimensions:', e);
+        }
+      }
+    };
+    img.src = imageUrl;
+  };
+
   const handleFileDrop = (e, uniqueId) => {
     if (isPreviewMode) return;
     // Si es un archivo del SO (no un componente de la barra lateral)
@@ -643,8 +697,9 @@ function Editor() {
               }
               return item;
             }));
-            // Analizar typos con IA en background
+            // Análisis IA en background
             analyzeImageForTypos(data.url, uniqueId);
+            checkImageDimensions(data.url, uniqueId);
           }
         } catch (error) {
           console.error('Error subiendo imagen por drag:', error);
@@ -697,8 +752,9 @@ function Editor() {
               }
               return item;
             }));
-            // Analizar typos con IA en background
+            // Análisis IA en background
             analyzeImageForTypos(data.url, uploadTargetId);
+            checkImageDimensions(data.url, uploadTargetId);
           }
         } catch (error) {
           console.error('Error subiendo imagen a Cloudinary:', error);
