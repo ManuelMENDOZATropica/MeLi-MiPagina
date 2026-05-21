@@ -60,8 +60,7 @@ function CommentPanel({
   return (
     <div style={{
       position: 'absolute',
-      top: '50%', left: '50%',
-      transform: 'translate(-50%, -50%)',
+      top: '12px', left: '12px',
       width: '320px',
       background: 'rgba(255,255,255,0.97)',
       borderRadius: '14px',
