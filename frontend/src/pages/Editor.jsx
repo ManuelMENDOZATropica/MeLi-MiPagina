@@ -7,17 +7,10 @@ import '../index.css';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import ReactMarkdown from 'react-markdown';
-import { useSocket } from '../hooks/useSocket';
-import { useComments } from '../hooks/useComments';
-import { useExceptions } from '../hooks/useExceptions';
-import { useNotifications } from '../hooks/useNotifications';
-import { CommentPanel } from '../components/editor/CommentPanel';
-import { MaiaPanel } from '../components/editor/MaiaPanel';
-import { NotificationsPanel } from '../components/editor/NotificationsPanel';
 
-// Paleta de colores por colaborador (owner = ÃƒÂ­ndice 0)
+// Paleta de colores por colaborador (owner = índice 0)
 const COLLAB_COLORS = [
-  '#fff159', // owner Ã¢â€ â€™ amarillo MeLi
+  '#fff159', // owner → amarillo MeLi
   '#3483fa', // azul
   '#10b981', // verde
   '#f59e0b', // naranja
@@ -27,8 +20,238 @@ const COLLAB_COLORS = [
   '#ef4444', // rojo
 ];
 
+// ─────────────────────────────────────────────────────────────────────────────
+// CommentPanel: componente externo (NO dentro de Editor) para evitar remount
+// ─────────────────────────────────────────────────────────────────────────────
+function CommentPanel({
+  elementId, elementName,
+  comments, projectCollabs, replyingTo, setReplyingTo,
+  commentInputs, setCommentInputs,
+  mentionQuery, setMentionQuery,
+  onClose, onSubmit, onResolve, onDelete, onException,
+  getCollabColor,
+}) {
+  const elComments = comments.filter(c => c.elementId === elementId);
+  const inputKey = 'new_' + elementId;
+  const inputVal = commentInputs[inputKey] || '';
+  const currentUserId = JSON.parse(localStorage.getItem('tropica_user'))?.user?.id;
+  const [exceptionForm, setExceptionForm] = useState(null); // commentId | null
+  const [exWord, setExWord] = useState('');
+  const [exReason, setExReason] = useState('');
+  const [exLoading, setExLoading] = useState(false);
 
+  const handleInput = (e) => {
+    const val = e.target.value;
+    setCommentInputs(prev => ({ ...prev, [inputKey]: val }));
+    const match = val.match(/@([\w\s]*)$/);
+    if (match) setMentionQuery({ field: inputKey, query: match[1] });
+    else setMentionQuery(null);
+  };
 
+  const filteredCollabs = mentionQuery && mentionQuery.field === inputKey
+    ? projectCollabs.filter(c =>
+        c.id !== currentUserId &&
+        (c.name || '').toLowerCase().includes(mentionQuery.query.toLowerCase())
+      )
+    : [];
+
+  const insertMention = (collab) => {
+    const val = inputVal.replace(/@([\w\s]*)$/, `@${collab.name} `);
+    setCommentInputs(prev => ({ ...prev, [inputKey]: val }));
+    setMentionQuery(null);
+  };
+
+  return (
+    <div style={{
+      position: 'absolute',
+      top: '12px', left: '12px',
+      width: '320px',
+      background: 'rgba(255,255,255,0.97)',
+      borderRadius: '14px',
+      boxShadow: '0 16px 48px rgba(0,0,0,0.28), 0 2px 8px rgba(0,0,0,0.12)',
+      border: '1px solid rgba(224,229,239,0.8)',
+      backdropFilter: 'blur(12px)',
+      zIndex: 500, overflow: 'hidden',
+      fontFamily: "'Inter', sans-serif"
+    }}>
+      {/* Header */}
+      <div style={{ background: '#1a1f2e', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em' }}>💬 {elementName}</span>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '16px', lineHeight: 1, padding: '0 2px' }}>✕</button>
+      </div>
+
+      {/* Lista de comentarios */}
+      <div style={{ maxHeight: '340px', overflowY: 'auto', padding: '10px' }}>
+        {elComments.length === 0 && (
+          <p style={{ color: '#9ba3b5', fontSize: '12px', textAlign: 'center', margin: '16px 0' }}>Sin comentarios aún</p>
+        )}
+        {elComments.map(comment => (
+          <div key={comment.id} style={{
+            marginBottom: '12px', opacity: comment.resolved ? 0.55 : 1,
+            background: comment.resolved ? '#f4f6fb' : 'white',
+            borderRadius: '8px', border: '1px solid #e8ecf4', padding: '10px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '6px' }}>
+              <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: getCollabColor(comment.author.id) || '#ddd', color: '#1a1f2e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '800', overflow: 'hidden', flexShrink: 0 }}>
+                {comment.author.avatar ? <img src={comment.author.avatar} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : (comment.author.name || 'U').charAt(0).toUpperCase()}
+              </div>
+              <span style={{ fontSize: '12px', fontWeight: '700', color: '#1a1f2e' }}>{comment.author.name || comment.author.email}</span>
+              <span style={{ fontSize: '10px', color: '#b0b9cc', marginLeft: 'auto' }}>
+                {new Date(comment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </div>
+            <div style={{ fontSize: '13px', color: '#2d3548', margin: '0 0 8px', lineHeight: '1.5' }}>
+              <ReactMarkdown
+                components={{
+                  p: ({children}) => <p style={{ margin: '0 0 4px' }}>{children}</p>,
+                  strong: ({children}) => <strong style={{ fontWeight: '700', color: '#1a1f2e' }}>{children}</strong>,
+                  ol: ({children}) => <ol style={{ margin: '4px 0', paddingLeft: '18px' }}>{children}</ol>,
+                  ul: ({children}) => <ul style={{ margin: '4px 0', paddingLeft: '18px' }}>{children}</ul>,
+                  li: ({children}) => <li style={{ marginBottom: '2px' }}>{children}</li>,
+                }}
+              >{comment.text}</ReactMarkdown>
+            </div>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              <button onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
+                style={{ fontSize: '11px', color: '#3483fa', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600', padding: '2px 0' }}>↩ Responder</button>
+              <button onClick={() => onResolve(comment.id)}
+                style={{ fontSize: '11px', color: comment.resolved ? '#10b981' : '#6b7280', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600', padding: '2px 0' }}>
+                {comment.resolved ? '✓ Resuelto' : '✓ Resolver'}
+              </button>
+              {/* Botón Crear excepción — solo en comentarios de MAIA */}
+              {comment.author.email === 'maia@tropica.me' && !comment.resolved && (
+                <button
+                  onClick={() => { setExceptionForm(exceptionForm === comment.id ? null : comment.id); setExWord(''); setExReason(''); }}
+                  style={{ fontSize: '11px', color: '#8b5cf6', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600', padding: '2px 0' }}
+                >✦ Excepción</button>
+              )}
+              {comment.author.id === currentUserId && (
+                <button onClick={() => onDelete(comment.id)}
+                  style={{ fontSize: '11px', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600', padding: '2px 0', marginLeft: 'auto' }}>🗑</button>
+              )}
+            </div>
+
+            {/* Formulario inline de excepción */}
+            {exceptionForm === comment.id && (
+              <div style={{ marginTop: '10px', background: '#faf5ff', border: '1px solid #ddd6fe', borderRadius: '8px', padding: '10px' }}>
+                <p style={{ margin: '0 0 6px', fontSize: '11px', fontWeight: '700', color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.06em' }}>✦ Crear excepción creativa</p>
+                <input
+                  value={exWord}
+                  onChange={e => setExWord(e.target.value)}
+                  placeholder='Palabra/frase exacta (ej: "Protecciónn")'
+                  style={{ width: '100%', fontSize: '12px', border: '1.5px solid #ddd6fe', borderRadius: '6px', padding: '6px 8px', outline: 'none', marginBottom: '6px', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                  onFocus={e => e.target.style.borderColor = '#8b5cf6'}
+                  onBlur={e => e.target.style.borderColor = '#ddd6fe'}
+                />
+                <input
+                  value={exReason}
+                  onChange={e => setExReason(e.target.value)}
+                  placeholder='Razón creativa (opcional)'
+                  style={{ width: '100%', fontSize: '12px', border: '1.5px solid #ddd6fe', borderRadius: '6px', padding: '6px 8px', outline: 'none', marginBottom: '8px', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                  onFocus={e => e.target.style.borderColor = '#8b5cf6'}
+                  onBlur={e => e.target.style.borderColor = '#ddd6fe'}
+                />
+                <button
+                  disabled={!exWord.trim() || exLoading}
+                  onClick={async () => {
+                    if (!exWord.trim()) return;
+                    setExLoading(true);
+                    await onException(comment.id, exWord, exReason);
+                    setExLoading(false);
+                    setExceptionForm(null);
+                  }}
+                  style={{ width: '100%', background: exLoading ? '#c4b5fd' : '#7c3aed', color: 'white', border: 'none', borderRadius: '6px', padding: '7px', fontSize: '12px', fontWeight: '800', cursor: exLoading ? 'wait' : 'pointer', letterSpacing: '0.04em' }}
+                >{exLoading ? 'Verificando con MAIA...' : 'Guardar excepción'}</button>
+              </div>
+            )}
+
+            {/* Respuestas */}
+            {(comment.replies || []).length > 0 && (
+              <div style={{ marginTop: '8px', paddingLeft: '10px', borderLeft: '2px solid #e8ecf4' }}>
+                {comment.replies.map(reply => (
+                  <div key={reply.id} style={{ marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
+                      <div style={{ width: '18px', height: '18px', borderRadius: '50%', background: getCollabColor(reply.author.id) || '#ddd', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: '800', overflow: 'hidden', flexShrink: 0 }}>
+                        {reply.author.avatar ? <img src={reply.author.avatar} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : (reply.author.name || 'U').charAt(0).toUpperCase()}
+                      </div>
+                      <span style={{ fontSize: '11px', fontWeight: '700', color: '#1a1f2e' }}>{reply.author.name || reply.author.email}</span>
+                      {reply.author.id === currentUserId && (
+                        <button onClick={() => onDelete(reply.id, comment.id)}
+                          style={{ fontSize: '10px', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', marginLeft: 'auto', padding: 0 }}>🗑</button>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#2d3548', margin: 0, lineHeight: '1.4' }}>
+                      <ReactMarkdown
+                        components={{
+                          p: ({children}) => <p style={{ margin: '0 0 2px' }}>{children}</p>,
+                          strong: ({children}) => <strong style={{ fontWeight: '700' }}>{children}</strong>,
+                          ol: ({children}) => <ol style={{ margin: '2px 0', paddingLeft: '16px' }}>{children}</ol>,
+                          ul: ({children}) => <ul style={{ margin: '2px 0', paddingLeft: '16px' }}>{children}</ul>,
+                          li: ({children}) => <li style={{ marginBottom: '1px' }}>{children}</li>,
+                        }}
+                      >{reply.text}</ReactMarkdown>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Input de respuesta */}
+            {replyingTo === comment.id && (
+              <div style={{ marginTop: '8px', display: 'flex', gap: '6px' }}>
+                <input
+                  autoFocus
+                  value={commentInputs[comment.id] || ''}
+                  onChange={e => setCommentInputs(prev => ({ ...prev, [comment.id]: e.target.value }))}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSubmit(elementId, comment.id); } }}
+                  placeholder="Responder..."
+                  style={{ flex: 1, fontSize: '12px', border: '1.5px solid #3483fa', borderRadius: '6px', padding: '5px 8px', outline: 'none', fontFamily: 'inherit' }}
+                />
+                <button onClick={() => onSubmit(elementId, comment.id)}
+                  style={{ background: '#3483fa', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px', fontWeight: '700' }}>↩</button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Input nuevo comentario */}
+      <div style={{ padding: '10px', borderTop: '1px solid #e8ecf4', position: 'relative' }}>
+        {filteredCollabs.length > 0 && (
+          <div style={{ position: 'absolute', bottom: '100%', left: '10px', right: '10px', background: 'white', border: '1px solid #e0e5ef', borderRadius: '8px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 600 }}>
+            {filteredCollabs.map(c => (
+              <div key={c.id} onClick={() => insertMention(c)}
+                style={{ padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}
+                onMouseEnter={e => e.currentTarget.style.background = '#f4f6fb'}
+                onMouseLeave={e => e.currentTarget.style.background = 'white'}>
+                <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: '800', color: c.color === '#fff159' ? '#1a1f2e' : 'white' }}>
+                  {(c.name || 'U').charAt(0).toUpperCase()}
+                </div>
+                <span style={{ fontWeight: '600', color: '#1a1f2e' }}>{c.name}</span>
+                <span style={{ color: '#9ba3b5', fontSize: '11px' }}>{c.email}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <textarea
+          value={inputVal}
+          onChange={handleInput}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSubmit(elementId); } }}
+          placeholder="Comentar... (@ para mencionar, Enter para enviar)"
+          rows={2}
+          style={{ width: '100%', fontSize: '13px', border: '1.5px solid #e0e5ef', borderRadius: '8px', padding: '8px 10px', outline: 'none', resize: 'none', fontFamily: 'inherit', boxSizing: 'border-box', transition: 'border-color 0.15s' }}
+          onFocus={e => e.target.style.borderColor = '#3483fa'}
+          onBlur={e => e.target.style.borderColor = '#e0e5ef'}
+        />
+        <button onClick={() => onSubmit(elementId)}
+          style={{ marginTop: '6px', width: '100%', background: '#1a1f2e', color: '#fff159', border: 'none', borderRadius: '7px', padding: '8px', fontSize: '12px', fontWeight: '800', cursor: 'pointer', letterSpacing: '0.05em', textTransform: 'uppercase', transition: 'background 0.15s' }}
+          onMouseEnter={e => e.currentTarget.style.background = '#252c3f'}
+          onMouseLeave={e => e.currentTarget.style.background = '#1a1f2e'}
+        >Enviar comentario</button>
+      </div>
+    </div>
+  );
+}
 
 
 
@@ -119,7 +342,7 @@ function Editor() {
   const [allUsers, setAllUsers] = useState([]);
   const [collabSearch, setCollabSearch] = useState('');
 
-  // Excepciones creativas de MAIA (declarar ANTES que useComments para poder pasar setExceptions)
+  // Excepciones creativas de MAIA (declarar ANTES que useComments para pasar setExceptions)
   const {
     exceptions, setExceptions,
     showMaiaPanel, setShowMaiaPanel,
@@ -277,7 +500,7 @@ function Editor() {
     });
   };
 
-  // Devuelve el color del colaborador que agregÃƒÂ³ un elemento
+  // Devuelve el color del colaborador que agregó un elemento
   const getCollabColor = (userId) =>
     projectCollabs.find(c => c.id === userId)?.color ?? null;
 
@@ -319,7 +542,7 @@ function Editor() {
 
     const errors = [];
 
-    // Procesar en serie para que la animaciÃƒÂ³n se vea secuencial
+    // Procesar en serie para que la animación se vea secuencial
     (async () => {
       for (let idx = 0; idx < itemsToCheck.length; idx++) {
         const item = itemsToCheck[idx];
@@ -327,7 +550,7 @@ function Editor() {
         const size = viewMode === 'desktop' ? item.desktopSize : item.mobileSize;
         const itemErrors = [];
 
-        // Ã¢â€â‚¬Ã¢â€â‚¬ Check 1: dimensiones Ã¢â€â‚¬Ã¢â€â‚¬
+        // ── Check 1: dimensiones ──
         if (size?.width && size?.height) {
           await new Promise(res2 => {
             const imgEl = new window.Image();
@@ -335,7 +558,7 @@ function Editor() {
               const tol = 0.05;
               const ok = Math.abs(imgEl.naturalWidth - size.width) / size.width <= tol &&
                          Math.abs(imgEl.naturalHeight - size.height) / size.height <= tol;
-              if (!ok) itemErrors.push(`Dimensiones: ${imgEl.naturalWidth}Ãƒâ€”${imgEl.naturalHeight}px (esperado ${size.width}Ãƒâ€”${size.height}px)`);
+              if (!ok) itemErrors.push(`Dimensiones: ${imgEl.naturalWidth}×${imgEl.naturalHeight}px (esperado ${size.width}×${size.height}px)`);
               res2();
             };
             imgEl.onerror = () => res2();
@@ -343,7 +566,7 @@ function Editor() {
           });
         }
 
-        // Ã¢â€â‚¬Ã¢â€â‚¬ Check 2: typos con Gemini (re-verificaciÃƒÂ³n fresca) Ã¢â€â‚¬Ã¢â€â‚¬
+        // ── Check 2: typos con Gemini (re-verificación fresca) ──
         try {
           const typoRes = await fetch(`${API_URL}/api/check-typos-only`, {
             method: 'POST',
@@ -367,7 +590,7 @@ function Editor() {
           i === idx ? { ...p, status: hasError ? 'error' : 'ok', msg } : p
         ));
 
-        // Pausa entre elementos para que la animaciÃƒÂ³n sea legible
+        // Pausa entre elementos para que la animación sea legible
         await new Promise(r => setTimeout(r, 400));
       }
       setTimeout(() => resolve({ errors }), 500);
@@ -433,7 +656,14 @@ function Editor() {
   };
 
 
-  const triggerUpload = (uniqueId) => {
+  
+  
+  
+  
+  
+  
+  
+    const triggerUpload = (uniqueId) => {
     setUploadTargetId(uniqueId);
     setUploadIndex(0);
     if (fileInputRef.current) {
@@ -504,14 +734,14 @@ function Editor() {
       const expW = expectedSize.width;
       const expH = expectedSize.height;
 
-      // Tolerancia del 5% para evitar falsos positivos por compresiÃƒÂ³n
+      // Tolerancia del 5% para evitar falsos positivos por compresión
       const tol = 0.05;
       const wOk = Math.abs(actualW - expW) / expW <= tol;
       const hOk = Math.abs(actualH - expH) / expH <= tol;
 
       if (!wOk || !hOk) {
         const elementOwnerId = foundItem.addedBy || null;
-        const text = `**Aviso de dimensiones:**\n\nLa imagen subida mide **${actualW} Ãƒâ€” ${actualH} px** pero este elemento espera **${expW} Ãƒâ€” ${expH} px**.\n\nConsiderÃƒÂ¡ reemplazarla con una imagen del tamaÃƒÂ±o correcto para evitar distorsiÃƒÂ³n.`;
+        const text = `**Aviso de dimensiones:**\n\nLa imagen subida mide **${actualW} × ${actualH} px** pero este elemento espera **${expW} × ${expH} px**.\n\nConsiderá reemplazarla con una imagen del tamaño correcto para evitar distorsión.`;
         try {
           const res = await fetch(`${API_URL}/api/maia-comment`, {
             method: 'POST',
@@ -572,7 +802,7 @@ function Editor() {
               }
               return item;
             }));
-            // AnÃƒÂ¡lisis IA en background
+            // Análisis IA en background
             analyzeImageForTypos(data.url, uniqueId);
             checkImageDimensions(data.url, uniqueId);
           }
@@ -627,13 +857,13 @@ function Editor() {
               }
               return item;
             }));
-            // AnÃƒÂ¡lisis IA en background
+            // Análisis IA en background
             analyzeImageForTypos(data.url, uploadTargetId);
             checkImageDimensions(data.url, uploadTargetId);
           }
         } catch (error) {
           console.error('Error subiendo imagen a Cloudinary:', error);
-          alert('Hubo un error subiendo la imagen. IntÃƒÂ©ntalo de nuevo.');
+          alert('Hubo un error subiendo la imagen. Inténtalo de nuevo.');
         } finally {
           setUploadTargetId(null);
           setUploadIndex(0);
@@ -707,7 +937,7 @@ function Editor() {
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/html', '');
 
-    // Crear imagen de drag pequeÃƒÂ±a y compacta
+    // Crear imagen de drag pequeña y compacta
     const item = canvasItems[index];
     const ghost = document.createElement('div');
     ghost.style.cssText = `
@@ -728,7 +958,7 @@ function Editor() {
       gap: 8px;
       pointer-events: none;
     `;
-    ghost.textContent = `Ã¢Â Â¿ ${item?.name || 'Componente'}`;
+    ghost.textContent = `⠿ ${item?.name || 'Componente'}`;
     document.body.appendChild(ghost);
     e.dataTransfer.setDragImage(ghost, ghost.offsetWidth / 2, 20);
     setTimeout(() => document.body.removeChild(ghost), 0);
@@ -748,7 +978,7 @@ function Editor() {
 
     const rect = e.currentTarget.getBoundingClientRect();
     const y = e.clientY - rect.top;
-    // Si estamos en la mitad superior Ã¢â€ â€™ 'before'; mitad inferior Ã¢â€ â€™ 'after'
+    // Si estamos en la mitad superior → 'before'; mitad inferior → 'after'
     const position = y < rect.height / 2 ? 'before' : 'after';
     setDragOverTarget({ index, position });
   };
@@ -776,7 +1006,7 @@ function Editor() {
       if (dropTarget.position === 'after') {
         dropIndex += 1;
       }
-      // 'before' Ã¢â€ â€™ insert at dropTarget.index (no increment)
+      // 'before' → insert at dropTarget.index (no increment)
     }
 
     if (componentId) {
@@ -1040,7 +1270,7 @@ function Editor() {
           onContextMenu={(e) => handleItemContextMenu(e, item.uniqueId)}
         >
           {!isPreviewMode && <button className="delete-btn" onClick={() => removeItem(item.uniqueId)}><Trash2 size={16} /></button>}
-          {!isPreviewMode && <div className="spacer-item">Salto de LÃƒÂ­nea (Espaciador)</div>}
+          {!isPreviewMode && <div className="spacer-item">Salto de Línea (Espaciador)</div>}
         </div>
       );
     }
@@ -1107,7 +1337,7 @@ function Editor() {
               display: 'flex', alignItems: 'center', gap: '3px'
             }}
           >
-            Ã°Å¸â€™Â¬ {comments.filter(c => c.elementId === item.uniqueId && !c.resolved).length}
+            💬 {comments.filter(c => c.elementId === item.uniqueId && !c.resolved).length}
           </div>
         )}
         {/* Panel de comentarios flotante */}
@@ -1170,7 +1400,7 @@ function Editor() {
                       {editingField.id === item.uniqueId && editingField.field === 'contentTitle' ? (
                         <input
                           autoFocus
-                          defaultValue={item.contentTitle || 'TÃƒÂ­tulo de la tarjeta'}
+                          defaultValue={item.contentTitle || 'Título de la tarjeta'}
                           onBlur={(e) => {
                             updateItemText(item.uniqueId, 'contentTitle', e.target.value);
                             setEditingField({ id: null, field: null });
@@ -1183,14 +1413,14 @@ function Editor() {
                           onDoubleClick={() => !isPreviewMode && setEditingField({ id: item.uniqueId, field: 'contentTitle' })}
                           style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#333', cursor: isPreviewMode ? 'default' : 'text' }}
                         >
-                          {item.contentTitle || 'TÃƒÂ­tulo de la tarjeta'}
+                          {item.contentTitle || 'Título de la tarjeta'}
                         </h4>
                       )}
 
                       {editingField.id === item.uniqueId && editingField.field === 'contentParagraph' ? (
                         <textarea
                           autoFocus
-                          defaultValue={item.contentParagraph || 'Este es un pÃƒÂ¡rrafo de ejemplo para la lista de contenido. Describe el evento o promociÃƒÂ³n.'}
+                          defaultValue={item.contentParagraph || 'Este es un párrafo de ejemplo para la lista de contenido. Describe el evento o promoción.'}
                           onBlur={(e) => {
                             updateItemText(item.uniqueId, 'contentParagraph', e.target.value);
                             setEditingField({ id: null, field: null });
@@ -1203,14 +1433,14 @@ function Editor() {
                           onDoubleClick={() => !isPreviewMode && setEditingField({ id: item.uniqueId, field: 'contentParagraph' })}
                           style={{ margin: '0 0 15px 0', fontSize: '12px', color: '#666', lineHeight: '1.4', flex: 1, cursor: isPreviewMode ? 'default' : 'text' }}
                         >
-                          {item.contentParagraph || 'Este es un pÃƒÂ¡rrafo de ejemplo para la lista de contenido. Describe el evento o promociÃƒÂ³n.'}
+                          {item.contentParagraph || 'Este es un párrafo de ejemplo para la lista de contenido. Describe el evento o promoción.'}
                         </p>
                       )}
 
                       {editingField.id === item.uniqueId && editingField.field === 'contentCTA' ? (
                         <input
                           autoFocus
-                          defaultValue={item.contentCTA || 'Descubrir mÃƒÂ¡s'}
+                          defaultValue={item.contentCTA || 'Descubrir más'}
                           onBlur={(e) => {
                             updateItemText(item.uniqueId, 'contentCTA', e.target.value);
                             setEditingField({ id: null, field: null });
@@ -1230,7 +1460,7 @@ function Editor() {
                           style={{ color: '#3483fa', fontSize: '12px', fontWeight: 'bold', textDecoration: 'none', cursor: isPreviewMode ? 'pointer' : 'text' }}
                           onClick={(e) => { if (!isPreviewMode) e.preventDefault(); }}
                         >
-                          {item.contentCTA || 'Descubrir mÃƒÂ¡s'}
+                          {item.contentCTA || 'Descubrir más'}
                         </a>
                       )}
                     </div>
@@ -1248,14 +1478,14 @@ function Editor() {
 
           {!isPreviewMode && (
             <>
-              {safeAreaStyle && <div style={safeAreaStyle} title={`ÃƒÂrea Segura: ${safeAreaStr}`} />}
+              {safeAreaStyle && <div style={safeAreaStyle} title={`Área Segura: ${safeAreaStr}`} />}
               {showComponentInfo && (
                 <div className="component-content" style={{ position: 'relative', zIndex: 10, background: 'rgba(255,255,255,0.9)', padding: '15px', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
                   <h3>{item.name}</h3>
                   <p>Renderizado: {size.width} x {size.height} px</p>
-                  {safeAreaStr && <p className="safe-area">ÃƒÂrea Segura: {safeAreaStr}</p>}
+                  {safeAreaStr && <p className="safe-area">Área Segura: {safeAreaStr}</p>}
 
-                  {item.uploadedImages?.length > 0 && <span style={{ fontSize: '11px', marginTop: '10px', display: 'block', color: '#666' }}>{item.uploadedImages.length} imÃƒÂ¡genes cargadas</span>}
+                  {item.uploadedImages?.length > 0 && <span style={{ fontSize: '11px', marginTop: '10px', display: 'block', color: '#666' }}>{item.uploadedImages.length} imágenes cargadas</span>}
 
                   {item.notes && <p style={{ fontSize: '0.75rem', marginTop: '5px', color: '#666' }}>Nota: {item.notes}</p>}
                 </div>
@@ -1270,7 +1500,7 @@ function Editor() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', fontFamily: "'Inter', sans-serif" }}>
 
-      {/* Ã¢â€â‚¬Ã¢â€â‚¬ TOP BAR Ã¢â€â‚¬Ã¢â€â‚¬ */}
+      {/* ── TOP BAR ── */}
       <div style={{ height: '56px', background: '#1a1f2e', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', zIndex: 100, flexShrink: 0 }}>
         {/* Left */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -1305,7 +1535,7 @@ function Editor() {
           )}
 
           {isSaving ? (
-            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', fontStyle: 'italic' }}>GuardandoÃ¢â‚¬Â¦</span>
+            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', fontStyle: 'italic' }}>Guardando…</span>
           ) : lastSaved ? (
             <span style={{ fontSize: '11px', color: '#4ade80', display: 'flex', alignItems: 'center', gap: '4px' }}>
               <CheckCircle2 size={12} /> Guardado
@@ -1322,7 +1552,7 @@ function Editor() {
             {isPreviewMode ? <><Edit3 size={14} /> Editor</> : <><Play size={14} /> Preview</>}
           </button>
 
-          {/* BotÃƒÂ³n Exportar PDF Ã¢â‚¬â€ solo en preview */}
+          {/* Botón Exportar PDF — solo en preview */}
           {isPreviewMode && (
             <button
               onClick={exportToPdf}
@@ -1332,13 +1562,13 @@ function Editor() {
               onMouseLeave={e => { if (!isExporting) e.currentTarget.style.background = 'rgba(16,185,129,0.15)'; }}
             >
               <FileDown size={14} />
-              {isExporting ? 'ExportandoÃ¢â‚¬Â¦' : 'Exportar PDF'}
+              {isExporting ? 'Exportando…' : 'Exportar PDF'}
             </button>
           )}
 
           <button
             onClick={async () => {
-              // Paso 1: verificaciÃƒÂ³n MAIA
+              // Paso 1: verificación MAIA
               setMaiaCheckState('checking');
               setMaiaCheckItems([]);
               const { errors } = await runMaiaPrePublishCheck();
@@ -1366,7 +1596,7 @@ function Editor() {
             onMouseEnter={e => e.currentTarget.style.background = '#ffe800'}
             onMouseLeave={e => e.currentTarget.style.background = '#fff159'}
           >
-            {isPublishing ? '...' : isPublished ? 'Ã¢Å“â€œ Publicado' : 'Publicar'}
+            {isPublishing ? '...' : isPublished ? '✓ Publicado' : 'Publicar'}
           </button>
 
           {/* Publish Modal */}
@@ -1376,10 +1606,10 @@ function Editor() {
             return (
               <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowPublishModal(false)}>
                 <div style={{ background: 'white', borderRadius: '16px', padding: '32px', maxWidth: '480px', width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', position: 'relative' }} onClick={e => e.stopPropagation()}>
-                  <button onClick={() => setShowPublishModal(false)} style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: '#888' }}>Ã¢Å“â€¢</button>
+                  <button onClick={() => setShowPublishModal(false)} style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: '#888' }}>✕</button>
                   <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-                    <div style={{ fontSize: '40px', marginBottom: '8px' }}>Ã°Å¸Å½â€°</div>
-                    <h2 style={{ margin: '0 0 4px 0', fontSize: '22px', color: '#1a1a1a' }}>Ã‚Â¡Maqueta publicada!</h2>
+                    <div style={{ fontSize: '40px', marginBottom: '8px' }}>🎉</div>
+                    <h2 style={{ margin: '0 0 4px 0', fontSize: '22px', color: '#1a1a1a' }}>¡Maqueta publicada!</h2>
                     <p style={{ color: '#888', fontSize: '14px', margin: 0 }}>Cualquier persona con el enlace puede verla</p>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
@@ -1403,8 +1633,7 @@ function Editor() {
             );
           })()}
 
-
-          {/* BotÃ³n MAIA â€” panel de excepciones creativas */}
+          {/* Botón MAIA — panel de excepciones creativas */}
           <div style={{ position: 'relative' }}>
             <button
               id="maia-exceptions-btn"
@@ -1420,31 +1649,161 @@ function Editor() {
               <span style={{ position: 'absolute', top: '0px', right: '0px', background: '#8b5cf6', color: 'white', borderRadius: '50%', width: '14px', height: '14px', fontSize: '8px', fontWeight: '800', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid #1a1f2e' }}>{exceptions.length > 9 ? '9+' : exceptions.length}</span>
             )}
             {showMaiaPanel && (
-              <MaiaPanel
-                onClose={() => setShowMaiaPanel(false)}
-                exceptions={exceptions}
-                newExWord={newExWord} setNewExWord={setNewExWord}
-                newExReason={newExReason} setNewExReason={setNewExReason}
-                newExLoading={newExLoading}
-                addException={addException}
-                editingExId={editingExId} setEditingExId={setEditingExId}
-                editWord={editWord} setEditWord={setEditWord}
-                editReason={editReason} setEditReason={setEditReason}
-                editException={editException}
-                deleteException={deleteException}
-              />
+              <div style={{ position: 'absolute', top: '44px', right: 0, width: '320px', background: 'white', borderRadius: '14px', boxShadow: '0 8px 40px rgba(0,0,0,0.22)', border: '1px solid #e0e5ef', zIndex: 9999, overflow: 'hidden', fontFamily: "'Inter', sans-serif" }}>
+                {/* Header */}
+                <div style={{ background: '#1a1f2e', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <img src="/MAIA.png" alt="MAIA" style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #8b5cf6' }} />
+                  <div style={{ flex: 1 }}>
+                    <p style={{ margin: 0, color: 'white', fontWeight: '800', fontSize: '13px' }}>Excepciones creativas</p>
+                    <p style={{ margin: 0, color: 'rgba(255,255,255,0.4)', fontSize: '10px' }}>Palabras que MAIA no marca como error</p>
+                  </div>
+                  <button onClick={() => setShowMaiaPanel(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '16px' }}>✕</button>
+                </div>
+
+                {/* Form agregar */}
+                <div style={{ padding: '12px 14px', borderBottom: '1px solid #f0f2f7', background: '#faf5ff' }}>
+                  <p style={{ margin: '0 0 8px', fontSize: '10px', fontWeight: '700', color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.07em' }}>+ Agregar excepción</p>
+                  <input
+                    value={newExWord}
+                    onChange={e => setNewExWord(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') addException(); }}
+                    placeholder='Palabra exacta (ej: "Ofertass")'
+                    style={{ width: '100%', fontSize: '12px', border: '1.5px solid #ddd6fe', borderRadius: '6px', padding: '6px 8px', outline: 'none', marginBottom: '6px', boxSizing: 'border-box', fontFamily: 'inherit', background: 'white' }}
+                    onFocus={e => e.target.style.borderColor = '#8b5cf6'}
+                    onBlur={e => e.target.style.borderColor = '#ddd6fe'}
+                  />
+                  <input
+                    value={newExReason}
+                    onChange={e => setNewExReason(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') addException(); }}
+                    placeholder='Razón creativa (opcional)'
+                    style={{ width: '100%', fontSize: '12px', border: '1.5px solid #ddd6fe', borderRadius: '6px', padding: '6px 8px', outline: 'none', marginBottom: '8px', boxSizing: 'border-box', fontFamily: 'inherit', background: 'white' }}
+                    onFocus={e => e.target.style.borderColor = '#8b5cf6'}
+                    onBlur={e => e.target.style.borderColor = '#ddd6fe'}
+                  />
+                  <button
+                    disabled={!newExWord.trim() || newExLoading}
+                    onClick={addException}
+                    style={{ width: '100%', background: !newExWord.trim() ? '#ede9fe' : '#7c3aed', color: !newExWord.trim() ? '#a78bfa' : 'white', border: 'none', borderRadius: '6px', padding: '7px', fontSize: '12px', fontWeight: '800', cursor: newExWord.trim() ? 'pointer' : 'default', transition: 'all 0.15s' }}
+                  >{newExLoading ? 'Guardando...' : 'Guardar excepción'}</button>
+                </div>
+
+                {/* Lista */}
+                <div style={{ maxHeight: '280px', overflowY: 'auto' }}>
+                  {exceptions.length === 0 ? (
+                    <p style={{ color: '#9ba3b5', fontSize: '12px', textAlign: 'center', padding: '20px 16px', margin: 0 }}>Sin excepciones registradas</p>
+                  ) : exceptions.map(ex => (
+                    <div key={ex.id} style={{ padding: '10px 14px', borderBottom: '1px solid #f0f2f7' }}>
+                      {editingExId === ex.id ? (
+                        /* ── Modo edición ── */
+                        <div>
+                          <input
+                            value={editWord}
+                            onChange={e => setEditWord(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') editException(ex.id); if (e.key === 'Escape') setEditingExId(null); }}
+                            autoFocus
+                            style={{ width: '100%', fontSize: '12px', fontFamily: 'monospace', border: '1.5px solid #8b5cf6', borderRadius: '6px', padding: '5px 8px', outline: 'none', marginBottom: '5px', boxSizing: 'border-box' }}
+                          />
+                          <input
+                            value={editReason}
+                            onChange={e => setEditReason(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') editException(ex.id); if (e.key === 'Escape') setEditingExId(null); }}
+                            placeholder='Razón creativa (opcional)'
+                            style={{ width: '100%', fontSize: '11px', border: '1.5px solid #ddd6fe', borderRadius: '6px', padding: '5px 8px', outline: 'none', marginBottom: '7px', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                            onFocus={e => e.target.style.borderColor = '#8b5cf6'}
+                            onBlur={e => e.target.style.borderColor = '#ddd6fe'}
+                          />
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button
+                              onClick={() => editException(ex.id)}
+                              disabled={!editWord.trim()}
+                              style={{ flex: 1, background: '#7c3aed', color: 'white', border: 'none', borderRadius: '6px', padding: '6px', fontSize: '11px', fontWeight: '800', cursor: 'pointer' }}
+                            >Guardar</button>
+                            <button
+                              onClick={() => setEditingExId(null)}
+                              style={{ flex: 1, background: '#f0f2f7', color: '#6b7280', border: 'none', borderRadius: '6px', padding: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                            >Cancelar</button>
+                          </div>
+                        </div>
+                      ) : (
+                        /* ── Modo lectura ── */
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                          <div style={{ flex: 1 }}>
+                            <p style={{ margin: 0, fontSize: '13px', fontWeight: '700', color: '#1a1f2e', fontFamily: 'monospace' }}>«{ex.word}»</p>
+                            {ex.reason && <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#6b7280', fontStyle: 'italic' }}>{ex.reason}</p>}
+                            <p style={{ margin: '2px 0 0', fontSize: '10px', color: '#b0b9cc' }}>{new Date(ex.createdAt).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                          </div>
+                          <button
+                            onClick={() => { setEditingExId(ex.id); setEditWord(ex.word); setEditReason(ex.reason || ''); }}
+                            title="Editar excepción"
+                            style={{ background: 'none', border: 'none', color: '#8b5cf6', cursor: 'pointer', fontSize: '13px', padding: '2px 4px', borderRadius: '4px', flexShrink: 0 }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#f5f3ff'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                          >✏</button>
+                          <button
+                            onClick={() => deleteException(ex.id)}
+                            title="Eliminar excepción"
+                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '13px', padding: '2px 4px', flexShrink: 0, borderRadius: '4px' }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#fee2e2'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                          >🗑</button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
 
           {/* Campana de notificaciones */}
-          <NotificationsPanel
-            notifications={notifications}
-            showNotifPanel={showNotifPanel}
-            setShowNotifPanel={setShowNotifPanel}
-            unreadCount={unreadCount}
-            markNotifsRead={markNotifsRead}
-            scrollToElement={scrollToElement}
-          />
+          <div style={{ position: 'relative' }}>
+            <button
+              id="notif-bell-btn"
+              onClick={() => { setShowNotifPanel(!showNotifPanel); if (!showNotifPanel) markNotifsRead(); }}
+              style={{ background: 'rgba(255,255,255,0.08)', border: 'none', color: 'rgba(255,255,255,0.65)', cursor: 'pointer', padding: '6px 10px', borderRadius: '6px', display: 'flex', alignItems: 'center', transition: 'all 0.18s', position: 'relative' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.14)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+            >
+              <Bell size={18} />
+              {unreadCount > 0 && (
+                <span style={{ position: 'absolute', top: '2px', right: '2px', background: '#ef4444', color: 'white', borderRadius: '50%', width: '16px', height: '16px', fontSize: '9px', fontWeight: '800', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid #1a1f2e' }}>{unreadCount > 9 ? '9+' : unreadCount}</span>
+              )}
+            </button>
+            {showNotifPanel && (
+              <div style={{ position: 'absolute', top: '44px', right: 0, width: '300px', background: 'white', borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.18)', border: '1px solid #e0e5ef', zIndex: 9999, overflow: 'hidden' }}>
+                <div style={{ padding: '12px 16px', background: '#1a1f2e', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'white', fontWeight: '800', fontSize: '13px' }}>🔔 Notificaciones</span>
+                  <button onClick={() => setShowNotifPanel(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '16px' }}>✕</button>
+                </div>
+                <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
+                  {notifications.length === 0 ? (
+                    <p style={{ color: '#9ba3b5', fontSize: '13px', textAlign: 'center', padding: '24px 16px', margin: 0 }}>Sin notificaciones</p>
+                  ) : notifications.map(n => (
+                    <div key={n.id}
+                      onClick={() => {
+                        setShowNotifPanel(false);
+                        const elementId = n.comment?.elementId;
+                        if (elementId) scrollToElement(elementId);
+                      }}
+                      style={{ padding: '10px 14px', borderBottom: '1px solid #f0f2f7', cursor: 'pointer', background: n.read ? 'white' : '#eef4ff', display: 'flex', gap: '10px', alignItems: 'flex-start' }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#f4f6fb'}
+                      onMouseLeave={e => e.currentTarget.style.background = n.read ? 'white' : '#eef4ff'}
+                    >
+                      {!n.read && <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#3483fa', marginTop: '5px', flexShrink: 0 }} />}
+                      <div style={{ flex: 1 }}>
+                        <p style={{ margin: '0 0 2px', fontSize: '12px', fontWeight: '700', color: '#1a1f2e' }}>
+                          {n.comment.author.name} te mencionó
+                        </p>
+                        <p style={{ margin: '0 0 2px', fontSize: '11px', color: '#6b7280' }}>en "{n.comment.project.title}"</p>
+                        <p style={{ margin: 0, fontSize: '12px', color: '#4b5563', fontStyle: 'italic' }}>«{n.comment.text.slice(0, 60)}{n.comment.text.length > 60 ? '…' : ''}»</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
 
           {projectCollabs.length > 0 && (
             <div style={{ width: '1px', height: '24px', background: 'rgba(255,255,255,0.1)', margin: '0 2px' }} />
@@ -1487,7 +1846,7 @@ function Editor() {
             ))}
           </div>
 
-          {/* BotÃƒÂ³n + para agregar colaborador (solo owner) */}
+          {/* Botón + para agregar colaborador (solo owner) */}
           {user && projectCollabs.length > 0 && projectCollabs[0]?.id === user.id && (
             <div style={{ position: 'relative' }}>
               <button
@@ -1521,14 +1880,14 @@ function Editor() {
                   }}>
                     <div style={{ padding: '10px 12px', background: '#1a1f2e', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <span style={{ color: 'white', fontSize: '12px', fontWeight: '700' }}>Agregar colaborador</span>
-                      <button onClick={() => setShowAddCollab(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '14px' }}>Ã¢Å“â€¢</button>
+                      <button onClick={() => setShowAddCollab(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '14px' }}>✕</button>
                     </div>
                     <div style={{ padding: '8px' }}>
                       <input
                         autoFocus
                         value={collabSearch}
                         onChange={e => setCollabSearch(e.target.value)}
-                        placeholder="Buscar por nombre o emailÃ¢â‚¬Â¦"
+                        placeholder="Buscar por nombre o email…"
                         style={{ width: '100%', fontSize: '12px', border: '1.5px solid #e0e5ef', borderRadius: '7px', padding: '6px 10px', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
                         onFocus={e => e.target.style.borderColor = '#3483fa'}
                         onBlur={e => e.target.style.borderColor = '#e0e5ef'}
@@ -1565,7 +1924,7 @@ function Editor() {
       </div>
 
       <div className="builder-layout" style={{ height: 'calc(100vh - 56px)' }} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
-        {/* Ã¢â€â‚¬Ã¢â€â‚¬ SIDEBAR Ã¢â€â‚¬Ã¢â€â‚¬ */}
+        {/* ── SIDEBAR ── */}
         {!isPreviewMode && (
           <div className="sidebar">
             <div className="sidebar-header">
@@ -1608,7 +1967,7 @@ function Editor() {
                   <div className="meli-header-top">
                     <div className="meli-logo"><img src="https://http2.mlstatic.com/frontend-assets/ml-web-navigation/ui-navigation/6.6.73/mercadolibre/logo_large_25years_v2.png" alt="Mercado Libre" /></div>
                     <div className="meli-search-bar">
-                      <input type="text" placeholder="Buscar productos, marcas y mÃƒÂ¡s..." />
+                      <input type="text" placeholder="Buscar productos, marcas y más..." />
                       <div className="meli-search-store"><span>en Nike</span><ChevronDown size={14} /></div>
                       <button className="meli-search-btn"><Search size={18} color="#666" /></button>
                     </div>
@@ -1617,7 +1976,7 @@ function Editor() {
                   <div className="meli-header-bottom">
                     <div className="meli-location"><MapPin size={22} opacity={0.6} /><div className="location-text"><span className="location-send">Enviar a</span><span className="location-cp">CP 56607</span></div></div>
                     <div className="meli-nav-links">
-                      <a href="#">CategorÃƒÂ­as <ChevronDown size={12} /></a><a href="#">Ofertas</a><a href="#">Cupones</a><a href="#">Supermercado</a><a href="#">Moda</a><a href="#" className="mercado-play">Mercado Play <span className="gratis-badge">GRATIS</span></a><a href="#">Vender</a><a href="#">Ayuda</a>
+                      <a href="#">Categorías <ChevronDown size={12} /></a><a href="#">Ofertas</a><a href="#">Cupones</a><a href="#">Supermercado</a><a href="#">Moda</a><a href="#" className="mercado-play">Mercado Play <span className="gratis-badge">GRATIS</span></a><a href="#">Vender</a><a href="#">Ayuda</a>
                     </div>
                     <div className="meli-user-links">
                       <a href="#" className="user-profile"><div className="user-avatar">MM</div>Manuel <ChevronDown size={12} /></a><a href="#">Mis compras</a><a href="#">Favoritos <ChevronDown size={12} /></a><a href="#"><Bell size={18} /></a><a href="#"><ShoppingCart size={18} /></a>
@@ -1633,7 +1992,7 @@ function Editor() {
                 >
                   {canvasItems.length === 0 ? (
                     <div style={{ textAlign: 'center', color: '#999', marginTop: '100px', width: '100%' }}>
-                      <h3>Arrastra componentes aquÃƒÂ­ para construir tu Landing</h3>
+                      <h3>Arrastra componentes aquí para construir tu Landing</h3>
                     </div>
                   ) : (
                     <>
@@ -1725,7 +2084,7 @@ function Editor() {
                     </div>
                   )}
                   <div className="context-menu-item" onClick={() => { setActiveCommentElId(contextMenu.targetId); setContextMenu(null); }} style={{ fontWeight: 'bold', color: '#6b7280' }}>
-                    Ã°Å¸â€™Â¬ Comentar
+                    💬 Comentar
                   </div>
                   <div className="context-menu-item" onClick={() => { triggerUpload(contextMenu.targetId); setContextMenu(null); }} style={{ fontWeight: 'bold', color: '#3483fa' }}>
                     <ImageIcon size={16} /> {hasImage ? 'Cambiar Imagen' : 'Subir Imagen'}
@@ -1774,7 +2133,7 @@ function Editor() {
             })()}
 
             <div className="context-menu-item" onClick={() => { setShowSafeAreas(!showSafeAreas); setContextMenu(null); }}>
-              <Tag size={16} /> {showSafeAreas ? "Ocultar ÃƒÂreas Seguras" : "Visualizar ÃƒÂreas Seguras"}
+              <Tag size={16} /> {showSafeAreas ? "Ocultar Áreas Seguras" : "Visualizar Áreas Seguras"}
             </div>
             <div className="context-menu-item" onClick={() => { setShowComponentInfo(!showComponentInfo); setContextMenu(null); }}>
               {showComponentInfo ? <><EyeOff size={16} /> Ocultar Info de Componentes</> : <><Eye size={16} /> Mostrar Info de Componentes</>}
@@ -1804,7 +2163,7 @@ function Editor() {
               e.dataTransfer.setData('componentId', 'salto_linea');
               e.dataTransfer.effectAllowed = 'copy';
             }}
-            title="Arrastra para forzar un salto de lÃƒÂ­nea"
+            title="Arrastra para forzar un salto de línea"
           >
             <CornerDownLeft size={28} />
           </div>
@@ -1821,7 +2180,7 @@ function Editor() {
         onChange={handleGlobalImageUpload}
       />
 
-      {/* Ã¢â€â‚¬Ã¢â€â‚¬ MAIA Pre-publish check overlay Ã¢â€â‚¬Ã¢â€â‚¬ */}
+      {/* ── MAIA Pre-publish check overlay ── */}
       {maiaCheckState && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 99998,
@@ -1839,7 +2198,7 @@ function Editor() {
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px'
           }}>
 
-            {/* MAIA avatar + tÃƒÂ­tulo */}
+            {/* MAIA avatar + título */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
               <div style={{
                 width: '52px', height: '52px', borderRadius: '50%',
@@ -1856,13 +2215,13 @@ function Editor() {
               <div>
                 <p style={{ margin: 0, fontWeight: '800', fontSize: '17px', color: '#ffffff' }}>
                   {maiaCheckState === 'checking' ? 'Verificando maqueta...' :
-                   maiaCheckState === 'ok' ? 'Ã‚Â¡Todo en orden!' :
+                   maiaCheckState === 'ok' ? '¡Todo en orden!' :
                    'No se puede publicar'}
                 </p>
                 <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>
-                  {maiaCheckState === 'checking' ? 'MAIA estÃƒÂ¡ revisando cada elemento' :
+                  {maiaCheckState === 'checking' ? 'MAIA está revisando cada elemento' :
                    maiaCheckState === 'ok' ? 'Publicando...' :
-                   'CorregÃƒÂ­ los errores antes de publicar'}
+                   'Corregí los errores antes de publicar'}
                 </p>
               </div>
             </div>
@@ -1878,7 +2237,7 @@ function Editor() {
                     border: `1px solid ${item.status === 'ok' ? 'rgba(16,185,129,0.3)' : item.status === 'error' ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.06)'}`
                   }}>
                     <span style={{ fontSize: '16px', flexShrink: 0 }}>
-                      {item.status === 'pending' ? 'Ã¢ÂÂ³' : item.status === 'ok' ? 'Ã¢Å“â€¦' : 'Ã¢ÂÅ’'}
+                      {item.status === 'pending' ? '⏳' : item.status === 'ok' ? '✅' : '❌'}
                     </span>
                     <div style={{ flex: 1 }}>
                       <p style={{ margin: 0, fontSize: '12px', fontWeight: '700', color: '#e2e8f0' }}>{item.name}</p>
@@ -1898,7 +2257,7 @@ function Editor() {
                 }}>
                   {maiaCheckState.errors.map((err, i) => (
                     <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: i < maiaCheckState.errors.length - 1 ? '8px' : 0 }}>
-                      <span style={{ fontSize: '14px', flexShrink: 0 }}>Ã¢ÂÅ’</span>
+                      <span style={{ fontSize: '14px', flexShrink: 0 }}>❌</span>
                       <div>
                         <p style={{ margin: 0, fontSize: '12px', fontWeight: '700', color: '#fca5a5' }}>{err.name}</p>
                         <p style={{ margin: '1px 0 0', fontSize: '11px', color: 'rgba(252,165,165,0.7)' }}>{err.msg}</p>
@@ -1924,13 +2283,13 @@ function Editor() {
         </div>
       )}
 
-      {/* Panel flotante de ediciÃƒÂ³n de textos */}
+      {/* Panel flotante de edición de textos */}
       {textEditorPanel && (() => {
         const panelItem = textEditorPanel.item;
         const fields = [
-          { key: 'contentTitle', label: 'TÃƒÂ­tulo', type: 'input', placeholder: 'TÃƒÂ­tulo de la tarjeta' },
-          { key: 'contentParagraph', label: 'PÃƒÂ¡rrafo', type: 'textarea', placeholder: 'Describe el evento o promociÃƒÂ³n.' },
-          { key: 'contentCTA', label: 'Texto del CTA', type: 'input', placeholder: 'Descubrir mÃƒÂ¡s' },
+          { key: 'contentTitle', label: 'Título', type: 'input', placeholder: 'Título de la tarjeta' },
+          { key: 'contentParagraph', label: 'Párrafo', type: 'textarea', placeholder: 'Describe el evento o promoción.' },
+          { key: 'contentCTA', label: 'Texto del CTA', type: 'input', placeholder: 'Descubrir más' },
         ];
         // Estado local temporal para los valores del panel
         const handleSave = (e) => {
@@ -1964,10 +2323,10 @@ function Editor() {
               {/* Header del panel */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '17px', color: '#1a1a1a', fontWeight: 700 }}>Ã¢Å“ÂÃ¯Â¸Â Editar Textos</h3>
+                  <h3 style={{ margin: 0, fontSize: '17px', color: '#1a1a1a', fontWeight: 700 }}>✏️ Editar Textos</h3>
                   <p style={{ margin: '3px 0 0 0', fontSize: '12px', color: '#999' }}>{panelItem.name}</p>
                 </div>
-                <button onClick={() => setTextEditorPanel(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#aaa', fontSize: '20px', lineHeight: 1 }}>Ã¢Å“â€¢</button>
+                <button onClick={() => setTextEditorPanel(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#aaa', fontSize: '20px', lineHeight: 1 }}>✕</button>
               </div>
 
               <form onSubmit={handleSave}>
