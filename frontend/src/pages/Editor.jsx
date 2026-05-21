@@ -119,6 +119,19 @@ function Editor() {
   const [allUsers, setAllUsers] = useState([]);
   const [collabSearch, setCollabSearch] = useState('');
 
+  // Excepciones creativas de MAIA (declarar ANTES que useComments para poder pasar setExceptions)
+  const {
+    exceptions, setExceptions,
+    showMaiaPanel, setShowMaiaPanel,
+    newExWord, setNewExWord,
+    newExReason, setNewExReason,
+    newExLoading,
+    editingExId, setEditingExId,
+    editWord, setEditWord,
+    editReason, setEditReason,
+    addException, deleteException, editException
+  } = useExceptions({ projectId: id });
+
   // Sistema de comentarios
   const [activeCommentElId, setActiveCommentElId] = useState(null);
   const {
@@ -135,19 +148,6 @@ function Editor() {
     showNotifPanel, setShowNotifPanel,
     markNotifsRead
   } = useNotifications();
-
-  // Excepciones creativas de MAIA
-  const {
-    exceptions, setExceptions,
-    showMaiaPanel, setShowMaiaPanel,
-    newExWord, setNewExWord,
-    newExReason, setNewExReason,
-    newExLoading,
-    editingExId, setEditingExId,
-    editWord, setEditWord,
-    editReason, setEditReason,
-    addException, deleteException, editException
-  } = useExceptions({ projectId: id });
 
   // Global Upload State
   const [uploadTargetId, setUploadTargetId] = useState(null);
@@ -230,8 +230,12 @@ function Editor() {
     }
   }, [id, navigate]);
 
-  // Socket.io: tiempo real (delegado al hook useSocket)
-  useSocket({ projectId: id, token, setComments, setNotifications, setExceptions });
+  // Socket.io: tiempo real (canvas + comentarios + notificaciones + excepciones)
+  const socketRef = useSocket({
+    projectId: id, token,
+    setComments, setNotifications, setExceptions,
+    setCanvases, setProjectTitle,
+  });
 
   // Autoguardado silencioso con Debounce (espera 1.5s sin cambios para guardar)
   useEffect(() => {
@@ -243,7 +247,8 @@ function Editor() {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          ...(socketRef.current?.id ? { 'X-Socket-Id': socketRef.current.id } : {})
         },
         body: JSON.stringify({
           title: projectTitle,

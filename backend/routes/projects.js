@@ -3,6 +3,8 @@ import prisma from '../lib/prisma.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = Router();
+let io = null;
+export const setIo = (ioInstance) => { io = ioInstance; };
 
 // Slug corto único (7 chars, base62)
 const SLUG_CHARS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -91,6 +93,24 @@ router.patch('/projects/:id', authenticateToken, async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Project not found or unauthorized' });
 
     const project = await prisma.project.update({ where: { id: req.params.id }, data: updateData });
+
+    // Broadcast en tiempo real a los demás colaboradores
+    if (io && (desktopLayout !== undefined || mobileLayout !== undefined || title !== undefined)) {
+      const socketId = req.headers['x-socket-id'] || null;
+      const payload = {
+        desktopLayout: project.desktopLayout,
+        mobileLayout: project.mobileLayout,
+        title: project.title,
+        savedBy: req.user.id,
+      };
+      if (socketId) {
+        // Emitir a todos excepto al que guardó
+        io.to(`project:${req.params.id}`).except(socketId).emit('canvas:updated', payload);
+      } else {
+        io.to(`project:${req.params.id}`).emit('canvas:updated', payload);
+      }
+    }
+
     res.json(project);
   } catch (error) {
     console.error(error);

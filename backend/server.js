@@ -20,7 +20,7 @@ cloudinary.config({ cloudinary_url: process.env.CLOUDINARY_URL });
 // ── Rutas ──────────────────────────────────────────────────────────────────
 import authRouter from './routes/auth.js';
 import usersRouter from './routes/users.js';
-import projectsRouter from './routes/projects.js';
+import projectsRouter, { setIo as setProjectsIo } from './routes/projects.js';
 import maiaRouter, { setIo as setMaiaIo, setMaiaUserId } from './routes/maia.js';
 import exceptionsRouter, { setIo as setExceptionsIo } from './routes/exceptions.js';
 import commentsRouter, { setIo as setCommentsIo } from './routes/comments.js';
@@ -81,6 +81,7 @@ const io = new SocketIOServer(httpServer, {
 });
 
 // Inyectar io en los routers que lo necesitan
+setProjectsIo(io);
 setMaiaIo(io);
 setExceptionsIo(io);
 setCommentsIo(io);

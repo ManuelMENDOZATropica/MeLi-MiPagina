@@ -1,28 +1,46 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { io as socketIO } from 'socket.io-client';
 import API_URL from '../api';
 
 /**
- * Conecta Socket.io al proyecto, se une a la sala y registra
- * todos los listeners de tiempo real. Se desconecta al desmontar.
+ * Conecta Socket.io al proyecto y registra todos los listeners en tiempo real.
+ * Retorna el socketId para que el autoguardado pueda excluirse del broadcast.
  */
-export function useSocket({ projectId, token, setComments, setNotifications, setExceptions }) {
+export function useSocket({
+  projectId, token,
+  setComments, setNotifications, setExceptions,
+  setCanvases, setProjectTitle,
+}) {
+  const socketRef = useRef(null);
+
   useEffect(() => {
     if (!projectId || !token) return;
     const currentUserId = JSON.parse(localStorage.getItem('tropica_user'))?.user?.id;
 
     const socket = socketIO(API_URL, { transports: ['websocket', 'polling'] });
+    socketRef.current = socket;
     socket.emit('join-project', projectId);
 
-    // ─ Comentarios ─────────────────────────────────────────────────────────
+    // ─ Canvas (layout) ──────────────────────────────────────────────────────
+    socket.on('canvas:updated', ({ desktopLayout, mobileLayout, title, savedBy }) => {
+      // Ignorar si lo guardó este mismo usuario (el backend lo filtra, pero doble seguro)
+      if (savedBy === currentUserId) return;
+      if (setCanvases) {
+        setCanvases(prev => ({
+          desktop: Array.isArray(desktopLayout) ? desktopLayout : prev.desktop,
+          mobile:  Array.isArray(mobileLayout)  ? mobileLayout  : prev.mobile,
+        }));
+      }
+      if (setProjectTitle && title) setProjectTitle(title);
+    });
+
+    // ─ Comentarios ──────────────────────────────────────────────────────────
     socket.on('comment:new', (comment) => {
       setComments(prev => prev.some(c => c.id === comment.id) ? prev : [...prev, comment]);
     });
-
     socket.on('comment:resolved', (updated) => {
       setComments(prev => prev.map(c => c.id === updated.id ? updated : c));
     });
-
     socket.on('comment:deleted', ({ id: deletedId, parentId }) => {
       if (parentId) {
         setComments(prev => prev.map(c =>
@@ -45,11 +63,9 @@ export function useSocket({ projectId, token, setComments, setNotifications, set
     socket.on('exception:new', (ex) => {
       setExceptions(prev => prev.some(e => e.id === ex.id) ? prev : [ex, ...prev]);
     });
-
     socket.on('exception:updated', (ex) => {
       setExceptions(prev => prev.map(e => e.id === ex.id ? ex : e));
     });
-
     socket.on('exception:deleted', ({ id: exId }) => {
       setExceptions(prev => prev.filter(e => e.id !== exId));
     });
@@ -57,6 +73,10 @@ export function useSocket({ projectId, token, setComments, setNotifications, set
     return () => {
       socket.emit('leave-project', projectId);
       socket.disconnect();
+      socketRef.current = null;
     };
   }, [projectId, token]);
+
+  // Expone el socketId actual para usarlo en el autoguardado
+  return socketRef;
 }
