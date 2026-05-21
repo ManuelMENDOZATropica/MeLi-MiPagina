@@ -289,6 +289,8 @@ function Editor() {
   const [publishedSlug, setPublishedSlug] = useState(null);
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [maiaCheckState, setMaiaCheckState] = useState(null); // null | 'checking' | { errors } | 'ok'
+  const [maiaCheckItems, setMaiaCheckItems] = useState([]); // [{name, status:'pending'|'ok'|'error', msg}]
   const [textEditorPanel, setTextEditorPanel] = useState(null); // { item, x, y }
   const [projectCollabs, setProjectCollabs] = useState([]); // [{id,name,email,avatar,color}]
   const [showAddCollab, setShowAddCollab] = useState(false);
@@ -440,6 +442,58 @@ function Editor() {
       }
     }, 80);
   };
+
+  // Verifica todos los elementos antes de publicar
+  const runMaiaPrePublishCheck = () => new Promise((resolve) => {
+    const allItems = [];
+    const collect = (items) => items.forEach(item => {
+      if (item.type === 'rowGroup' && item.items) item.items.forEach(c => allItems.push(c));
+      else allItems.push(item);
+    });
+    collect([...(canvases.desktop || []), ...(canvases.mobile || [])]);
+
+    // Solo items con imagen y tamaño esperado
+    const itemsToCheck = allItems.filter(item => {
+      const img = item.uploadedImages?.[0];
+      const size = viewMode === 'desktop' ? item.desktopSize : item.mobileSize;
+      return img && size?.width && size?.height;
+    });
+
+    if (itemsToCheck.length === 0) { resolve({ errors: [] }); return; }
+
+    const initial = itemsToCheck.map(item => ({ id: item.uniqueId, name: item.name || 'Elemento', status: 'pending', msg: '' }));
+    setMaiaCheckItems(initial);
+
+    let done = 0;
+    const errors = [];
+
+    itemsToCheck.forEach((item, idx) => {
+      const size = viewMode === 'desktop' ? item.desktopSize : item.mobileSize;
+      const imgEl = new window.Image();
+      imgEl.onload = () => {
+        const actualW = imgEl.naturalWidth;
+        const actualH = imgEl.naturalHeight;
+        const tol = 0.05;
+        const ok = Math.abs(actualW - size.width) / size.width <= tol &&
+                   Math.abs(actualH - size.height) / size.height <= tol;
+
+        const status = ok ? 'ok' : 'error';
+        const msg = ok ? '' : `Imagen ${actualW}×${actualH}px — esperado ${size.width}×${size.height}px`;
+        if (!ok) errors.push({ name: item.name || 'Elemento', msg });
+
+        setMaiaCheckItems(prev => prev.map((p, i) => i === idx ? { ...p, status, msg } : p));
+        done++;
+        if (done === itemsToCheck.length) setTimeout(() => resolve({ errors }), 600);
+      };
+      imgEl.onerror = () => {
+        setMaiaCheckItems(prev => prev.map((p, i) => i === idx ? { ...p, status: 'ok' } : p));
+        done++;
+        if (done === itemsToCheck.length) setTimeout(() => resolve({ errors }), 600);
+      };
+      // Escalonar checks para que la animación se vea
+      setTimeout(() => { imgEl.src = item.uploadedImages[0]; }, idx * 350);
+    });
+  });
 
   // Agregar colaborador al proyecto
   const addCollaborator = async (userId) => {
@@ -1462,6 +1516,16 @@ function Editor() {
 
           <button
             onClick={async () => {
+              // Paso 1: verificación MAIA
+              setMaiaCheckState('checking');
+              setMaiaCheckItems([]);
+              const { errors } = await runMaiaPrePublishCheck();
+              if (errors.length > 0) {
+                setMaiaCheckState({ errors });
+                return;
+              }
+              setMaiaCheckState('ok');
+              // Paso 2: publicar
               setIsPublishing(true);
               try {
                 const res = await fetch(`${API_URL}/api/projects/${id}/publish`, {
@@ -1474,8 +1538,9 @@ function Editor() {
                 if (data.isPublished) setShowPublishModal(true);
               } catch (e) { console.error(e); }
               setIsPublishing(false);
+              setMaiaCheckState(null);
             }}
-            style={{ background: isPublished ? '#fff159' : '#fff159', color: '#1a1f2e', border: 'none', padding: '7px 18px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '800', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.06em', transition: 'all 0.18s' }}
+            style={{ background: '#fff159', color: '#1a1f2e', border: 'none', padding: '7px 18px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '800', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.06em', transition: 'all 0.18s' }}
             onMouseEnter={e => e.currentTarget.style.background = '#ffe800'}
             onMouseLeave={e => e.currentTarget.style.background = '#fff159'}
           >
@@ -1939,6 +2004,109 @@ function Editor() {
         style={{ position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', border: 0 }}
         onChange={handleGlobalImageUpload}
       />
+
+      {/* ── MAIA Pre-publish check overlay ── */}
+      {maiaCheckState && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 99998,
+          background: 'rgba(10,14,26,0.88)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          backdropFilter: 'blur(6px)',
+          animation: 'fadeIn 0.25s ease'
+        }}>
+          <div style={{
+            background: '#0f1420', borderRadius: '20px',
+            padding: '36px 40px', minWidth: '420px', maxWidth: '520px',
+            boxShadow: '0 32px 80px rgba(0,0,0,0.6)',
+            border: '1px solid rgba(255,255,255,0.06)',
+            fontFamily: "'Inter', sans-serif",
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px'
+          }}>
+
+            {/* MAIA avatar + título */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{
+                width: '52px', height: '52px', borderRadius: '50%',
+                overflow: 'hidden', flexShrink: 0,
+                boxShadow: maiaCheckState === 'checking'
+                  ? '0 0 0 3px #3483fa, 0 0 20px #3483fa88'
+                  : maiaCheckState === 'ok'
+                  ? '0 0 0 3px #10b981, 0 0 20px #10b98188'
+                  : '0 0 0 3px #ef4444, 0 0 20px #ef444488)',
+                animation: maiaCheckState === 'checking' ? 'pulse 1.4s infinite' : 'none'
+              }}>
+                <img src="/MAIA.png" alt="MAIA" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              </div>
+              <div>
+                <p style={{ margin: 0, fontWeight: '800', fontSize: '17px', color: '#ffffff' }}>
+                  {maiaCheckState === 'checking' ? 'Verificando maqueta...' :
+                   maiaCheckState === 'ok' ? '¡Todo en orden!' :
+                   'No se puede publicar'}
+                </p>
+                <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>
+                  {maiaCheckState === 'checking' ? 'MAIA está revisando cada elemento' :
+                   maiaCheckState === 'ok' ? 'Publicando...' :
+                   'Corregí los errores antes de publicar'}
+                </p>
+              </div>
+            </div>
+
+            {/* Lista de items verificados */}
+            {maiaCheckState === 'checking' && maiaCheckItems.length > 0 && (
+              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {maiaCheckItems.map((item, i) => (
+                  <div key={i} style={{
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                    background: 'rgba(255,255,255,0.04)', borderRadius: '8px',
+                    padding: '8px 12px',
+                    border: `1px solid ${item.status === 'ok' ? 'rgba(16,185,129,0.3)' : item.status === 'error' ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.06)'}`
+                  }}>
+                    <span style={{ fontSize: '16px', flexShrink: 0 }}>
+                      {item.status === 'pending' ? '⏳' : item.status === 'ok' ? '✅' : '❌'}
+                    </span>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ margin: 0, fontSize: '12px', fontWeight: '700', color: '#e2e8f0' }}>{item.name}</p>
+                      {item.msg && <p style={{ margin: '1px 0 0', fontSize: '10px', color: '#ef4444' }}>{item.msg}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Error screen */}
+            {maiaCheckState !== 'checking' && maiaCheckState !== 'ok' && maiaCheckState?.errors && (
+              <div style={{ width: '100%' }}>
+                <div style={{
+                  background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
+                  borderRadius: '10px', padding: '14px', marginBottom: '16px'
+                }}>
+                  {maiaCheckState.errors.map((err, i) => (
+                    <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: i < maiaCheckState.errors.length - 1 ? '8px' : 0 }}>
+                      <span style={{ fontSize: '14px', flexShrink: 0 }}>❌</span>
+                      <div>
+                        <p style={{ margin: 0, fontSize: '12px', fontWeight: '700', color: '#fca5a5' }}>{err.name}</p>
+                        <p style={{ margin: '1px 0 0', fontSize: '11px', color: 'rgba(252,165,165,0.7)' }}>{err.msg}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setMaiaCheckState(null)}
+                  style={{
+                    width: '100%', padding: '12px',
+                    background: '#fff159', color: '#1a1f2e',
+                    border: 'none', borderRadius: '10px',
+                    fontWeight: '800', fontSize: '13px', cursor: 'pointer',
+                    textTransform: 'uppercase', letterSpacing: '0.06em'
+                  }}
+                >
+                  Corregir y volver al editor
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Panel flotante de edición de textos */}
       {textEditorPanel && (() => {
