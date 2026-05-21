@@ -410,12 +410,13 @@ Sin texto adicional fuera del JSON.`
       const mentionText = elementOwnerId ? `@${elementOwnerId} ` : '';
       const commentText = `🤖 **Análisis de IA — Posibles typos detectados:**\n${errorList}`;
 
-      // Crear comentario automático (autor = el usuario que subió la imagen)
+      // Crear comentario como MAIA (usuario IA del sistema)
+      const authorIdToUse = maiaUserId || req.user.id;
       const comment = await prisma.comment.create({
         data: {
           projectId,
           elementId,
-          authorId: req.user.id,
+          authorId: authorIdToUse,
           text: commentText,
           mentions: elementOwnerId ? [elementOwnerId] : [],
           parentId: null
@@ -713,10 +714,22 @@ app.post('/api/upload', authenticateToken, async (req, res) => {
 
 const PORT = process.env.PORT || 4000;
 
-// Siempre escuchar (Render lo necesita como servidor Node.js tradicional)
-// El export permite que Vercel lo use como serverless handler
-app.listen(PORT, () => {
+// Arrancar servidor + asegurar que el usuario MAIA existe en la BD
+let maiaUserId = null;
+
+app.listen(PORT, async () => {
   console.log(`🚀 Backend server running on port ${PORT}`);
+  try {
+    const maia = await prisma.user.upsert({
+      where: { email: 'maia@tropica.me' },
+      update: { name: 'MAIA', avatar: '/MAIA.png' },
+      create: { email: 'maia@tropica.me', name: 'MAIA', avatar: '/MAIA.png' }
+    });
+    maiaUserId = maia.id;
+    console.log(`🤖 Usuario MAIA listo (id: ${maiaUserId})`);
+  } catch (e) {
+    console.error('⚠️  No se pudo crear/encontrar el usuario MAIA:', e.message);
+  }
 });
 
 export default app;
