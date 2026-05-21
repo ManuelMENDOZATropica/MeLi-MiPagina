@@ -270,6 +270,17 @@ function Editor() {
   const [showAddCollab, setShowAddCollab] = useState(false);
   const [allUsers, setAllUsers] = useState([]);
   const [collabSearch, setCollabSearch] = useState('');
+  const [debugLogs, setDebugLogs] = useState([]); // logs visibles en pantalla
+
+  // Agrega un mensaje al panel de debug (desaparece a los 8s)
+  const debugLog = (msg, type = 'info') => {
+    const id = Date.now() + Math.random();
+    const icons = { info: '⚙️', ok: '✅', warn: '⚠️', error: '❌' };
+    const colors = { info: '#3483fa', ok: '#10b981', warn: '#f59e0b', error: '#ef4444' };
+    const entry = { id, msg, icon: icons[type] || '⚙️', color: colors[type] || '#3483fa', ts: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) };
+    setDebugLogs(prev => [...prev.slice(-9), entry]); // máx 10
+    setTimeout(() => setDebugLogs(prev => prev.filter(l => l.id !== id)), 8000);
+  };
 
   // Sistema de comentarios
   const [comments, setComments] = useState([]);
@@ -529,7 +540,9 @@ function Editor() {
 
   // Analiza una imagen subida con Gemini Vision para detectar typos
   const analyzeImageForTypos = async (imageUrl, elementId) => {
+    debugLog(`🖼 Imagen subida. Iniciando análisis de IA...`);
     const tok = JSON.parse(localStorage.getItem('tropica_user'))?.token;
+
     // Buscar el addedBy del elemento en el canvas actual
     let elementOwnerId = null;
     const findOwner = (items) => {
@@ -544,19 +557,31 @@ function Editor() {
     };
     const allItems = [...(canvases.desktop || []), ...(canvases.mobile || [])];
     findOwner(allItems);
+    debugLog(`🔍 Elemento: ${elementId.slice(0,8)}… | Dueño: ${elementOwnerId ? elementOwnerId.slice(0,8)+'…' : 'sin dueño'}`, 'info');
 
     try {
+      debugLog(`📤 Enviando imagen al servidor para análisis Gemini...`, 'info');
       const res = await fetch(`${API_URL}/api/analyze-typos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tok}` },
         body: JSON.stringify({ imageUrl, projectId: id, elementId, elementOwnerId })
       });
+
+      debugLog(`📥 Respuesta del servidor: HTTP ${res.status}`, res.ok ? 'ok' : 'error');
+
       const result = await res.json();
+      debugLog(`🤖 Gemini respondió: ${JSON.stringify(result).slice(0, 120)}`, result.typos ? 'warn' : 'ok');
+
       if (result.typos && result.comment) {
-        // Refrescar comentarios para mostrar el auto-comment
+        debugLog(`🚨 Typos encontrados — comentario creado!`, 'warn');
         setComments(prev => [...prev, result.comment]);
+      } else if (result.message) {
+        debugLog(`ℹ️ Mensaje: ${result.message}`, 'info');
+      } else {
+        debugLog(`✓ Sin typos detectados en la imagen`, 'ok');
       }
     } catch (e) {
+      debugLog(`❌ Error: ${e.message}`, 'error');
       console.error('Error analizando imagen:', e);
     }
   };
@@ -1930,6 +1955,43 @@ function Editor() {
           </div>
         );
       })()}
+
+      {/* 🐛 Panel de debug IA — aparece al analizar imágenes */}
+      {debugLogs.length > 0 && (
+        <div style={{
+          position: 'fixed', bottom: '20px', left: '20px', zIndex: 99999,
+          display: 'flex', flexDirection: 'column', gap: '6px',
+          maxWidth: '420px', pointerEvents: 'none'
+        }}>
+          {/* Header */}
+          <div style={{
+            background: '#1a1f2e', borderRadius: '8px 8px 0 0',
+            padding: '5px 12px', display: 'flex', alignItems: 'center',
+            justifyContent: 'space-between', pointerEvents: 'all'
+          }}>
+            <span style={{ color: '#fff159', fontSize: '10px', fontWeight: '800', letterSpacing: '0.1em', textTransform: 'uppercase' }}>🤖 Debug IA</span>
+            <button onClick={() => setDebugLogs([])} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '13px', padding: '0 2px' }}>✕</button>
+          </div>
+          {/* Logs */}
+          {debugLogs.map(log => (
+            <div key={log.id} style={{
+              background: 'rgba(15,19,32,0.97)',
+              borderLeft: `3px solid ${log.color}`,
+              borderRadius: '0 6px 6px 0',
+              padding: '7px 12px',
+              backdropFilter: 'blur(8px)',
+              animation: 'slideInLeft 0.2s ease',
+              boxShadow: '0 2px 12px rgba(0,0,0,0.3)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '7px' }}>
+                <span style={{ fontSize: '13px', flexShrink: 0 }}>{log.icon}</span>
+                <span style={{ fontSize: '11px', color: '#e2e8f0', lineHeight: '1.4', flex: 1, wordBreak: 'break-word' }}>{log.msg}</span>
+                <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.25)', flexShrink: 0, marginTop: '1px' }}>{log.ts}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
