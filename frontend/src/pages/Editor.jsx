@@ -7,6 +7,10 @@ import '../index.css';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import ReactMarkdown from 'react-markdown';
+import { useExceptions } from '../hooks/useExceptions';
+import { useComments } from '../hooks/useComments';
+import { useNotifications } from '../hooks/useNotifications';
+import { useSocket } from '../hooks/useSocket';
 
 // Paleta de colores por colaborador (owner = índice 0)
 const COLLAB_COLORS = [
@@ -1846,8 +1850,8 @@ function Editor() {
             ))}
           </div>
 
-          {/* Botón + para agregar colaborador (solo owner) */}
-          {user && projectCollabs.length > 0 && projectCollabs[0]?.id === user.id && (
+          {/* Botón + para agregar colaborador (solo Manuel Mendoza) */}
+          {user && user.email === 'manuel@tropica.me' && (
             <div style={{ position: 'relative' }}>
               <button
                 onClick={() => { setShowAddCollab(!showAddCollab); setCollabSearch(''); }}
