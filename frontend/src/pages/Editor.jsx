@@ -913,7 +913,7 @@ function Editor() {
     const updateScale = () => {
       if (containerRef.current) {
         const containerWidth = containerRef.current.clientWidth - 60; // 30px padding on each side
-        const targetWidth = viewMode === 'desktop' ? 1920 : 920;
+        const targetWidth = viewMode === 'desktop' ? 1920 : 800;
         const newScale = containerWidth < targetWidth ? containerWidth / targetWidth : 1;
         setScale(newScale);
       }
@@ -1070,22 +1070,15 @@ function Editor() {
     setSelectedIds(newSelected);
   };
 
-  const MOBILE_CANVAS_WIDTH = 920;
-
   const getScaledHeight = (item, mode) => {
     const size = mode === 'desktop' ? item.desktopSize : item.mobileSize;
     if (!size) return 100;
-    if (mode === 'mobile' && size.width && size.width > 0) {
-      // Scale height proportionally to the 920px canvas
-      return Math.round((size.height / size.width) * MOBILE_CANVAS_WIDTH);
-    }
     return size.height;
   };
 
   const getScaledWidth = (item, mode) => {
     const size = mode === 'desktop' ? item.desktopSize : item.mobileSize;
     if (!size) return '100%';
-    if (mode === 'mobile') return '100%';
     return size.width;
   };
 
@@ -1292,7 +1285,7 @@ function Editor() {
         data-id={item.uniqueId}
         className={`canvas-item ${isSelected ? 'selected' : ''} ${indicatorClass} ${draggedIndex === index ? 'is-dragging' : ''}`}
         draggable={!isInsideGroup && !isHoveringText}
-        style={{ width: typeof width === 'string' ? width : `${width}px` }}
+        style={{ width: `${width}px` }}
         onDragStart={!isInsideGroup ? (e) => handleDragStartCanvas(e, index) : undefined}
         onDragEnd={() => { setDraggedIndex(null); setDragOverTarget(null); }}
         onDragOver={(e) => {
@@ -1972,7 +1965,7 @@ function Editor() {
           </div>
 
           <div className="canvas-container" onMouseDown={handleMouseDown} ref={containerRef}>
-            <div style={{ width: (viewMode === 'desktop' ? 1920 : 920) * scale, display: 'flex', justifyContent: 'center', transition: 'width 0.3s ease' }}>
+            <div style={{ width: (viewMode === 'desktop' ? 1920 : 800) * scale, display: 'flex', justifyContent: 'center', transition: 'width 0.3s ease' }}>
               <div className={`canvas-wrapper ${viewMode}`} ref={pdfCanvasRef} style={{ transform: `scale(${scale})`, transformOrigin: 'top center' }}>
                 <div className={`meli-header-container ${viewMode === 'mobile' ? 'mobile-header' : ''}`}>
                   <div className="meli-header-top">
