@@ -1967,26 +1967,66 @@ function Editor() {
           <div className="canvas-container" onMouseDown={handleMouseDown} ref={containerRef}>
             <div style={{ width: (viewMode === 'desktop' ? 1920 : 800) * scale, display: 'flex', justifyContent: 'center', transition: 'width 0.3s ease' }}>
               <div className={`canvas-wrapper ${viewMode}`} ref={pdfCanvasRef} style={{ transform: `scale(${scale})`, transformOrigin: 'top center' }}>
-                <div className={`meli-header-container ${viewMode === 'mobile' ? 'mobile-header' : ''}`}>
-                  <div className="meli-header-top">
-                    <div className="meli-logo"><img src="https://http2.mlstatic.com/frontend-assets/ml-web-navigation/ui-navigation/6.6.73/mercadolibre/logo_large_25years_v2.png" alt="Mercado Libre" /></div>
-                    <div className="meli-search-bar">
-                      <input type="text" placeholder="Buscar productos, marcas y más..." />
-                      <div className="meli-search-store"><span>en Nike</span><ChevronDown size={14} /></div>
-                      <button className="meli-search-btn"><Search size={18} color="#666" /></button>
+                {viewMode === 'mobile' ? (
+                  <div className="mobile-app-header">
+                    {/* Status bar */}
+                    <div className="mobile-status-bar">
+                      <span className="mobile-time">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      <div className="mobile-status-icons">
+                        <svg width="17" height="12" viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="0.5" fill="#1a1a1a"/><rect x="4.5" y="2" width="3" height="10" rx="0.5" fill="#1a1a1a"/><rect x="9" y="0" width="3" height="12" rx="0.5" fill="#d0d0d0"/><rect x="13.5" y="0" width="3" height="12" rx="0.5" fill="#d0d0d0"/></svg>
+                        <svg width="16" height="12" viewBox="0 0 16 12" fill="none"><path d="M8 2.4C10.8 2.4 13.3 3.6 15 5.6L16 4.4C13.9 2 11.1 0.6 8 0.6C4.9 0.6 2.1 2 0 4.4L1 5.6C2.7 3.6 5.2 2.4 8 2.4Z" fill="#1a1a1a"/><path d="M8 5.6C9.9 5.6 11.6 6.4 12.8 7.7L13.8 6.5C12.3 4.9 10.2 4 8 4C5.8 4 3.7 4.9 2.2 6.5L3.2 7.7C4.4 6.4 6.1 5.6 8 5.6Z" fill="#1a1a1a"/><circle cx="8" cy="10.5" r="1.5" fill="#1a1a1a"/></svg>
+                        <div className="mobile-battery">
+                          <span>84</span>
+                          <svg width="28" height="14" viewBox="0 0 28 14" fill="none"><rect x="0.5" y="0.5" width="24" height="13" rx="3.5" stroke="#1a1a1a"/><rect x="2" y="2" width="19" height="10" rx="2" fill="#1a1a1a"/><path d="M26 4.5V9.5C27.1 9 27.1 5 26 4.5Z" fill="#1a1a1a"/></svg>
+                        </div>
+                      </div>
                     </div>
-                    <div className="meli-promo"><Tag size={20} /><span>Ofertas por tiempo limitado</span></div>
+                    {/* Search row */}
+                    <div className="mobile-search-row">
+                      <div className="mobile-search-input">
+                        <Search size={16} color="#9ca3af" />
+                        <span>Buscar en Mercado Libre</span>
+                      </div>
+                      <div className="mobile-bell-btn">
+                        <Bell size={22} color="#1a1a1a" />
+                        <span className="mobile-bell-badge">1</span>
+                      </div>
+                    </div>
+                    {/* Location */}
+                    <div className="mobile-location-row">
+                      <MapPin size={14} color="#1a1a1a" />
+                      <span>CP 56806</span>
+                      <ChevronDown size={14} color="#1a1a1a" />
+                    </div>
+                    {/* Category chips */}
+                    <div className="mobile-category-chips">
+                      {['Todo','Celulares','Moda','Belleza','Vehículos','Hogar','Televisores','Juegos'].map((cat, i) => (
+                        <span key={cat} className={`mobile-chip ${i === 0 ? 'active' : ''}`}>{cat}</span>
+                      ))}
+                    </div>
                   </div>
-                  <div className="meli-header-bottom">
-                    <div className="meli-location"><MapPin size={22} opacity={0.6} /><div className="location-text"><span className="location-send">Enviar a</span><span className="location-cp">CP 56607</span></div></div>
-                    <div className="meli-nav-links">
-                      <a href="#">Categorías <ChevronDown size={12} /></a><a href="#">Ofertas</a><a href="#">Cupones</a><a href="#">Supermercado</a><a href="#">Moda</a><a href="#" className="mercado-play">Mercado Play <span className="gratis-badge">GRATIS</span></a><a href="#">Vender</a><a href="#">Ayuda</a>
+                ) : (
+                  <div className="meli-header-container">
+                    <div className="meli-header-top">
+                      <div className="meli-logo"><img src="https://http2.mlstatic.com/frontend-assets/ml-web-navigation/ui-navigation/6.6.73/mercadolibre/logo_large_25years_v2.png" alt="Mercado Libre" /></div>
+                      <div className="meli-search-bar">
+                        <input type="text" placeholder="Buscar productos, marcas y más..." />
+                        <div className="meli-search-store"><span>en Nike</span><ChevronDown size={14} /></div>
+                        <button className="meli-search-btn"><Search size={18} color="#666" /></button>
+                      </div>
+                      <div className="meli-promo"><Tag size={20} /><span>Ofertas por tiempo limitado</span></div>
                     </div>
-                    <div className="meli-user-links">
-                      <a href="#" className="user-profile"><div className="user-avatar">MM</div>Manuel <ChevronDown size={12} /></a><a href="#">Mis compras</a><a href="#">Favoritos <ChevronDown size={12} /></a><a href="#"><Bell size={18} /></a><a href="#"><ShoppingCart size={18} /></a>
+                    <div className="meli-header-bottom">
+                      <div className="meli-location"><MapPin size={22} opacity={0.6} /><div className="location-text"><span className="location-send">Enviar a</span><span className="location-cp">CP 56607</span></div></div>
+                      <div className="meli-nav-links">
+                        <a href="#">Categorías <ChevronDown size={12} /></a><a href="#">Ofertas</a><a href="#">Cupones</a><a href="#">Supermercado</a><a href="#">Moda</a><a href="#" className="mercado-play">Mercado Play <span className="gratis-badge">GRATIS</span></a><a href="#">Vender</a><a href="#">Ayuda</a>
+                      </div>
+                      <div className="meli-user-links">
+                        <a href="#" className="user-profile"><div className="user-avatar">MM</div>Manuel <ChevronDown size={12} /></a><a href="#">Mis compras</a><a href="#">Favoritos <ChevronDown size={12} /></a><a href="#"><Bell size={18} /></a><a href="#"><ShoppingCart size={18} /></a>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
 
                 <div
                   className={`drop-zone ${isOverCanvas ? 'is-over' : ''}`}
