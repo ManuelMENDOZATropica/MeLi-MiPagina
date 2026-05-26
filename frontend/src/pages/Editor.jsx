@@ -279,21 +279,20 @@ const getIcon = (type) => {
 const AnimatedBanner = ({ item, height, isPreviewMode }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const validImages = (item?.uploadedImages || []).filter(Boolean);
+  // Placeholders solo si no hay ninguna imagen subida
   const images = validImages.length > 0 ? validImages : [
     "https://http2.mlstatic.com/D_NQ_853512-MLA75916035059_042024-OO.webp",
     "https://http2.mlstatic.com/D_NQ_938676-MLA75908076632_042024-OO.webp"
   ];
 
+  // Siempre anima (editor y preview/publicado)
   useEffect(() => {
-    if (!isPreviewMode) {
-      setCurrentIndex(0);
-      return;
-    }
+    if (images.length <= 1) return;
     const timer = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % images.length);
     }, 3000);
     return () => clearInterval(timer);
-  }, [images.length, isPreviewMode]);
+  }, [images.length]);
 
   return (
     <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', overflow: 'hidden' }}>
@@ -317,7 +316,19 @@ const AnimatedBanner = ({ item, height, isPreviewMode }) => {
       {images.length > 1 && (
         <div style={{ position: 'absolute', bottom: '15px', left: '0', width: '100%', display: 'flex', justifyContent: 'center', gap: '8px', zIndex: 20 }}>
           {images.map((_, idx) => (
-            <div key={idx} style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: currentIndex === idx ? '#3483fa' : 'rgba(255,255,255,0.5)', transition: 'background-color 0.3s' }} />
+            <div
+              key={idx}
+              onClick={() => setCurrentIndex(idx)}
+              style={{
+                width: currentIndex === idx ? '20px' : '8px',
+                height: '8px',
+                borderRadius: currentIndex === idx ? '4px' : '50%',
+                backgroundColor: currentIndex === idx ? '#3483fa' : 'rgba(255,255,255,0.7)',
+                transition: 'all 0.3s',
+                cursor: 'pointer',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+              }}
+            />
           ))}
         </div>
       )}
@@ -1625,7 +1636,7 @@ function Editor() {
         >
           
             <>
-              {item.type === 'banner' && <AnimatedBanner item={item} height={height} isPreviewMode={isPreviewMode} />}
+              {(item.type === 'banner' || item.type === 'carousel') && <AnimatedBanner item={item} height={height} isPreviewMode={isPreviewMode} />}
 
               {item.id === 'encabezado_portada_logo' && (
                 <>
@@ -2384,21 +2395,59 @@ function Editor() {
                   <div className="context-menu-item" onClick={() => { setActiveCommentElId(contextMenu.targetId); setContextMenu(null); }} style={{ fontWeight: 'bold', color: '#6b7280' }}>
                     💬 Comentar
                   </div>
-                  <div className="context-menu-item" onClick={() => { triggerUpload(contextMenu.targetId); setContextMenu(null); }} style={{ fontWeight: 'bold', color: '#3483fa' }}>
-                    <ImageIcon size={16} /> {hasImage ? 'Cambiar Imagen' : 'Subir Imagen'}
-                  </div>
-                  {hasImage && (
-                    <div className="context-menu-item" onClick={() => {
-                      setCanvasItems(prev => prev.map(item => {
-                        if (item.uniqueId === contextMenu.targetId) return { ...item, uploadedImages: [] };
-                        if (item.type === 'rowGroup') return { ...item, items: item.items.map(c => c.uniqueId === contextMenu.targetId ? { ...c, uploadedImages: [] } : c) };
-                        return item;
-                      }));
-                      setContextMenu(null);
-                    }} style={{ color: '#e53e3e' }}>
-                      <ImageIcon size={16} /> Quitar Imagen
-                    </div>
-                  )}
+                  {/* Opciones dinámicas de subir imagen */}
+                  {(() => {
+                    const imgs = targetItem?.uploadedImages?.filter(Boolean) || [];
+                    const isMultiType = ['banner', 'carousel'].includes(targetItem?.type);
+                    if (isMultiType) {
+                      // Mostrar opción para subir la siguiente imagen
+                      const nextIndex = imgs.length;
+                      return (
+                        <>
+                          <div className="context-menu-item" onClick={() => {
+                            setUploadTargetId(contextMenu.targetId);
+                            setUploadIndex(nextIndex);
+                            if (fileInputRef.current) fileInputRef.current.click();
+                            setContextMenu(null);
+                          }} style={{ fontWeight: 'bold', color: '#3483fa' }}>
+                            <ImageIcon size={16} /> Subir imagen {nextIndex + 1}
+                          </div>
+                          {imgs.length > 0 && (
+                            <div className="context-menu-item" onClick={() => {
+                              setCanvasItems(prev => prev.map(it => {
+                                if (it.uniqueId === contextMenu.targetId) return { ...it, uploadedImages: [] };
+                                if (it.type === 'rowGroup') return { ...it, items: it.items.map(c => c.uniqueId === contextMenu.targetId ? { ...c, uploadedImages: [] } : c) };
+                                return it;
+                              }));
+                              setContextMenu(null);
+                            }} style={{ color: '#e53e3e' }}>
+                              <ImageIcon size={16} /> Quitar todas las imágenes ({imgs.length})
+                            </div>
+                          )}
+                        </>
+                      );
+                    }
+                    // Para otros tipos: comportamiento original
+                    return (
+                      <>
+                        <div className="context-menu-item" onClick={() => { triggerUpload(contextMenu.targetId); setContextMenu(null); }} style={{ fontWeight: 'bold', color: '#3483fa' }}>
+                          <ImageIcon size={16} /> {imgs.length > 0 ? 'Cambiar Imagen' : 'Subir Imagen'}
+                        </div>
+                        {imgs.length > 0 && (
+                          <div className="context-menu-item" onClick={() => {
+                            setCanvasItems(prev => prev.map(it => {
+                              if (it.uniqueId === contextMenu.targetId) return { ...it, uploadedImages: [] };
+                              if (it.type === 'rowGroup') return { ...it, items: it.items.map(c => c.uniqueId === contextMenu.targetId ? { ...c, uploadedImages: [] } : c) };
+                              return it;
+                            }));
+                            setContextMenu(null);
+                          }} style={{ color: '#e53e3e' }}>
+                            <ImageIcon size={16} /> Quitar Imagen
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                   <div className="context-menu-item" onClick={() => { removeItem(contextMenu.targetId); setContextMenu(null); }} style={{ color: '#e53e3e', borderTop: '1px solid #eee', marginTop: '4px', paddingTop: '4px' }}>
                     <Trash2 size={16} /> Eliminar Componente
                   </div>
