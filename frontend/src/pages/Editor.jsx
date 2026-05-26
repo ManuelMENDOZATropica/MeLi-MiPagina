@@ -276,61 +276,83 @@ const getIcon = (type) => {
   }
 };
 
-const AnimatedBanner = ({ item, height, isPreviewMode }) => {
+const AnimatedBanner = ({ item, isPreviewMode }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const validImages = (item?.uploadedImages || []).filter(Boolean);
-  // Placeholders solo si no hay ninguna imagen subida
   const images = validImages.length > 0 ? validImages : [
     "https://http2.mlstatic.com/D_NQ_853512-MLA75916035059_042024-OO.webp",
     "https://http2.mlstatic.com/D_NQ_938676-MLA75908076632_042024-OO.webp"
   ];
 
-  // Siempre anima (editor y preview/publicado)
+  // Auto-advance siempre activo
   useEffect(() => {
     if (images.length <= 1) return;
     const timer = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % images.length);
+      setCurrentIndex(prev => (prev + 1) % images.length);
     }, 3000);
     return () => clearInterval(timer);
   }, [images.length]);
 
+  const goTo = (idx) => setCurrentIndex((idx + images.length) % images.length);
+
   return (
     <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', overflow: 'hidden' }}>
-      {images.map((img, idx) => (
-        <div
-          key={idx}
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
+      {/* Track que se desliza a la izquierda */}
+      <div style={{
+        display: 'flex',
+        width: `${images.length * 100}%`,
+        height: '100%',
+        transform: `translateX(-${currentIndex * (100 / images.length)}%)`,
+        transition: 'transform 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+        willChange: 'transform',
+      }}>
+        {images.map((img, idx) => (
+          <div key={idx} style={{
+            width: `${100 / images.length}%`,
             height: '100%',
+            flexShrink: 0,
             backgroundImage: `url(${img})`,
             backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            opacity: currentIndex === idx ? 1 : 0,
-            transition: 'opacity 0.8s ease-in-out'
-          }}
-        />
-      ))}
+            backgroundPosition: 'center center',
+          }} />
+        ))}
+      </div>
+
+      {/* Dots */}
       {images.length > 1 && (
-        <div style={{ position: 'absolute', bottom: '15px', left: '0', width: '100%', display: 'flex', justifyContent: 'center', gap: '8px', zIndex: 20 }}>
+        <div style={{ position: 'absolute', bottom: '15px', left: 0, width: '100%', display: 'flex', justifyContent: 'center', gap: '8px', zIndex: 20 }}>
           {images.map((_, idx) => (
-            <div
-              key={idx}
-              onClick={() => setCurrentIndex(idx)}
-              style={{
-                width: currentIndex === idx ? '20px' : '8px',
-                height: '8px',
-                borderRadius: currentIndex === idx ? '4px' : '50%',
-                backgroundColor: currentIndex === idx ? '#3483fa' : 'rgba(255,255,255,0.7)',
-                transition: 'all 0.3s',
-                cursor: 'pointer',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-              }}
-            />
+            <div key={idx} onClick={() => goTo(idx)} style={{
+              width: currentIndex === idx ? '20px' : '8px',
+              height: '8px',
+              borderRadius: currentIndex === idx ? '4px' : '50%',
+              backgroundColor: currentIndex === idx ? '#3483fa' : 'rgba(255,255,255,0.75)',
+              transition: 'all 0.3s ease',
+              cursor: 'pointer',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
+            }} />
           ))}
         </div>
+      )}
+
+      {/* Flechas prev / next */}
+      {images.length > 1 && (
+        <>
+          <button onClick={() => goTo(currentIndex - 1)} style={{
+            position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)',
+            background: 'rgba(255,255,255,0.88)', border: 'none', borderRadius: '50%',
+            width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', zIndex: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+            fontSize: '22px', color: '#333', lineHeight: 1,
+          }}>‹</button>
+          <button onClick={() => goTo(currentIndex + 1)} style={{
+            position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+            background: 'rgba(255,255,255,0.88)', border: 'none', borderRadius: '50%',
+            width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', zIndex: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+            fontSize: '22px', color: '#333', lineHeight: 1,
+          }}>›</button>
+        </>
       )}
     </div>
   );
