@@ -284,16 +284,20 @@ const AnimatedBanner = ({ item, isPreviewMode }) => {
     "https://http2.mlstatic.com/D_NQ_938676-MLA75908076632_042024-OO.webp"
   ];
 
-  // Auto-advance siempre activo
+  // Auto-advance SOLO en preview/publicado, NO en editor
   useEffect(() => {
-    if (images.length <= 1) return;
+    if (!isPreviewMode || images.length <= 1) return;
     const timer = setInterval(() => {
       setCurrentIndex(prev => (prev + 1) % images.length);
     }, 3000);
     return () => clearInterval(timer);
-  }, [images.length]);
+  }, [images.length, isPreviewMode]);
 
-  const goTo = (idx) => setCurrentIndex((idx + images.length) % images.length);
+  const goTo = (e, idx) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setCurrentIndex((idx + images.length) % images.length);
+  };
 
   return (
     <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', overflow: 'hidden' }}>
@@ -320,17 +324,22 @@ const AnimatedBanner = ({ item, isPreviewMode }) => {
 
       {/* Dots */}
       {images.length > 1 && (
-        <div style={{ position: 'absolute', bottom: '15px', left: 0, width: '100%', display: 'flex', justifyContent: 'center', gap: '8px', zIndex: 20 }}>
+        <div style={{ position: 'absolute', bottom: '15px', left: 0, width: '100%', display: 'flex', justifyContent: 'center', gap: '8px', zIndex: 20, pointerEvents: 'auto' }}>
           {images.map((_, idx) => (
-            <div key={idx} onClick={() => goTo(idx)} style={{
-              width: currentIndex === idx ? '20px' : '8px',
-              height: '8px',
-              borderRadius: currentIndex === idx ? '4px' : '50%',
-              backgroundColor: currentIndex === idx ? '#3483fa' : 'rgba(255,255,255,0.75)',
-              transition: 'all 0.3s ease',
-              cursor: 'pointer',
-              boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
-            }} />
+            <div
+              key={idx}
+              onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+              onClick={(e) => goTo(e, idx)}
+              style={{
+                width: currentIndex === idx ? '20px' : '8px',
+                height: '8px',
+                borderRadius: currentIndex === idx ? '4px' : '50%',
+                backgroundColor: currentIndex === idx ? '#3483fa' : 'rgba(255,255,255,0.75)',
+                transition: 'all 0.3s ease',
+                cursor: 'pointer',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
+              }}
+            />
           ))}
         </div>
       )}
@@ -338,20 +347,28 @@ const AnimatedBanner = ({ item, isPreviewMode }) => {
       {/* Flechas prev / next */}
       {images.length > 1 && (
         <>
-          <button onClick={() => goTo(currentIndex - 1)} style={{
-            position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)',
-            background: 'rgba(255,255,255,0.88)', border: 'none', borderRadius: '50%',
-            width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', zIndex: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-            fontSize: '22px', color: '#333', lineHeight: 1,
-          }}>‹</button>
-          <button onClick={() => goTo(currentIndex + 1)} style={{
-            position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
-            background: 'rgba(255,255,255,0.88)', border: 'none', borderRadius: '50%',
-            width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', zIndex: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-            fontSize: '22px', color: '#333', lineHeight: 1,
-          }}>›</button>
+          <button
+            onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+            onClick={(e) => goTo(e, currentIndex - 1)}
+            style={{
+              position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)',
+              background: 'rgba(255,255,255,0.88)', border: 'none', borderRadius: '50%',
+              width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', zIndex: 30, boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+              fontSize: '22px', color: '#333', lineHeight: 1, pointerEvents: 'auto',
+            }}
+          >‹</button>
+          <button
+            onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+            onClick={(e) => goTo(e, currentIndex + 1)}
+            style={{
+              position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+              background: 'rgba(255,255,255,0.88)', border: 'none', borderRadius: '50%',
+              width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', zIndex: 30, boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+              fontSize: '22px', color: '#333', lineHeight: 1, pointerEvents: 'auto',
+            }}
+          >›</button>
         </>
       )}
     </div>
