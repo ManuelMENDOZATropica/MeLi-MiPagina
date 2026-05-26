@@ -271,6 +271,7 @@ const getIcon = (type) => {
     case 'gallery': return <Layout size={20} />;
     case 'video': return <Video size={20} />;
     case 'spacer': return <ListMinus size={20} />;
+    case 'text_block': return <Type size={20} />;
     default: return <Layout size={20} />;
   }
 };
@@ -386,6 +387,7 @@ function Editor() {
 
   const [isHoveringText, setIsHoveringText] = useState(false);
   const [editingField, setEditingField] = useState({ id: null, field: null });
+  const [textResizing, setTextResizing] = useState(null); // { id, dir, startX, startY, startW, startH }
 
   const [viewMode, setViewMode] = useState('desktop');
   const [canvases, setCanvases] = useState({ desktop: [], mobile: [] });
@@ -1150,6 +1152,38 @@ function Editor() {
     return () => window.removeEventListener('click', hideMenu);
   }, []);
 
+  // Resize handler para text_block
+  useEffect(() => {
+    if (!textResizing) return;
+    const canvasWidth = viewMode === 'desktop' ? 1920 : 800;
+    const onMove = (e) => {
+      const dx = (e.clientX - textResizing.startX) / scale;
+      const dy = (e.clientY - textResizing.startY) / scale;
+      setCanvasItems(prev => prev.map(it => {
+        const update = (child) => {
+          if (child.uniqueId !== textResizing.id) return child;
+          const newW = textResizing.dir.includes('e')
+            ? Math.round(Math.max(120, Math.min(canvasWidth, textResizing.startW + dx * 2)))
+            : child.textWidthPx ?? canvasWidth;
+          const newH = textResizing.dir.includes('s')
+            ? Math.round(Math.max(40, textResizing.startH + dy))
+            : child.textHeightPx ?? 80;
+          return { ...child, textWidthPx: newW, textHeightPx: newH };
+        };
+        if (it.uniqueId === textResizing.id) return update(it);
+        if (it.type === 'rowGroup') return { ...it, items: it.items.map(update) };
+        return it;
+      }));
+    };
+    const onUp = () => setTextResizing(null);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [textResizing, scale, viewMode]);
+
   const groupSelected = (justify) => {
     const extracted = [];
     const remainingItems = canvasItems.map(item => {
@@ -1278,6 +1312,226 @@ function Editor() {
         </div>
       );
     }
+
+    if (item.type === 'text_block') {
+      const canvasWidth = viewMode === 'desktop' ? 1920 : 800;
+      const tbW = item.textWidthPx ?? canvasWidth;
+      const tbH = item.textHeightPx ?? 80;
+      const isResizingThis = textResizing?.id === item.uniqueId;
+
+      // Estilo de handle de resize
+      const handleBase = {
+        position: 'absolute',
+        background: 'rgba(230, 126, 34, 0.85)',
+        borderRadius: '3px',
+        zIndex: 30,
+        cursor: 'pointer',
+        transition: 'opacity 0.15s',
+      };
+
+      return (
+        <div
+          key={item.uniqueId}
+          data-id={item.uniqueId}
+          className={`canvas-item ${isSelected ? 'selected' : ''} ${indicatorClass}`}
+          style={{ width: '100%', padding: '16px 0', boxSizing: 'border-box' }}
+          draggable={!isInsideGroup && !isHoveringText && !textResizing}
+          onDragStart={!isInsideGroup ? (e) => handleDragStartCanvas(e, index) : undefined}
+          onDragEnd={() => { setDraggedIndex(null); setDragOverTarget(null); }}
+          onDragOver={(e) => handleItemDragOver(e, index)}
+          onDrop={!isInsideGroup ? (e) => handleDropCanvas(e, index) : undefined}
+          onContextMenu={(e) => handleItemContextMenu(e, item.uniqueId)}
+        >
+          {!isPreviewMode && (
+            <button className="delete-btn" onClick={() => removeItem(item.uniqueId)}>
+              <Trash2 size={16} />
+            </button>
+          )}
+
+          {/* Contenedor centrado con borde naranja + resize */}
+          <div
+            style={{
+              width: `${tbW}px`,
+              height: `${tbH}px`,
+              margin: '0 auto',
+              position: 'relative',
+              border: isPreviewMode ? 'none' : '2px dashed rgba(230, 126, 34, 0.8)',
+              backgroundColor: isPreviewMode ? 'transparent' : 'rgba(230, 126, 34, 0.03)',
+              boxSizing: 'border-box',
+              overflow: 'visible',
+            }}
+            onMouseEnter={() => !isPreviewMode && setIsHoveringText(true)}
+            onMouseLeave={() => setIsHoveringText(false)}
+          >
+            {/* Etiqueta de dimensiones (estilo safe area) */}
+            {!isPreviewMode && (
+              <div style={{
+                position: 'absolute',
+                top: '-22px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                background: 'rgba(230, 126, 34, 0.9)',
+                color: 'white',
+                fontSize: '10px',
+                fontWeight: '700',
+                padding: '2px 8px',
+                borderRadius: '4px',
+                whiteSpace: 'nowrap',
+                pointerEvents: 'none',
+                letterSpacing: '0.04em',
+              }}>
+                {tbW} × {tbH} px
+              </div>
+            )}
+
+            {/* Toolbar: tamaño de fuente + alineación */}
+            {!isPreviewMode && (
+              <div style={{
+                position: 'absolute',
+                top: '-26px',
+                right: '0',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+              onMouseEnter={() => setIsHoveringText(true)}
+              >
+                {/* Alineación */}
+                {[
+                  { val: 'left',    icon: '\u2630\u2013' },
+                  { val: 'center',  icon: '\u2630\u2014\u2630' },
+                  { val: 'right',   icon: '\u2013\u2630' },
+                  { val: 'justify', icon: '\u2261' },
+                ].map(({ val, icon }) => (
+                  <button
+                    key={val}
+                    title={val}
+                    onClick={() => updateItemText(item.uniqueId, 'textAlign', val)}
+                    style={{
+                      background: (item.textAlign ?? 'left') === val ? 'rgba(230,126,34,0.9)' : 'white',
+                      color: (item.textAlign ?? 'left') === val ? 'white' : 'rgba(230,126,34,0.9)',
+                      border: '1.5px solid rgba(230,126,34,0.6)',
+                      borderRadius: '3px',
+                      padding: '1px 5px',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                      lineHeight: 1,
+                      fontWeight: '700',
+                    }}
+                  >{icon}</button>
+                ))}
+                <span style={{ fontSize: '9px', fontWeight: '700', color: 'rgba(230,126,34,0.9)', marginLeft: '4px' }}>T</span>
+                <select
+                  value={item.textFontSize ?? (viewMode === 'desktop' ? 10 : 8)}
+                  onChange={(e) => updateItemText(item.uniqueId, 'textFontSize', Number(e.target.value))}
+                  style={{
+                    fontSize: '10px',
+                    fontWeight: '700',
+                    color: '#1a1f2e',
+                    background: 'white',
+                    border: '1.5px solid rgba(230,126,34,0.6)',
+                    borderRadius: '4px',
+                    padding: '1px 4px',
+                    cursor: 'pointer',
+                    outline: 'none',
+                  }}
+                >
+                  {[8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48].map(s => (
+                    <option key={s} value={s}>{s}px</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Textarea */}
+            <textarea
+              value={item.textContent || ''}
+              placeholder={isPreviewMode ? '' : 'Escribe aquí tu texto...'}
+              onChange={(e) => updateItemText(item.uniqueId, 'textContent', e.target.value)}
+              readOnly={isPreviewMode}
+              style={{
+                width: '100%',
+                height: '100%',
+                resize: 'none',
+                border: 'none',
+                outline: 'none',
+                overflow: isPreviewMode ? 'hidden' : 'auto',
+                background: 'transparent',
+                fontFamily: "'Proxima Nova', 'Inter', -apple-system, sans-serif",
+                fontSize: `${item.textFontSize ?? (viewMode === 'desktop' ? 10 : 8)}px`,
+                lineHeight: '1.6',
+                color: '#1a1a2e',
+                padding: '8px 10px',
+                cursor: isPreviewMode ? 'default' : 'text',
+                boxSizing: 'border-box',
+                textAlign: item.textAlign ?? 'left',
+              }}
+            />
+
+            {/* Handle: borde derecho */}
+            {!isPreviewMode && (
+              <div
+                style={{
+                  ...handleBase,
+                  right: '-5px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: '10px',
+                  height: '36px',
+                  cursor: 'ew-resize',
+                }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setTextResizing({ id: item.uniqueId, dir: 'e', startX: e.clientX, startY: e.clientY, startW: tbW, startH: tbH });
+                }}
+              />
+            )}
+
+            {/* Handle: borde inferior */}
+            {!isPreviewMode && (
+              <div
+                style={{
+                  ...handleBase,
+                  bottom: '-5px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: '36px',
+                  height: '10px',
+                  cursor: 'ns-resize',
+                }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setTextResizing({ id: item.uniqueId, dir: 's', startX: e.clientX, startY: e.clientY, startW: tbW, startH: tbH });
+                }}
+              />
+            )}
+
+            {/* Handle: esquina inferior-derecha */}
+            {!isPreviewMode && (
+              <div
+                style={{
+                  ...handleBase,
+                  right: '-5px',
+                  bottom: '-5px',
+                  width: '12px',
+                  height: '12px',
+                  cursor: 'nwse-resize',
+                  borderRadius: '50%',
+                }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setTextResizing({ id: item.uniqueId, dir: 'se', startX: e.clientX, startY: e.clientY, startW: tbW, startH: tbH });
+                }}
+              />
+            )}
+          </div>
+        </div>
+      );
+    }
+
 
     return (
       <div

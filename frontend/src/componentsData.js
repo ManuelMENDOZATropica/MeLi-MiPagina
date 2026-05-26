@@ -120,6 +120,14 @@ export const componentsList = [
     type: "video"
   },
   {
+    id: "texto_libre",
+    name: "Texto",
+    desktopSize: { width: 1920, height: null },
+    mobileSize: { width: 800, height: null },
+    notes: "Bloque de texto editable. Fuente Proxima Nova.",
+    type: "text_block"
+  },
+  {
     id: "salto_linea",
     name: "Salto de Línea (Espaciador)",
     desktopSize: { width: '100%', height: 40 },
