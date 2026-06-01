@@ -75,6 +75,65 @@ const renderPublicItem = (item, viewMode) => {
     );
   }
 
+  if (item.type === 'product_card') {
+    const fs = (base) => `${Math.round(base * (width / 271))}px`;
+    return (
+      <div key={item.uniqueId} style={{ width, position: 'relative' }}>
+        <div style={{
+          width: '100%', height,
+          background: 'white', borderRadius: '8px',
+          overflow: 'hidden', boxShadow: '0 1px 8px rgba(0,0,0,0.10)',
+          display: 'flex', flexDirection: 'column',
+          border: '1px solid #ebebeb',
+          fontFamily: "'Proxima Nova', 'Inter', -apple-system, sans-serif",
+        }}>
+          {/* Portada / Imagen */}
+          <div style={{
+            flex: '0 0 52%', background: '#f5f5f5',
+            position: 'relative', overflow: 'hidden',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            {item.uploadedImages?.[0] && (
+              <img src={item.uploadedImages[0]} style={{ width: '100%', height: '100%', objectFit: 'contain' }} alt="" />
+            )}
+          </div>
+
+          {/* Contenido */}
+          <div style={{ flex: 1, padding: `${Math.round(8 * width / 271)}px ${Math.round(10 * width / 271)}px`, display: 'flex', flexDirection: 'column', gap: `${Math.round(4 * width / 271)}px`, overflow: 'hidden' }}>
+            {/* Badge */}
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: '3px',
+              fontSize: fs(8.5), fontWeight: '700', letterSpacing: '0.02em',
+              background: '#2968C8', color: 'white',
+              padding: `1px ${fs(4)}`, borderRadius: '2px',
+              alignSelf: 'flex-start',
+            }}>★ OFERTA IMPERDIBLE</span>
+
+            {/* Precio anterior */}
+            <s style={{ fontSize: fs(10), color: '#999', lineHeight: 1 }}>$ XX.XXX</s>
+
+            {/* Precio actual + % OFF */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: `${Math.round(5 * width / 271)}px`, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: fs(18), fontWeight: '400', color: '#1a1a2e', lineHeight: 1 }}>$ XX.XXX</span>
+              <span style={{ fontSize: fs(9), fontWeight: '700', background: '#00A650', color: 'white', padding: `1px ${fs(5)}`, borderRadius: '10px' }}>XX% OFF</span>
+            </div>
+
+            {/* Cuotas */}
+            <span style={{ fontSize: fs(10), color: '#00A650', fontWeight: '500' }}>Hasta 3 cuotas sin interés</span>
+
+            {/* Envío */}
+            <span style={{ fontSize: fs(10), color: '#3483fa', fontWeight: '500' }}>Envío gratis ⚡ FULL</span>
+
+            {/* Descripción */}
+            <p style={{ fontSize: fs(9.5), color: '#666', margin: 0, lineHeight: '1.35', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Elementum imperdiet.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div key={item.uniqueId} style={{ width, position: 'relative' }}>
       <div style={{ height, width: '100%', position: 'relative', overflow: 'hidden', backgroundColor: '#ebebeb' }}>

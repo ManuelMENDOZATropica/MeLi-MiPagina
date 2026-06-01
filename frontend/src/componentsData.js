@@ -112,6 +112,14 @@ export const componentsList = [
     type: "gallery"
   },
   {
+    id: "tarjeta_producto",
+    name: "Tarjeta de Producto",
+    desktopSize: { width: 271, height: 420 },
+    mobileSize: { width: 160, height: 300 },
+    notes: "Tarjeta de producto estilo MeLi. Subir imagen del producto.",
+    type: "product_card"
+  },
+  {
     id: "video_portada",
     name: "Video (Portada)",
     desktopSize: { width: 640, height: 360 },
