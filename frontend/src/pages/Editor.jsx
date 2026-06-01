@@ -1888,7 +1888,10 @@ function Editor() {
                     pointerEvents: isPreviewMode ? 'auto' : 'none',
                   }}
                 >Seguir</button>
+                </div>
               </div>
+
+            </div>
           </div>
         </div>
       );
@@ -2561,19 +2564,38 @@ function Editor() {
             <div className="sidebar-content">
               <div className="comp-grid">
                 {componentsList
-                  .filter(comp => viewMode === 'desktop' ? comp.desktopSize : comp.mobileSize)
-                  .map((comp) => (
-                    <div
-                      key={comp.id}
-                      className="comp-card"
-                      draggable
-                      onDragStart={(e) => handleDragStartSidebar(e, comp)}
-                      title={comp.notes || comp.name}
-                    >
-                      <div className="comp-card-icon">{getIcon(comp.type)}</div>
-                      <span className="comp-card-label">{comp.name}</span>
-                    </div>
-                  ))}
+                  .map((comp) => {
+                    const mobileOnly = !comp.desktopSize && comp.mobileSize;
+                    const desktopOnly = comp.desktopSize && !comp.mobileSize;
+                    return (
+                      <div
+                        key={comp.id}
+                        className="comp-card"
+                        draggable
+                        onDragStart={(e) => handleDragStartSidebar(e, comp)}
+                        title={comp.notes || comp.name}
+                        style={{ position: 'relative' }}
+                      >
+                        {mobileOnly && (
+                          <span style={{
+                            position: 'absolute', top: '4px', right: '4px',
+                            fontSize: '10px', lineHeight: 1,
+                            title: 'Solo Mobile'
+                          }}>📱</span>
+                        )}
+                        {desktopOnly && (
+                          <span style={{
+                            position: 'absolute', top: '4px', right: '4px',
+                            fontSize: '10px', lineHeight: 1,
+                            title: 'Solo Desktop'
+                          }}>🖥</span>
+                        )}
+                        <div className="comp-card-icon">{getIcon(comp.type)}</div>
+                        <span className="comp-card-label">{comp.name}</span>
+                      </div>
+                    );
+                  })}
+
               </div>
             </div>
           </div>
