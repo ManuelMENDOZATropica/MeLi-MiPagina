@@ -43,7 +43,7 @@ const AnimatedBanner = ({ item, height }) => {
 const renderPublicItem = (item, viewMode) => {
   if (item.type === 'rowGroup') {
     return (
-      <div key={item.uniqueId} style={{ display: 'flex', width: '100%', justifyContent: item.justify, gap: 20, flexWrap: 'wrap' }}>
+      <div key={item.uniqueId} style={{ display: 'flex', width: '100%', justifyContent: item.justify, flexWrap: 'wrap' }}>
         {item.items.map(child => renderPublicItem(child, viewMode))}
       </div>
     );
@@ -53,7 +53,27 @@ const renderPublicItem = (item, viewMode) => {
   if (!size) return null;
   const { height, width } = size;
 
-  if (item.type === 'spacer') return <div key={item.uniqueId} style={{ width: '100%', height: 20 }} />;
+  if (item.type === 'spacer') return <div key={item.uniqueId} style={{ width: '100%', height: height || 40 }} />;
+
+  if (item.type === 'text_block') {
+    const canvasWidth = viewMode === 'desktop' ? 1920 : 800;
+    const tbW = item.textWidthPx ?? canvasWidth;
+    const tbH = item.textHeightPx ?? 80;
+    return (
+      <div key={item.uniqueId} style={{ width: '100%', padding: '16px 0', boxSizing: 'border-box' }}>
+        <div style={{ width: tbW, height: tbH, margin: '0 auto', overflow: 'hidden' }}>
+          <p style={{
+            margin: 0, padding: '8px 10px',
+            fontFamily: "'Proxima Nova', 'Inter', -apple-system, sans-serif",
+            fontSize: `${item.textFontSize ?? (viewMode === 'desktop' ? 10 : 8)}px`,
+            lineHeight: '1.6', color: '#1a1a2e',
+            textAlign: item.textAlign ?? 'left',
+            whiteSpace: 'pre-wrap',
+          }}>{item.textContent || ''}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div key={item.uniqueId} style={{ width, position: 'relative' }}>
@@ -186,7 +206,7 @@ export default function PublicView() {
       // Usar window.innerWidth, NO el clientWidth del contenedor
       // (el contenedor se expande por el hijo de 1920px y siempre da 1920)
       const vw = window.innerWidth;
-      const tw = viewMode === 'desktop' ? 1920 : 375;
+      const tw = viewMode === 'desktop' ? 1920 : 800;
       setScale(vw < tw ? vw / tw : 1);
     };
     update();
@@ -244,14 +264,14 @@ export default function PublicView() {
         }}
       >
         <div style={{
-          width: viewMode === 'desktop' ? 1920 : 375,
+          width: viewMode === 'desktop' ? 1920 : 800,
           zoom: scale,
           background: 'white',
           margin: isMobile ? 0 : '0 auto',
           boxShadow: isMobile ? 'none' : '0 10px 40px rgba(0,0,0,0.12)'
         }}>
           {viewMode === 'desktop' ? <MeLiHeaderDesktop /> : <MeLiHeaderMobile />}
-          <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignContent: 'flex-start', padding: 20, gap: 20 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             {canvasItems?.map(item => renderPublicItem(item, viewMode))}
           </div>
         </div>
