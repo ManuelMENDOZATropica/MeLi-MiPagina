@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import '../index.css';
 import API_URL from '../api';
 
@@ -7,6 +7,8 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirectTo = location.state?.from || '/projects';
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [gsiReady, setGsiReady] = useState(false);
@@ -25,7 +27,7 @@ function Login() {
       const data = await res.json();
       if (res.ok) {
         localStorage.setItem('tropica_user', JSON.stringify({ token: data.token, user: data.user }));
-        navigate('/projects');
+        navigate(redirectTo, { replace: true });
       } else {
         setError(data.error || 'Acceso denegado');
         setIsLoading(false);
@@ -241,6 +243,22 @@ function Login() {
             <h1 className="ln-title">Iniciar<br />sesión</h1>
 
             {error && <div className="ln-error">{error}</div>}
+
+            {/* Aviso si viene de un link de editor */}
+            {redirectTo.startsWith('/editor/') && !error && (
+              <div style={{
+                borderLeft: '3px solid #3483fa',
+                padding: '10px 14px',
+                background: 'rgba(52,131,250,0.07)',
+                color: '#1a6fd4',
+                fontSize: '12px',
+                fontWeight: '600',
+                marginBottom: '16px',
+                lineHeight: '1.5'
+              }}>
+                🔒 Iniciá sesión para acceder al editor
+              </div>
+            )}
 
             {isLoading ? (
               <p className="ln-loading-indicator">Verificando acceso…</p>

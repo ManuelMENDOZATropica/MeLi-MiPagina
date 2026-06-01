@@ -449,7 +449,7 @@ function Editor() {
   useEffect(() => {
     const savedUser = localStorage.getItem('tropica_user');
     if (!savedUser) {
-      navigate('/login');
+      navigate('/login', { state: { from: `/editor/${id}` } });
     } else {
       const parsed = JSON.parse(savedUser);
       setUser(parsed.user);
@@ -2154,8 +2154,8 @@ function Editor() {
             ))}
           </div>
 
-          {/* Botón + para agregar colaborador (solo Manuel Mendoza) */}
-          {user && user.email === 'manuel@tropica.me' && (
+          {/* Botón + para agregar colaborador (todos los usuarios) */}
+          {user && (
             <div style={{ position: 'relative' }}>
               <button
                 onClick={() => { setShowAddCollab(!showAddCollab); setCollabSearch(''); }}
