@@ -396,6 +396,7 @@ function Editor() {
   const [showAddCollab, setShowAddCollab] = useState(false);
   const [allUsers, setAllUsers] = useState([]);
   const [collabSearch, setCollabSearch] = useState('');
+  const [collabError, setCollabError] = useState('');
 
   // Excepciones creativas de MAIA (declarar ANTES que useComments para pasar setExceptions)
   const {
@@ -659,13 +660,18 @@ function Editor() {
 
   // Agregar colaborador al proyecto
   const addCollaborator = async (userId) => {
+    setCollabError('');
     const tok = JSON.parse(localStorage.getItem('tropica_user'))?.token;
     const res = await fetch(`${API_URL}/api/projects/${id}/editors`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tok}` },
       body: JSON.stringify({ userId })
     });
-    if (!res.ok) return;
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setCollabError(data.error || 'No se pudo agregar el colaborador');
+      return;
+    }
     const updated = await res.json();
     // Reconstruir lista de colaboradores
     const collabs = [
@@ -675,6 +681,7 @@ function Editor() {
     setProjectCollabs(collabs);
     setShowAddCollab(false);
     setCollabSearch('');
+    setCollabError('');
   };
 
   // Exportar el canvas como PDF
@@ -2187,35 +2194,44 @@ function Editor() {
                    (u.email || '').toLowerCase().includes(collabSearch.toLowerCase()))
                 );
                 return (
-                  <div style={{
-                    position: 'absolute', top: '42px', right: 0,
-                    width: '240px', background: 'white', borderRadius: '12px',
-                    boxShadow: '0 8px 32px rgba(0,0,0,0.2)', border: '1px solid #e0e5ef',
-                    zIndex: 9999, overflow: 'hidden'
-                  }}>
+                  <div
+                    style={{
+                      position: 'absolute', top: '42px', right: 0,
+                      width: '240px', background: 'white', borderRadius: '12px',
+                      boxShadow: '0 8px 32px rgba(0,0,0,0.2)', border: '1px solid #e0e5ef',
+                      zIndex: 9999, overflow: 'hidden'
+                    }}
+                    onMouseDown={e => e.stopPropagation()}
+                  >
                     <div style={{ padding: '10px 12px', background: '#1a1f2e', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <span style={{ color: 'white', fontSize: '12px', fontWeight: '700' }}>Agregar colaborador</span>
-                      <button onClick={() => setShowAddCollab(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '14px' }}>✕</button>
+                      <button onClick={() => { setShowAddCollab(false); setCollabError(''); }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '14px' }}>✕</button>
                     </div>
                     <div style={{ padding: '8px' }}>
                       <input
                         autoFocus
                         value={collabSearch}
-                        onChange={e => setCollabSearch(e.target.value)}
+                        onChange={e => { setCollabSearch(e.target.value); setCollabError(''); }}
                         placeholder="Buscar por nombre o email…"
                         style={{ width: '100%', fontSize: '12px', border: '1.5px solid #e0e5ef', borderRadius: '7px', padding: '6px 10px', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
                         onFocus={e => e.target.style.borderColor = '#3483fa'}
                         onBlur={e => e.target.style.borderColor = '#e0e5ef'}
                       />
                     </div>
+                    {/* Mensaje de error */}
+                    {collabError && (
+                      <div style={{ padding: '6px 12px', background: '#fee2e2', color: '#dc2626', fontSize: '11px', fontWeight: '600', borderTop: '1px solid #fca5a5' }}>
+                        ⚠️ {collabError}
+                      </div>
+                    )}
                     <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
                       {available.length === 0 ? (
                         <p style={{ color: '#9ba3b5', fontSize: '12px', textAlign: 'center', padding: '16px', margin: 0 }}>Sin usuarios disponibles</p>
                       ) : available.map(u => (
                         <div
                           key={u.id}
-                          onClick={() => addCollaborator(u.id)}
-                          style={{ padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '9px', borderBottom: '1px solid #f0f2f7' }}
+                          onMouseDown={(e) => { e.preventDefault(); addCollaborator(u.id); }}
+                          style={{ padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '9px', borderBottom: '1px solid #f0f2f7', userSelect: 'none' }}
                           onMouseEnter={e => e.currentTarget.style.background = '#f4f6fb'}
                           onMouseLeave={e => e.currentTarget.style.background = 'white'}
                         >
