@@ -608,8 +608,8 @@ function Editor() {
         const size = viewMode === 'desktop' ? item.desktopSize : item.mobileSize;
         const itemErrors = [];
 
-        // ── Check 1: dimensiones ──
-        if (size?.width && size?.height) {
+        // ── Check 1: dimensiones (omitido para tarjetas de producto) ──
+        if (size?.width && size?.height && item.type !== 'product_card') {
           await new Promise(res2 => {
             const imgEl = new window.Image();
             imgEl.onload = () => {
@@ -794,6 +794,8 @@ function Editor() {
 
     const expectedSize = viewMode === 'desktop' ? foundItem.desktopSize : foundItem.mobileSize;
     if (!expectedSize?.width || !expectedSize?.height) return;
+    // Las tarjetas de producto aceptan cualquier imagen sin validar dimensiones
+    if (foundItem.type === 'product_card') return;
 
     const img = new window.Image();
     img.onload = async () => {
