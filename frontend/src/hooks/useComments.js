@@ -11,7 +11,7 @@ export function useComments({ projectId, token, setExceptions }) {
   const [replyingTo, setReplyingTo] = useState(null);
   const [mentionQuery, setMentionQuery] = useState(null);
 
-  const submitComment = async (elementId, parentId = null) => {
+  const submitComment = async (elementId, parentId = null, mentions = []) => {
     const key = parentId ? parentId : `new_${elementId}`;
     const text = (commentInputs[key] || '').trim();
     if (!text) return;
@@ -20,7 +20,7 @@ export function useComments({ projectId, token, setExceptions }) {
     const res = await fetch(`${API_URL}/api/projects/${projectId}/comments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tok}` },
-      body: JSON.stringify({ elementId, text, parentId })
+      body: JSON.stringify({ elementId, text, parentId, mentions })
     });
     const comment = await res.json();
 

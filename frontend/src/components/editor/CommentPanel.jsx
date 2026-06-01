@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 
 export function CommentPanel({
@@ -17,11 +17,19 @@ export function CommentPanel({
   const [exWord, setExWord] = useState('');
   const [exReason, setExReason] = useState('');
   const [exLoading, setExLoading] = useState(false);
+  // Rastrea los IDs de usuarios mencionados en este comentario
+  const mentionedIds = useRef(new Set());
+
+  // Limpia el mentionQuery al abrir este panel (evita estado residual de otro elemento)
+  useEffect(() => {
+    setMentionQuery(null);
+    mentionedIds.current = new Set();
+  }, [elementId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleInput = (e) => {
     const val = e.target.value;
     setCommentInputs(prev => ({ ...prev, [inputKey]: val }));
-    const match = val.match(/@([\w\s]*)$/);
+    const match = val.match(/@([\w ]+)$/);
     if (match) setMentionQuery({ field: inputKey, query: match[1] });
     else setMentionQuery(null);
   };
@@ -34,10 +42,12 @@ export function CommentPanel({
     : [];
 
   const insertMention = (collab) => {
-    const val = inputVal.replace(/@([\w\s]*)$/, `@${collab.name} `);
+    const val = inputVal.replace(/@([\w ]+)$/, `@${collab.name} `);
     setCommentInputs(prev => ({ ...prev, [inputKey]: val }));
     setMentionQuery(null);
+    mentionedIds.current.add(collab.id); // registra el ID para notificación
   };
+
 
   return (
     <div style={{
@@ -188,12 +198,12 @@ export function CommentPanel({
           </div>
         )}
         <textarea value={inputVal} onChange={handleInput}
-          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSubmit(elementId); } }}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSubmit(elementId, null, [...mentionedIds.current]); mentionedIds.current = new Set(); } }}
           placeholder="Comentar... (@ para mencionar, Enter para enviar)"
           rows={2}
           style={{ width: '100%', fontSize: '13px', border: '1.5px solid #e0e5ef', borderRadius: '8px', padding: '8px 10px', outline: 'none', resize: 'none', fontFamily: 'inherit', boxSizing: 'border-box', transition: 'border-color 0.15s' }}
           onFocus={e => e.target.style.borderColor = '#3483fa'} onBlur={e => e.target.style.borderColor = '#e0e5ef'} />
-        <button onClick={() => onSubmit(elementId)}
+        <button onClick={() => { onSubmit(elementId, null, [...mentionedIds.current]); mentionedIds.current = new Set(); }}
           style={{ marginTop: '6px', width: '100%', background: '#1a1f2e', color: '#fff159', border: 'none', borderRadius: '7px', padding: '8px', fontSize: '12px', fontWeight: '800', cursor: 'pointer', letterSpacing: '0.05em', textTransform: 'uppercase', transition: 'background 0.15s' }}
           onMouseEnter={e => e.currentTarget.style.background = '#252c3f'}
           onMouseLeave={e => e.currentTarget.style.background = '#1a1f2e'}>Enviar comentario</button>
