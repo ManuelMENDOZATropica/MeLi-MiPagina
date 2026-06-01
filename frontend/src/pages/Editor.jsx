@@ -1609,20 +1609,85 @@ function Editor() {
           data-id={item.uniqueId}
           className={`canvas-item ${isSelected ? 'selected' : ''} ${indicatorClass} ${draggedIndex === index ? 'is-dragging' : ''}`}
           draggable={!isInsideGroup}
-          style={{ width: `${width}px` }}
+          style={{ width: `${width}px`, position: 'relative' }}
           onDragStart={!isInsideGroup ? (e) => handleDragStartCanvas(e, index) : undefined}
           onDragEnd={() => { setDraggedIndex(null); setDragOverTarget(null); }}
-          onDragOver={(e) => handleItemDragOver(e, index)}
-          onDrop={!isInsideGroup ? (e) => handleDropCanvas(e, index) : undefined}
+          onDragOver={(e) => {
+            if (!isPreviewMode) {
+              if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); e.stopPropagation(); }
+              else { handleItemDragOver(e, index); }
+            }
+          }}
+          onDrop={(e) => {
+            if (isPreviewMode) return;
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) { handleFileDrop(e, item.uniqueId); }
+            else if (!isInsideGroup) { handleDropCanvas(e, index); }
+          }}
           onContextMenu={(e) => handleItemContextMenu(e, item.uniqueId)}
           onClick={() => setSelectedId(item.uniqueId)}
         >
+          {/* Botón eliminar */}
           {!isPreviewMode && (
             <button className="delete-btn" onClick={(e) => { e.stopPropagation(); removeItem(item.uniqueId); }}>
               <Trash2 size={16} />
             </button>
           )}
 
+          {/* Dot de colaborador */}
+          {!isPreviewMode && item.addedBy && getCollabColor(item.addedBy) && (
+            <div
+              title={projectCollabs.find(c => c.id === item.addedBy)?.name || ''}
+              style={{
+                position: 'absolute', bottom: '6px', right: '8px',
+                width: '10px', height: '10px', borderRadius: '50%',
+                background: getCollabColor(item.addedBy),
+                border: '2px solid rgba(255,255,255,0.9)',
+                zIndex: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.35)',
+                pointerEvents: 'none'
+              }}
+            />
+          )}
+
+          {/* Badge de comentarios */}
+          {!isPreviewMode && comments.some(c => c.elementId === item.uniqueId && !c.resolved) && (
+            <div
+              onClick={e => { e.stopPropagation(); setActiveCommentElId(item.uniqueId); }}
+              title="Ver comentarios"
+              style={{
+                position: 'absolute', top: '6px', right: '8px',
+                background: '#3483fa', color: 'white', borderRadius: '10px',
+                fontSize: '10px', fontWeight: '800', padding: '2px 7px',
+                zIndex: 20, cursor: 'pointer', boxShadow: '0 2px 8px rgba(52,131,250,0.4)',
+                display: 'flex', alignItems: 'center', gap: '3px'
+              }}
+            >
+              💬 {comments.filter(c => c.elementId === item.uniqueId && !c.resolved).length}
+            </div>
+          )}
+
+          {/* Panel de comentarios flotante */}
+          {!isPreviewMode && activeCommentElId === item.uniqueId && (
+            <CommentPanel
+              elementId={item.uniqueId}
+              elementName={item.name || 'Tarjeta de Producto'}
+              comments={comments}
+              projectCollabs={projectCollabs}
+              replyingTo={replyingTo}
+              setReplyingTo={setReplyingTo}
+              commentInputs={commentInputs}
+              setCommentInputs={setCommentInputs}
+              mentionQuery={mentionQuery}
+              setMentionQuery={setMentionQuery}
+              onClose={() => setActiveCommentElId(null)}
+              onSubmit={submitComment}
+              onResolve={resolveComment}
+              onDelete={deleteComment}
+              onException={handleException}
+              getCollabColor={getCollabColor}
+            />
+          )}
+
+          {/* Tarjeta */}
           <div
             style={{
               width: `${width}px`, height: `${height}px`,
@@ -1643,11 +1708,7 @@ function Editor() {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
               {item.uploadedImages?.[0] ? (
-                <img
-                  src={item.uploadedImages[0]}
-                  style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                  alt=""
-                />
+                <img src={item.uploadedImages[0]} style={{ width: '100%', height: '100%', objectFit: 'contain' }} alt="" />
               ) : (
                 <div style={{ textAlign: 'center', color: '#ccc' }}>
                   <ImageIcon size={Math.round(32 * width / 271)} color="#d0d0d0" />
@@ -1658,7 +1719,6 @@ function Editor() {
 
             {/* ── Contenido ── */}
             <div style={{ flex: 1, padding: `${Math.round(8 * width / 271)}px ${Math.round(10 * width / 271)}px`, display: 'flex', flexDirection: 'column', gap: `${Math.round(4 * width / 271)}px`, overflow: 'hidden' }}>
-              {/* Badge oferta */}
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: '3px',
                 fontSize: fs(8.5), fontWeight: '700', letterSpacing: '0.02em',
@@ -1667,26 +1727,16 @@ function Editor() {
                 alignSelf: 'flex-start',
               }}>★ OFERTA IMPERDIBLE</span>
 
-              {/* Precio anterior */}
               <s style={{ fontSize: fs(10), color: '#999', lineHeight: 1 }}>$ XX.XXX</s>
 
-              {/* Precio actual + % OFF */}
               <div style={{ display: 'flex', alignItems: 'center', gap: `${Math.round(5 * width / 271)}px`, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: fs(18), fontWeight: '400', color: '#1a1a2e', lineHeight: 1 }}>$ XX.XXX</span>
-                <span style={{
-                  fontSize: fs(9), fontWeight: '700',
-                  background: '#00A650', color: 'white',
-                  padding: `1px ${fs(5)}`, borderRadius: '10px',
-                }}>XX% OFF</span>
+                <span style={{ fontSize: fs(9), fontWeight: '700', background: '#00A650', color: 'white', padding: `1px ${fs(5)}`, borderRadius: '10px' }}>XX% OFF</span>
               </div>
 
-              {/* Cuotas */}
               <span style={{ fontSize: fs(10), color: '#00A650', fontWeight: '500' }}>Hasta 3 cuotas sin interés</span>
-
-              {/* Envío */}
               <span style={{ fontSize: fs(10), color: '#3483fa', fontWeight: '500' }}>Envío gratis ⚡ FULL</span>
 
-              {/* Descripción placeholder */}
               <p style={{
                 fontSize: fs(9.5), color: '#666', margin: 0, lineHeight: '1.35',
                 overflow: 'hidden', display: '-webkit-box',
