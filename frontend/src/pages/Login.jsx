@@ -4,6 +4,7 @@ import '../index.css';
 import API_URL from '../api';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+const IS_DEV = import.meta.env.DEV;
 
 function Login() {
   const navigate = useNavigate();
@@ -36,6 +37,26 @@ function Login() {
       setError('Sin conexión al servidor');
       setIsLoading(false);
     }
+  };
+
+  // DEV-only: saltear el login sin Google OAuth
+  const handleDevBypass = async () => {
+    setIsLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`${API_URL}/api/auth/dev-bypass`, { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem('tropica_user', JSON.stringify({ token: data.token, user: data.user }));
+        navigate(redirectTo, { replace: true });
+        return;
+      }
+    } catch (_) { /* servidor sin endpoint dev → usar mock */ }
+    // Fallback: usuario mock local
+    const mockUser = { id: 'dev-user', name: 'Dev User', email: 'dev@tropica.me', picture: null };
+    const mockToken = 'dev-token-' + Date.now();
+    localStorage.setItem('tropica_user', JSON.stringify({ token: mockToken, user: mockUser }));
+    navigate(redirectTo, { replace: true });
   };
 
   // Cargar Google Identity Services y renderizar el botón nativo
@@ -268,6 +289,45 @@ function Login() {
                 ref={btnRef}
                 className={`ln-google-btn-wrap${gsiReady ? ' ready' : ''}`}
               />
+            )}
+
+            {/* Bypass DEV — solo visible en modo desarrollo */}
+            {IS_DEV && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '16px 0 0' }}>
+                  <div style={{ flex: 1, height: '1px', background: '#e0e5ef' }} />
+                  <span style={{ fontSize: '10px', fontWeight: '700', color: '#b0b9cc', letterSpacing: '0.1em', textTransform: 'uppercase' }}>DEV</span>
+                  <div style={{ flex: 1, height: '1px', background: '#e0e5ef' }} />
+                </div>
+                <button
+                  onClick={handleDevBypass}
+                  disabled={isLoading}
+                  style={{
+                    marginTop: '10px',
+                    width: '100%',
+                    padding: '11px',
+                    background: '#fff159',
+                    color: '#1a1f2e',
+                    border: '2px solid rgba(26,31,46,0.15)',
+                    borderRadius: '4px',
+                    fontFamily: "'Inter', sans-serif",
+                    fontWeight: '800',
+                    fontSize: '13px',
+                    letterSpacing: '0.04em',
+                    cursor: isLoading ? 'not-allowed' : 'pointer',
+                    opacity: isLoading ? 0.6 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={e => { if (!isLoading) e.currentTarget.style.background = '#ffe800'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#fff159'; }}
+                >
+                  ⚡ Entrar sin login (DEV)
+                </button>
+              </>
             )}
           </div>
 

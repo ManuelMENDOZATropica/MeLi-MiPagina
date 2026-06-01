@@ -142,5 +142,13 @@ export const componentsList = [
     mobileSize: { width: '100%', height: 40 },
     notes: "Fuerza a los siguientes elementos a una nueva fila",
     type: "spacer"
+  },
+  {
+    id: "perfil_tienda_mobile",
+    name: "Perfil Tienda (Mobile)",
+    desktopSize: null,
+    mobileSize: { width: 800, height: 80 },
+    notes: "Encabezado de perfil de tienda oficial MeLi para mobile. Subir ícono y editar nombre de marca.",
+    type: "store_profile"
   }
 ];

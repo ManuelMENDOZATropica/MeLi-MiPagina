@@ -38,4 +38,24 @@ router.post('/auth/google', async (req, res) => {
   }
 });
 
+// ── DEV-ONLY: bypass de login sin Google OAuth ──────────────────────────────
+// Solo disponible cuando NODE_ENV !== 'production'
+router.post('/auth/dev-bypass', async (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({ error: 'No disponible en producción.' });
+  }
+  try {
+    const user = await prisma.user.upsert({
+      where: { email: 'dev@tropica.me' },
+      update: { name: 'Dev User' },
+      create: { email: 'dev@tropica.me', name: 'Dev User', avatar: null },
+    });
+    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({ token, user });
+  } catch (error) {
+    console.error('Error en dev-bypass:', error.message);
+    res.status(500).json({ error: 'Error interno en dev-bypass.' });
+  }
+});
+
 export default router;

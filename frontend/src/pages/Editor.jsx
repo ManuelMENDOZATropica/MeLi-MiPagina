@@ -273,6 +273,7 @@ const getIcon = (type) => {
     case 'spacer': return <ListMinus size={20} />;
     case 'text_block': return <Type size={20} />;
     case 'product_card': return <ShoppingCart size={20} />;
+    case 'store_profile': return <User size={20} />;
     default: return <Layout size={20} />;
   }
 };
@@ -1749,6 +1750,150 @@ function Editor() {
     }
 
 
+    // ── Perfil Tienda Mobile (MeLi ui-ms-profile) ──────────────────
+    if (item.type === 'store_profile') {
+      const brandName = item.brandName || 'Marca';
+      const iconUrl = item.uploadedImages?.[0] || null;
+
+      return (
+        <div
+          key={item.uniqueId}
+          data-id={item.uniqueId}
+          className={`canvas-item ${isSelected ? 'selected' : ''} ${indicatorClass} ${draggedIndex === index ? 'is-dragging' : ''}`}
+          draggable={!isInsideGroup}
+          style={{ width: '100%' }}
+          onDragStart={!isInsideGroup ? (e) => handleDragStartCanvas(e, index) : undefined}
+          onDragEnd={() => { setDraggedIndex(null); setDragOverTarget(null); }}
+          onDragOver={(e) => handleItemDragOver(e, index)}
+          onDrop={!isInsideGroup ? (e) => handleDropCanvas(e, index) : undefined}
+          onContextMenu={(e) => handleItemContextMenu(e, item.uniqueId)}
+        >
+          {!isPreviewMode && (
+            <button className="delete-btn" onClick={() => removeItem(item.uniqueId)}>
+              <Trash2 size={16} />
+            </button>
+          )}
+
+          {/* Badge comentarios */}
+          {!isPreviewMode && comments.some(c => c.elementId === item.uniqueId && !c.resolved) && (
+            <div
+              onClick={e => { e.stopPropagation(); setActiveCommentElId(item.uniqueId); }}
+              title="Ver comentarios"
+              style={{
+                position: 'absolute', top: '6px', right: '8px',
+                background: '#3483fa', color: 'white', borderRadius: '10px',
+                fontSize: '10px', fontWeight: '800', padding: '2px 7px',
+                zIndex: 20, cursor: 'pointer', boxShadow: '0 2px 8px rgba(52,131,250,0.4)',
+                display: 'flex', alignItems: 'center', gap: '3px'
+              }}
+            >
+              💬 {comments.filter(c => c.elementId === item.uniqueId && !c.resolved).length}
+            </div>
+          )}
+
+          {/* Panel comentarios flotante */}
+          {!isPreviewMode && activeCommentElId === item.uniqueId && (
+            <CommentPanel
+              elementId={item.uniqueId}
+              elementName={item.name || 'Perfil Tienda'}
+              comments={comments}
+              projectCollabs={projectCollabs}
+              replyingTo={replyingTo}
+              setReplyingTo={setReplyingTo}
+              commentInputs={commentInputs}
+              setCommentInputs={setCommentInputs}
+              mentionQuery={mentionQuery}
+              setMentionQuery={setMentionQuery}
+              onClose={() => setActiveCommentElId(null)}
+              onSubmit={submitComment}
+              onResolve={resolveComment}
+              onDelete={deleteComment}
+              onException={handleException}
+              getCollabColor={getCollabColor}
+            />
+          )}
+
+          {/* ui-ms-profile__profile-mobile */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            padding: '10px 14px',
+            background: '#fff',
+            borderBottom: '1px solid #ebebeb',
+            fontFamily: "'Proxima Nova', 'Inter', -apple-system, sans-serif",
+            gap: '10px',
+            width: '100%',
+            boxSizing: 'border-box',
+            minHeight: '72px',
+          }}>
+            {/* Bubble ícono de tienda */}
+            <div
+              title={!isPreviewMode ? 'Click para subir ícono' : brandName}
+              onClick={() => !isPreviewMode && triggerUpload(item.uniqueId)}
+              style={{
+                width: '56px', height: '56px', borderRadius: '50%',
+                background: '#fff',
+                border: iconUrl ? '2px solid #ebebeb' : '2.5px dashed #3483fa',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                overflow: 'hidden', flexShrink: 0,
+                cursor: !isPreviewMode ? 'pointer' : 'default',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+                transition: 'box-shadow 0.18s',
+                position: 'relative',
+              }}
+              onMouseEnter={e => { if (!isPreviewMode) e.currentTarget.style.boxShadow = '0 4px 16px rgba(52,131,250,0.25)'; }}
+              onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.10)'; }}
+            >
+              {iconUrl ? (
+                <img src={iconUrl} alt={brandName} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              ) : (
+                <div style={{ textAlign: 'center', pointerEvents: 'none' }}>
+                  <ImageIcon size={20} color={isPreviewMode ? '#ccc' : '#3483fa'} />
+                  {!isPreviewMode && <div style={{ fontSize: '8px', color: '#3483fa', marginTop: '2px', fontWeight: '700', lineHeight: 1.2 }}>Subir<br/>ícono</div>}
+                </div>
+              )}
+            </div>
+
+            {/* Información de perfil */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', overflow: 'hidden' }}>
+              {/* Título Tienda oficial */}
+              <p style={{
+                margin: 0, display: 'flex', alignItems: 'center', gap: '4px',
+                fontSize: '11px', fontWeight: '600', color: '#3483fa',
+              }}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+                  <g clipPath="url(#cp_sp)">
+                    <path fillRule="evenodd" clipRule="evenodd" d="M12.421 1.47153L12.8816 3.11824L14.5283 3.58005C15.1238 3.74723 15.6097 4.17842 15.8464 4.74984C16.0832 5.32125 16.0446 5.96971 15.7419 6.50906L14.9042 7.99992L15.7407 9.48963C16.0439 10.0289 16.0829 10.6776 15.8463 11.2492C15.6098 11.8209 15.1239 12.2524 14.5283 12.4198L12.8816 12.8816L12.4198 14.5283C12.2526 15.1238 11.8215 15.6097 11.25 15.8464C10.6786 16.0832 10.0302 16.0446 9.49085 15.7419L8 14.9042L6.5103 15.7407C5.97102 16.0439 5.32239 16.0829 4.75071 15.8463C4.17903 15.6098 3.74754 15.1239 3.58018 14.5283L3.11837 12.8816L1.47168 12.4198C0.876188 12.2526 0.39034 11.8214 0.153594 11.25C-0.0831526 10.6786 -0.0446146 10.0301 0.258145 9.49078L1.09582 7.99992L0.259291 6.5102C-0.0439437 5.97092 -0.0828808 5.32229 0.153663 4.7506C0.390207 4.17891 0.876056 3.74742 1.47168 3.58005L3.11837 3.11824L3.58018 1.47153C3.74745 0.87637 4.17844 0.390806 4.74954 0.154093C5.32064 -0.0826196 5.96875 -0.0443288 6.50801 0.257984L7.99885 1.09566L9.48855 0.25913C9.95476 -0.00318251 10.5061 -0.0695366 11.0212 0.0746666C11.5363 0.21887 11.9731 0.561816 12.2353 1.02805C12.3155 1.16786 12.3774 1.31683 12.421 1.47153ZM10.4569 5.27947L7.06378 8.67487L5.542 7.14963C5.44987 7.0546 5.32253 7.00192 5.1902 7.0041C5.05786 7.00192 4.93052 7.0546 4.8384 7.14963L4.13366 7.85209C4.03893 7.94433 3.98666 8.0717 3.98927 8.20389C3.98927 8.34141 4.0374 8.45829 4.13366 8.55455L6.71198 11.1283C6.8043 11.2229 6.93162 11.2752 7.06378 11.2727C7.1959 11.2749 7.32311 11.2227 7.41558 11.1283L11.8663 6.68438C11.9611 6.59214 12.0133 6.46478 12.0107 6.33258C12.013 6.20079 11.9608 6.07389 11.8663 5.98193L11.1616 5.27832C11.0693 5.18371 10.942 5.13146 10.8098 5.13394C10.6765 5.13261 10.5492 5.18486 10.4569 5.27947Z" fill="#3483FA"/>
+                  </g>
+                  <defs><clipPath id="cp_sp"><rect width="16" height="16" fill="white"/></clipPath></defs>
+                </svg>
+                Tienda oficial
+              </p>
+              {/* Nombre de marca */}
+              <p style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#1a1a2e', lineHeight: 1.2 }}>
+                {brandName}
+                {!isPreviewMode && (
+                  <span style={{ fontSize: '10px', color: '#9ca3af', marginLeft: '6px', fontWeight: '400', fontStyle: 'italic' }}>(clic derecho → editar)</span>
+                )}
+              </p>
+              {/* Seguidores + Seguir */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
+                <span style={{ fontSize: '11px', color: '#666' }}>+780 mil seguidores</span>
+                <button
+                  style={{
+                    fontSize: '11px', fontWeight: '600', color: '#3483fa',
+                    background: 'none', border: '1.5px solid #3483fa',
+                    borderRadius: '6px', padding: '2px 10px',
+                    cursor: 'pointer', lineHeight: 1.4,
+                    pointerEvents: isPreviewMode ? 'auto' : 'none',
+                  }}
+                >Seguir</button>
+              </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div
         key={item.uniqueId}
@@ -2596,6 +2741,7 @@ function Editor() {
               });
               const hasImage = targetItem?.uploadedImages?.length > 0;
               const hasTexts = targetItem?.type === 'list'; // Solo 'list' tiene textos editables
+              const hasStoreProfile = targetItem?.type === 'store_profile';
               return (
                 <>
                   {hasTexts && (
@@ -2604,6 +2750,14 @@ function Editor() {
                       setContextMenu(null);
                     }} style={{ fontWeight: 'bold', color: '#333', borderBottom: '1px solid #eee', marginBottom: '4px', paddingBottom: '8px' }}>
                       <Edit3 size={16} /> Editar Textos
+                    </div>
+                  )}
+                  {hasStoreProfile && (
+                    <div className="context-menu-item" onClick={() => {
+                      setTextEditorPanel({ item: { ...targetItem, _mode: 'store_profile' } });
+                      setContextMenu(null);
+                    }} style={{ fontWeight: 'bold', color: '#333', borderBottom: '1px solid #eee', marginBottom: '4px', paddingBottom: '8px' }}>
+                      <Edit3 size={16} /> Editar Nombre de Marca
                     </div>
                   )}
                   <div className="context-menu-item" onClick={() => { setActiveCommentElId(contextMenu.targetId); setContextMenu(null); }} style={{ fontWeight: 'bold', color: '#6b7280' }}>
@@ -2847,11 +3001,14 @@ function Editor() {
       {/* Panel flotante de edición de textos */}
       {textEditorPanel && (() => {
         const panelItem = textEditorPanel.item;
-        const fields = [
-          { key: 'contentTitle', label: 'Título', type: 'input', placeholder: 'Título de la tarjeta' },
-          { key: 'contentParagraph', label: 'Párrafo', type: 'textarea', placeholder: 'Describe el evento o promoción.' },
-          { key: 'contentCTA', label: 'Texto del CTA', type: 'input', placeholder: 'Descubrir más' },
-        ];
+        const isStoreProfileMode = panelItem?._mode === 'store_profile' || panelItem?.type === 'store_profile';
+        const fields = isStoreProfileMode
+          ? [{ key: 'brandName', label: 'Nombre de Marca', type: 'input', placeholder: 'Ej: Nike, Adidas, Mi Tienda…' }]
+          : [
+              { key: 'contentTitle', label: 'Título', type: 'input', placeholder: 'Título de la tarjeta' },
+              { key: 'contentParagraph', label: 'Párrafo', type: 'textarea', placeholder: 'Describe el evento o promoción.' },
+              { key: 'contentCTA', label: 'Texto del CTA', type: 'input', placeholder: 'Descubrir más' },
+            ];
         // Estado local temporal para los valores del panel
         const handleSave = (e) => {
           e.preventDefault();
@@ -2884,7 +3041,9 @@ function Editor() {
               {/* Header del panel */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '17px', color: '#1a1a1a', fontWeight: 700 }}>✏️ Editar Textos</h3>
+                  <h3 style={{ margin: 0, fontSize: '17px', color: '#1a1a1a', fontWeight: 700 }}>
+                    {isStoreProfileMode ? '🏪 Editar Nombre de Marca' : '✏️ Editar Textos'}
+                  </h3>
                   <p style={{ margin: '3px 0 0 0', fontSize: '12px', color: '#999' }}>{panelItem.name}</p>
                 </div>
                 <button onClick={() => setTextEditorPanel(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#aaa', fontSize: '20px', lineHeight: 1 }}>✕</button>
@@ -2911,6 +3070,7 @@ function Editor() {
                         name={f.key}
                         defaultValue={panelItem[f.key] || ''}
                         placeholder={f.placeholder}
+                        autoFocus={isStoreProfileMode}
                         style={{ width: '100%', border: '1.5px solid #e6e6e6', borderRadius: '8px', padding: '10px 12px', fontSize: '14px', color: '#333', outline: 'none', fontFamily: 'inherit', transition: 'border-color 0.2s', boxSizing: 'border-box' }}
                         onFocus={e => e.target.style.borderColor = '#3483fa'}
                         onBlur={e => e.target.style.borderColor = '#e6e6e6'}
