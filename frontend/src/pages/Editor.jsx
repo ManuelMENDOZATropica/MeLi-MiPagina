@@ -612,9 +612,13 @@ function Editor() {
             const imgEl = new window.Image();
             imgEl.onload = () => {
               const tol = 0.05;
-              const ok = Math.abs(imgEl.naturalWidth - size.width) / size.width <= tol &&
-                         Math.abs(imgEl.naturalHeight - size.height) / size.height <= tol;
-              if (!ok) itemErrors.push(`Dimensiones: ${imgEl.naturalWidth}×${imgEl.naturalHeight}px (esperado ${size.width}×${size.height}px)`);
+              const DPI_SCALE = 150 / 72; // acepta exportaciones a 150 dpi
+              const w72ok  = Math.abs(imgEl.naturalWidth  - size.width)              / size.width              <= tol;
+              const h72ok  = Math.abs(imgEl.naturalHeight - size.height)             / size.height             <= tol;
+              const w150ok = Math.abs(imgEl.naturalWidth  - size.width  * DPI_SCALE) / (size.width  * DPI_SCALE) <= tol;
+              const h150ok = Math.abs(imgEl.naturalHeight - size.height * DPI_SCALE) / (size.height * DPI_SCALE) <= tol;
+              const ok = (w72ok && h72ok) || (w150ok && h150ok);
+              if (!ok) itemErrors.push(`Dimensiones: ${imgEl.naturalWidth}×${imgEl.naturalHeight}px (esperado ${size.width}×${size.height}px @ 72dpi o ${Math.round(size.width*DPI_SCALE)}×${Math.round(size.height*DPI_SCALE)}px @ 150dpi)`);
               res2();
             };
             imgEl.onerror = () => res2();
@@ -790,14 +794,17 @@ function Editor() {
       const expW = expectedSize.width;
       const expH = expectedSize.height;
 
-      // Tolerancia del 5% para evitar falsos positivos por compresión
+      // Tolerancia del 5% — acepta 72 dpi (1:1) o 150 dpi (~2.08:1)
       const tol = 0.05;
-      const wOk = Math.abs(actualW - expW) / expW <= tol;
-      const hOk = Math.abs(actualH - expH) / expH <= tol;
+      const DPI_SCALE = 150 / 72;
+      const wOk = Math.abs(actualW - expW) / expW <= tol || Math.abs(actualW - expW * DPI_SCALE) / (expW * DPI_SCALE) <= tol;
+      const hOk = Math.abs(actualH - expH) / expH <= tol || Math.abs(actualH - expH * DPI_SCALE) / (expH * DPI_SCALE) <= tol;
 
       if (!wOk || !hOk) {
         const elementOwnerId = foundItem.addedBy || null;
-        const text = `**Aviso de dimensiones:**\n\nLa imagen subida mide **${actualW} × ${actualH} px** pero este elemento espera **${expW} × ${expH} px**.\n\nConsiderá reemplazarla con una imagen del tamaño correcto para evitar distorsión.`;
+        const exp150W = Math.round(expW * DPI_SCALE);
+        const exp150H = Math.round(expH * DPI_SCALE);
+        const text = `**Aviso de dimensiones:**\n\nLa imagen subida mide **${actualW} × ${actualH} px** pero este elemento espera **${expW} × ${expH} px** (72 dpi) o **${exp150W} × ${exp150H} px** (150 dpi).\n\nConsiderá reemplazarla con una imagen del tamaño correcto para evitar distorsión.`;
         try {
           const res = await fetch(`${API_URL}/api/maia-comment`, {
             method: 'POST',
