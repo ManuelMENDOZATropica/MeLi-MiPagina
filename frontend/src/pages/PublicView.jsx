@@ -249,7 +249,7 @@ export default function PublicView() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const isMobile = isMobileDevice();
-  const [viewMode, setViewMode] = useState(isMobile ? 'mobile' : 'desktop');
+  const [viewMode, setViewMode] = useState('mobile');
   const containerRef = useRef(null);
   const [scale, setScale] = useState(1);
 
