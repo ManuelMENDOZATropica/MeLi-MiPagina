@@ -43,7 +43,7 @@ const AnimatedBanner = ({ item, height }) => {
 const renderPublicItem = (item, viewMode) => {
   if (item.type === 'rowGroup') {
     return (
-      <div key={item.uniqueId} style={{ display: 'flex', width: '100%', justifyContent: item.justify, flexWrap: 'wrap' }}>
+      <div key={item.uniqueId} style={{ display: 'flex', width: '100%', justifyContent: item.justify, flexWrap: 'wrap', gap: 20 }}>
         {item.items.map(child => renderPublicItem(child, viewMode))}
       </div>
     );
@@ -271,7 +271,7 @@ export default function PublicView() {
           boxShadow: isMobile ? 'none' : '0 10px 40px rgba(0,0,0,0.12)'
         }}>
           {viewMode === 'desktop' ? <MeLiHeaderDesktop /> : <MeLiHeaderMobile />}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignContent: 'flex-start', padding: 20, gap: 20 }}>
             {canvasItems?.map(item => renderPublicItem(item, viewMode))}
           </div>
         </div>
