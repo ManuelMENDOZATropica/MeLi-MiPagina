@@ -588,8 +588,8 @@ function Editor() {
     });
     collect([...(canvases.desktop || []), ...(canvases.mobile || [])]);
 
-    // Solo items con imagen subida
-    const itemsToCheck = allItems.filter(item => item.uploadedImages?.[0]);
+    // Solo items con imagen subida (excluir store_profile — ícono de marca, sin validación MAIA)
+    const itemsToCheck = allItems.filter(item => item.uploadedImages?.[0] && item.type !== 'store_profile');
 
     if (itemsToCheck.length === 0) { resolve({ errors: [] }); return; }
 
