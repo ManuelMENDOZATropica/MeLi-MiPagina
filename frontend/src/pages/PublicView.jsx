@@ -338,7 +338,7 @@ export default function PublicView() {
 
       {/* Footer */}
       <div style={{ textAlign: 'center', padding: '10px', color: '#ccc', fontSize: 11, background: 'white', borderTop: '1px solid #f5f5f5' }}>
-        Creado con <strong style={{ color: '#3483fa' }}>MeLi Landing Builder</strong> · Trópica
+        Creado con <strong style={{ color: '#3483fa' }}>MeLi Landing Builder</strong> · TRÓPICA Creative &amp; Tech
       </div>
     </div>
   );
