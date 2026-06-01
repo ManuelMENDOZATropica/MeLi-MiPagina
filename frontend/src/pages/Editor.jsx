@@ -1813,83 +1813,85 @@ function Editor() {
             />
           )}
 
-          {/* ui-ms-profile__profile-mobile */}
+          {/* ui-ms-profile — layout fiel a la referencia MeLi */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            padding: '10px 14px',
+            padding: '12px 16px',
             background: '#fff',
-            borderBottom: '1px solid #ebebeb',
-            fontFamily: "'Proxima Nova', 'Inter', -apple-system, sans-serif",
-            gap: '10px',
+            borderBottom: '1px solid #e8e8e8',
+            fontFamily: "-apple-system, 'Helvetica Neue', Arial, sans-serif",
+            gap: '12px',
             width: '100%',
             boxSizing: 'border-box',
-            minHeight: '72px',
           }}>
-            {/* Bubble ícono de tienda */}
+
+            {/* ── Ícono circular ── */}
             <div
               title={!isPreviewMode ? 'Click para subir ícono' : brandName}
               onClick={() => !isPreviewMode && triggerUpload(item.uniqueId)}
               style={{
-                width: '56px', height: '56px', borderRadius: '50%',
-                background: '#fff',
-                border: iconUrl ? '2px solid #ebebeb' : '2.5px dashed #3483fa',
+                width: '64px', height: '64px', borderRadius: '50%',
+                background: '#f5f5f5',
+                border: iconUrl ? '1.5px solid #d9d9d9' : '2px dashed #3483fa',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 overflow: 'hidden', flexShrink: 0,
                 cursor: !isPreviewMode ? 'pointer' : 'default',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
-                transition: 'box-shadow 0.18s',
-                position: 'relative',
+                transition: 'border-color 0.18s, box-shadow 0.18s',
               }}
-              onMouseEnter={e => { if (!isPreviewMode) e.currentTarget.style.boxShadow = '0 4px 16px rgba(52,131,250,0.25)'; }}
-              onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.10)'; }}
+              onMouseEnter={e => { if (!isPreviewMode) { e.currentTarget.style.borderColor = '#3483fa'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(52,131,250,0.12)'; }}}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = iconUrl ? '#d9d9d9' : '#3483fa'; e.currentTarget.style.boxShadow = 'none'; }}
             >
               {iconUrl ? (
-                <img src={iconUrl} alt={brandName} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                <img src={iconUrl} alt={brandName} style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '4px' }} />
               ) : (
                 <div style={{ textAlign: 'center', pointerEvents: 'none' }}>
-                  <ImageIcon size={20} color={isPreviewMode ? '#ccc' : '#3483fa'} />
-                  {!isPreviewMode && <div style={{ fontSize: '8px', color: '#3483fa', marginTop: '2px', fontWeight: '700', lineHeight: 1.2 }}>Subir<br/>ícono</div>}
+                  <ImageIcon size={22} color={isPreviewMode ? '#ccc' : '#3483fa'} />
+                  {!isPreviewMode && <div style={{ fontSize: '8px', color: '#3483fa', marginTop: '3px', fontWeight: '700', lineHeight: 1.2 }}>Subir<br/>ícono</div>}
                 </div>
               )}
             </div>
 
-            {/* Información de perfil */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', overflow: 'hidden' }}>
-              {/* Título Tienda oficial */}
-              <p style={{
-                margin: 0, display: 'flex', alignItems: 'center', gap: '4px',
-                fontSize: '11px', fontWeight: '600', color: '#3483fa',
-              }}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
-                  <g clipPath="url(#cp_sp)">
-                    <path fillRule="evenodd" clipRule="evenodd" d="M12.421 1.47153L12.8816 3.11824L14.5283 3.58005C15.1238 3.74723 15.6097 4.17842 15.8464 4.74984C16.0832 5.32125 16.0446 5.96971 15.7419 6.50906L14.9042 7.99992L15.7407 9.48963C16.0439 10.0289 16.0829 10.6776 15.8463 11.2492C15.6098 11.8209 15.1239 12.2524 14.5283 12.4198L12.8816 12.8816L12.4198 14.5283C12.2526 15.1238 11.8215 15.6097 11.25 15.8464C10.6786 16.0832 10.0302 16.0446 9.49085 15.7419L8 14.9042L6.5103 15.7407C5.97102 16.0439 5.32239 16.0829 4.75071 15.8463C4.17903 15.6098 3.74754 15.1239 3.58018 14.5283L3.11837 12.8816L1.47168 12.4198C0.876188 12.2526 0.39034 11.8214 0.153594 11.25C-0.0831526 10.6786 -0.0446146 10.0301 0.258145 9.49078L1.09582 7.99992L0.259291 6.5102C-0.0439437 5.97092 -0.0828808 5.32229 0.153663 4.7506C0.390207 4.17891 0.876056 3.74742 1.47168 3.58005L3.11837 3.11824L3.58018 1.47153C3.74745 0.87637 4.17844 0.390806 4.74954 0.154093C5.32064 -0.0826196 5.96875 -0.0443288 6.50801 0.257984L7.99885 1.09566L9.48855 0.25913C9.95476 -0.00318251 10.5061 -0.0695366 11.0212 0.0746666C11.5363 0.21887 11.9731 0.561816 12.2353 1.02805C12.3155 1.16786 12.3774 1.31683 12.421 1.47153ZM10.4569 5.27947L7.06378 8.67487L5.542 7.14963C5.44987 7.0546 5.32253 7.00192 5.1902 7.0041C5.05786 7.00192 4.93052 7.0546 4.8384 7.14963L4.13366 7.85209C4.03893 7.94433 3.98666 8.0717 3.98927 8.20389C3.98927 8.34141 4.0374 8.45829 4.13366 8.55455L6.71198 11.1283C6.8043 11.2229 6.93162 11.2752 7.06378 11.2727C7.1959 11.2749 7.32311 11.2227 7.41558 11.1283L11.8663 6.68438C11.9611 6.59214 12.0133 6.46478 12.0107 6.33258C12.013 6.20079 11.9608 6.07389 11.8663 5.98193L11.1616 5.27832C11.0693 5.18371 10.942 5.13146 10.8098 5.13394C10.6765 5.13261 10.5492 5.18486 10.4569 5.27947Z" fill="#3483FA"/>
-                  </g>
-                  <defs><clipPath id="cp_sp"><rect width="16" height="16" fill="white"/></clipPath></defs>
+            {/* ── Información ── */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 }}>
+
+              {/* Fila 1: badge verificado + "Tienda oficial" */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                {/* Checkmark azul MeLi */}
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+                  <circle cx="8" cy="8" r="8" fill="#3483FA"/>
+                  <path d="M4.5 8L6.8 10.5L11.5 5.5" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                Tienda oficial
-              </p>
-              {/* Nombre de marca */}
-              <p style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#1a1a2e', lineHeight: 1.2 }}>
-                {brandName}
+                <span style={{ fontSize: '12px', fontWeight: '500', color: '#3483fa' }}>Tienda oficial</span>
+              </div>
+
+              {/* Fila 2: nombre de marca */}
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                <span style={{ fontSize: '17px', fontWeight: '700', color: '#111', lineHeight: 1.2, letterSpacing: '-0.2px' }}>
+                  {brandName}
+                </span>
                 {!isPreviewMode && (
-                  <span style={{ fontSize: '10px', color: '#9ca3af', marginLeft: '6px', fontWeight: '400', fontStyle: 'italic' }}>(clic derecho → editar)</span>
+                  <span style={{ fontSize: '9px', color: '#c0c0c0', fontWeight: '400', fontStyle: 'italic', whiteSpace: 'nowrap' }}>clic derecho → editar</span>
                 )}
-              </p>
-              {/* Seguidores + Seguir */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
-                <span style={{ fontSize: '11px', color: '#666' }}>+780 mil seguidores</span>
+              </div>
+
+              {/* Fila 3: seguidores + botón Seguir */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '3px' }}>
+                <span style={{ fontSize: '12px', color: '#767676', fontWeight: '400' }}>+780.1 mil seguidores</span>
                 <button
                   style={{
-                    fontSize: '11px', fontWeight: '600', color: '#3483fa',
-                    background: 'none', border: '1.5px solid #3483fa',
-                    borderRadius: '6px', padding: '2px 10px',
+                    fontSize: '13px', fontWeight: '600', color: '#3483fa',
+                    background: 'rgba(52,131,250,0.10)',
+                    border: 'none',
+                    borderRadius: '6px', padding: '4px 14px',
                     cursor: 'pointer', lineHeight: 1.4,
                     pointerEvents: isPreviewMode ? 'auto' : 'none',
+                    letterSpacing: '0',
                   }}
                 >Seguir</button>
-                </div>
               </div>
+
+            </div>
           </div>
         </div>
       );
