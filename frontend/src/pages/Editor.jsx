@@ -1890,8 +1890,6 @@ function Editor() {
                 >Seguir</button>
                 </div>
               </div>
-
-            </div>
           </div>
         </div>
       );
