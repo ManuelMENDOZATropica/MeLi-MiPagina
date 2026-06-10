@@ -604,12 +604,22 @@ function Editor() {
 
     // Procesar en serie para que la animación se vea secuencial
     (async () => {
+      const passedStatusUpdates = {}; // uniqueId -> boolean
+
       for (let idx = 0; idx < itemsToCheck.length; idx++) {
         const item = itemsToCheck[idx];
         const imageUrl = item.uploadedImages[0];
         // Cotejar contra las medidas del canvas al que pertenece el módulo (no el viewMode actual)
         const size = item._device === 'mobile' ? item.mobileSize : item.desktopSize;
         const itemErrors = [];
+
+        if (item.passedCheck) {
+          setMaiaCheckItems(prev => prev.map((p, i) =>
+            i === idx ? { ...p, status: 'ok', msg: 'Ya validado anteriormente' } : p
+          ));
+          await new Promise(r => setTimeout(r, 200));
+          continue;
+        }
 
         // ── Check 1: dimensiones (omitido para tarjetas de producto) ──
         if (size?.width && size?.height && item.type !== 'product_card') {
@@ -651,6 +661,8 @@ function Editor() {
         const msg = itemErrors.join(' | ');
         if (hasError) errors.push({ name: item.name || 'Elemento', msg, device: item._device, imageUrl });
 
+        passedStatusUpdates[item.uniqueId] = !hasError;
+
         setMaiaCheckItems(prev => prev.map((p, i) =>
           i === idx ? { ...p, status: hasError ? 'error' : 'ok', msg } : p
         ));
@@ -658,6 +670,33 @@ function Editor() {
         // Pausa entre elementos para que la animación sea legible
         await new Promise(r => setTimeout(r, 400));
       }
+
+      // Actualizar canvases con el estado del check
+      if (Object.keys(passedStatusUpdates).length > 0) {
+        setCanvases(prev => {
+          const updateLayout = (layout) => layout.map(item => {
+            if (item.type === 'rowGroup') {
+              const updatedItems = item.items.map(child => {
+                if (child.uniqueId in passedStatusUpdates) {
+                  return { ...child, passedCheck: passedStatusUpdates[child.uniqueId] };
+                }
+                return child;
+              });
+              return { ...item, items: updatedItems };
+            }
+            if (item.uniqueId in passedStatusUpdates) {
+              return { ...item, passedCheck: passedStatusUpdates[item.uniqueId] };
+            }
+            return item;
+          });
+
+          return {
+            desktop: updateLayout(prev.desktop),
+            mobile: updateLayout(prev.mobile)
+          };
+        });
+      }
+
       setTimeout(() => resolve({ errors }), 500);
     })();
   });
@@ -869,14 +908,14 @@ function Editor() {
               if (item.uniqueId === uniqueId) {
                 const currentImages = [...(item.uploadedImages || [])];
                 currentImages[0] = data.url;
-                return { ...item, uploadedImages: currentImages };
+                return { ...item, uploadedImages: currentImages, passedCheck: false };
               }
               if (item.type === 'rowGroup') {
                 return { ...item, items: item.items.map(child => {
                   if (child.uniqueId === uniqueId) {
                     const currentImages = [...(child.uploadedImages || [])];
                     currentImages[0] = data.url;
-                    return { ...child, uploadedImages: currentImages };
+                    return { ...child, uploadedImages: currentImages, passedCheck: false };
                   }
                   return child;
                 })};
@@ -923,14 +962,14 @@ function Editor() {
               if (item.uniqueId === uploadTargetId) {
                 const currentImages = [...(item.uploadedImages || [])];
                 currentImages[uploadIndex] = data.url;
-                return { ...item, uploadedImages: currentImages };
+                return { ...item, uploadedImages: currentImages, passedCheck: false };
               }
               if (item.type === 'rowGroup') {
                 const updatedChildren = item.items.map(child => {
                   if (child.uniqueId === uploadTargetId) {
                     const currentImages = [...(child.uploadedImages || [])];
                     currentImages[uploadIndex] = data.url;
-                    return { ...child, uploadedImages: currentImages };
+                    return { ...child, uploadedImages: currentImages, passedCheck: false };
                   }
                   return child;
                 });
@@ -1673,6 +1712,23 @@ function Editor() {
             </div>
           )}
 
+          {/* Indicador de check aprobado */}
+          {!isPreviewMode && item.passedCheck && (
+            <div
+              title="Este módulo ha aprobado el control de calidad MAIA"
+              style={{
+                position: 'absolute', top: '6px', left: '8px',
+                background: '#00a650', color: 'white', borderRadius: '10px',
+                fontSize: '10px', fontWeight: '800', padding: '2px 7px',
+                zIndex: 20, boxShadow: '0 2px 8px rgba(0,166,80,0.4)',
+                display: 'flex', alignItems: 'center', gap: '3px'
+              }}
+            >
+              <CheckCircle2 size={12} />
+              <span>Validado</span>
+            </div>
+          )}
+
           {/* Panel de comentarios flotante */}
           {!isPreviewMode && activeCommentElId === item.uniqueId && (
             <CommentPanel
@@ -1967,6 +2023,23 @@ function Editor() {
             }}
           >
             💬 {comments.filter(c => c.elementId === item.uniqueId && !c.resolved).length}
+          </div>
+        )}
+
+        {/* Indicador de check aprobado */}
+        {!isPreviewMode && item.passedCheck && (
+          <div
+            title="Este módulo ha aprobado el control de calidad MAIA"
+            style={{
+              position: 'absolute', top: '6px', left: '8px',
+              background: '#00a650', color: 'white', borderRadius: '10px',
+              fontSize: '10px', fontWeight: '800', padding: '2px 7px',
+              zIndex: 20, boxShadow: '0 2px 8px rgba(0,166,80,0.4)',
+              display: 'flex', alignItems: 'center', gap: '3px'
+            }}
+          >
+            <CheckCircle2 size={12} />
+            <span>Validado</span>
           </div>
         )}
         {/* Panel de comentarios flotante */}
@@ -2571,6 +2644,13 @@ function Editor() {
             <div className="sidebar-content">
               <div className="comp-grid">
                 {componentsList
+                  .filter((comp) => {
+                    if (viewMode === 'desktop') {
+                      return comp.desktopSize !== null;
+                    } else {
+                      return comp.mobileSize !== null;
+                    }
+                  })
                   .map((comp) => {
                     const mobileOnly = !comp.desktopSize && comp.mobileSize;
                     const desktopOnly = comp.desktopSize && !comp.mobileSize;
@@ -2812,8 +2892,8 @@ function Editor() {
                           {imgs.length > 0 && (
                             <div className="context-menu-item" onClick={() => {
                               setCanvasItems(prev => prev.map(it => {
-                                if (it.uniqueId === contextMenu.targetId) return { ...it, uploadedImages: [] };
-                                if (it.type === 'rowGroup') return { ...it, items: it.items.map(c => c.uniqueId === contextMenu.targetId ? { ...c, uploadedImages: [] } : c) };
+                                if (it.uniqueId === contextMenu.targetId) return { ...it, uploadedImages: [], passedCheck: false };
+                                if (it.type === 'rowGroup') return { ...it, items: it.items.map(c => c.uniqueId === contextMenu.targetId ? { ...c, uploadedImages: [], passedCheck: false } : c) };
                                 return it;
                               }));
                               setContextMenu(null);
@@ -2833,8 +2913,8 @@ function Editor() {
                         {imgs.length > 0 && (
                           <div className="context-menu-item" onClick={() => {
                             setCanvasItems(prev => prev.map(it => {
-                              if (it.uniqueId === contextMenu.targetId) return { ...it, uploadedImages: [] };
-                              if (it.type === 'rowGroup') return { ...it, items: it.items.map(c => c.uniqueId === contextMenu.targetId ? { ...c, uploadedImages: [] } : c) };
+                              if (it.uniqueId === contextMenu.targetId) return { ...it, uploadedImages: [], passedCheck: false };
+                              if (it.type === 'rowGroup') return { ...it, items: it.items.map(c => c.uniqueId === contextMenu.targetId ? { ...c, uploadedImages: [], passedCheck: false } : c) };
                               return it;
                             }));
                             setContextMenu(null);
