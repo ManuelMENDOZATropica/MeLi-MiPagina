@@ -582,11 +582,12 @@ function Editor() {
   // Verifica todos los elementos antes de publicar
   const runMaiaPrePublishCheck = () => new Promise((resolve) => {
     const allItems = [];
-    const collect = (items) => items.forEach(item => {
-      if (item.type === 'rowGroup' && item.items) item.items.forEach(c => allItems.push(c));
-      else allItems.push(item);
+    const collect = (items, device) => items.forEach(item => {
+      if (item.type === 'rowGroup' && item.items) item.items.forEach(c => allItems.push({ ...c, _device: device }));
+      else allItems.push({ ...item, _device: device });
     });
-    collect([...(canvases.desktop || []), ...(canvases.mobile || [])]);
+    collect(canvases.desktop || [], 'desktop');
+    collect(canvases.mobile || [], 'mobile');
 
     // Solo items con imagen subida (excluir store_profile — ícono de marca, sin validación MAIA)
     const itemsToCheck = allItems.filter(item => item.uploadedImages?.[0] && item.type !== 'store_profile');
@@ -595,7 +596,7 @@ function Editor() {
 
     const tok = JSON.parse(localStorage.getItem('tropica_user'))?.token;
     const initial = itemsToCheck.map(item => ({
-      id: item.uniqueId, name: item.name || 'Elemento', status: 'pending', msg: ''
+      id: item.uniqueId, name: item.name || 'Elemento', device: item._device, imageUrl: item.uploadedImages[0], status: 'pending', msg: ''
     }));
     setMaiaCheckItems(initial);
 
@@ -606,7 +607,8 @@ function Editor() {
       for (let idx = 0; idx < itemsToCheck.length; idx++) {
         const item = itemsToCheck[idx];
         const imageUrl = item.uploadedImages[0];
-        const size = viewMode === 'desktop' ? item.desktopSize : item.mobileSize;
+        // Cotejar contra las medidas del canvas al que pertenece el módulo (no el viewMode actual)
+        const size = item._device === 'mobile' ? item.mobileSize : item.desktopSize;
         const itemErrors = [];
 
         // ── Check 1: dimensiones (omitido para tarjetas de producto) ──
@@ -647,7 +649,7 @@ function Editor() {
 
         const hasError = itemErrors.length > 0;
         const msg = itemErrors.join(' | ');
-        if (hasError) errors.push({ name: item.name || 'Elemento', msg });
+        if (hasError) errors.push({ name: item.name || 'Elemento', msg, device: item._device, imageUrl });
 
         setMaiaCheckItems(prev => prev.map((p, i) =>
           i === idx ? { ...p, status: hasError ? 'error' : 'ok', msg } : p
@@ -778,22 +780,26 @@ function Editor() {
   const checkImageDimensions = (imageUrl, elementId) => {
     const tok = JSON.parse(localStorage.getItem('tropica_user'))?.token;
 
-    // Encontrar el elemento en cualquiera de los dos canvases
+    // Encontrar el elemento y a qué canvas pertenece (prioridad: el canvas de la vista actual)
     let foundItem = null;
-    const searchItem = (items) => {
+    let foundDevice = null;
+    const searchItem = (items, device) => {
       for (const item of items) {
-        if (item.uniqueId === elementId) { foundItem = item; return; }
+        if (item.uniqueId === elementId) { foundItem = item; foundDevice = device; return; }
         if (item.type === 'rowGroup' && item.items) {
           for (const child of item.items) {
-            if (child.uniqueId === elementId) { foundItem = child; return; }
+            if (child.uniqueId === elementId) { foundItem = child; foundDevice = device; return; }
           }
         }
       }
     };
-    searchItem([...(canvases.desktop || []), ...(canvases.mobile || [])]);
+    const otherMode = viewMode === 'desktop' ? 'mobile' : 'desktop';
+    searchItem(canvases[viewMode] || [], viewMode);
+    if (!foundItem) searchItem(canvases[otherMode] || [], otherMode);
     if (!foundItem) return;
 
-    const expectedSize = viewMode === 'desktop' ? foundItem.desktopSize : foundItem.mobileSize;
+    // Cotejar contra las medidas del canvas donde vive el módulo
+    const expectedSize = foundDevice === 'mobile' ? foundItem.mobileSize : foundItem.desktopSize;
     if (!expectedSize?.width || !expectedSize?.height) return;
     // Las tarjetas de producto aceptan cualquier imagen sin validar dimensiones
     if (foundItem.type === 'product_card') return;
@@ -815,7 +821,8 @@ function Editor() {
         const elementOwnerId = foundItem.addedBy || null;
         const exp150W = Math.round(expW * DPI_SCALE);
         const exp150H = Math.round(expH * DPI_SCALE);
-        const text = `**Aviso de dimensiones:**\n\nLa imagen subida mide **${actualW} × ${actualH} px** pero este elemento espera **${expW} × ${expH} px** (72 dpi) o **${exp150W} × ${exp150H} px** (150 dpi).\n\nConsiderá reemplazarla con una imagen del tamaño correcto para evitar distorsión.`;
+        const deviceLabel = foundDevice === 'mobile' ? 'Mobile' : 'Desktop';
+        const text = `**Aviso de dimensiones (${deviceLabel}):**\n\nLa imagen subida mide **${actualW} × ${actualH} px** pero este elemento (versión ${deviceLabel}) espera **${expW} × ${expH} px** (72 dpi) o **${exp150W} × ${exp150H} px** (150 dpi).\n\nConsiderá reemplazarla con una imagen del tamaño correcto para evitar distorsión.`;
         try {
           const res = await fetch(`${API_URL}/api/maia-comment`, {
             method: 'POST',
@@ -2917,8 +2924,19 @@ function Editor() {
         onChange={handleGlobalImageUpload}
       />
 
-      {/* ── MAIA Pre-publish check overlay ── */}
-      {maiaCheckState && (
+      {/* ── MAIA Pre-publish check overlay (agrupado Desktop/Mobile) ── */}
+      {maiaCheckState && (() => {
+        const errs = (maiaCheckState !== 'checking' && maiaCheckState !== 'ok' && maiaCheckState?.errors) ? maiaCheckState.errors : [];
+        const errGroups = [
+          { key: 'desktop', label: '🖥️ Desktop', errors: errs.filter(e => e.device !== 'mobile') },
+          { key: 'mobile', label: '📱 Mobile', errors: errs.filter(e => e.device === 'mobile') },
+        ].filter(g => g.errors.length > 0);
+        const isErrorScreen = errs.length > 0;
+        const checkGroups = [
+          { key: 'desktop', label: '🖥️ Desktop', items: maiaCheckItems.filter(it => it.device !== 'mobile') },
+          { key: 'mobile', label: '📱 Mobile', items: maiaCheckItems.filter(it => it.device === 'mobile') },
+        ].filter(g => g.items.length > 0);
+        return (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 99998,
           background: 'rgba(10,14,26,0.88)',
@@ -2928,7 +2946,9 @@ function Editor() {
         }}>
           <div style={{
             background: '#0f1420', borderRadius: '20px',
-            padding: '36px 40px', minWidth: '420px', maxWidth: '520px',
+            padding: '36px 40px', minWidth: '420px',
+            maxWidth: isErrorScreen && errGroups.length > 1 ? '880px' : '520px',
+            maxHeight: '86vh', overflowY: 'auto',
             boxShadow: '0 32px 80px rgba(0,0,0,0.6)',
             border: '1px solid rgba(255,255,255,0.06)',
             fontFamily: "'Inter', sans-serif",
@@ -2963,42 +2983,63 @@ function Editor() {
               </div>
             </div>
 
-            {/* Lista de items verificados */}
+            {/* Lista de items verificados — agrupados por dispositivo */}
             {maiaCheckState === 'checking' && maiaCheckItems.length > 0 && (
-              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {maiaCheckItems.map((item, i) => (
-                  <div key={i} style={{
-                    display: 'flex', alignItems: 'center', gap: '10px',
-                    background: 'rgba(255,255,255,0.04)', borderRadius: '8px',
-                    padding: '8px 12px',
-                    border: `1px solid ${item.status === 'ok' ? 'rgba(16,185,129,0.3)' : item.status === 'error' ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.06)'}`
-                  }}>
-                    <span style={{ fontSize: '16px', flexShrink: 0 }}>
-                      {item.status === 'pending' ? '⏳' : item.status === 'ok' ? '✅' : '❌'}
-                    </span>
-                    <div style={{ flex: 1 }}>
-                      <p style={{ margin: 0, fontSize: '12px', fontWeight: '700', color: '#e2e8f0' }}>{item.name}</p>
-                      {item.msg && <p style={{ margin: '1px 0 0', fontSize: '10px', color: '#ef4444' }}>{item.msg}</p>}
-                    </div>
+              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {checkGroups.map(group => (
+                  <div key={group.key} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <p style={{ margin: 0, fontSize: '10px', fontWeight: '800', color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{group.label}</p>
+                    {group.items.map((item, i) => (
+                      <div key={i} style={{
+                        display: 'flex', alignItems: 'flex-start', gap: '10px',
+                        background: 'rgba(255,255,255,0.04)', borderRadius: '8px',
+                        padding: '8px 12px',
+                        border: `1px solid ${item.status === 'ok' ? 'rgba(16,185,129,0.3)' : item.status === 'error' ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.06)'}`
+                      }}>
+                        <span style={{ fontSize: '16px', flexShrink: 0 }}>
+                          {item.status === 'pending' ? '⏳' : item.status === 'ok' ? '✅' : '❌'}
+                        </span>
+                        <div style={{ flex: 1 }}>
+                          <p style={{ margin: 0, fontSize: '12px', fontWeight: '700', color: '#e2e8f0' }}>{item.name}</p>
+                          {item.msg && <p style={{ margin: '1px 0 0', fontSize: '10px', color: '#ef4444' }}>{item.msg}</p>}
+                          {item.status === 'error' && item.imageUrl && (
+                            <img src={item.imageUrl} alt={item.name}
+                              style={{ marginTop: '6px', maxWidth: '100%', maxHeight: '70px', objectFit: 'contain', borderRadius: '6px', border: '1px solid rgba(239,68,68,0.35)', background: 'rgba(255,255,255,0.05)', display: 'block' }} />
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Error screen */}
-            {maiaCheckState !== 'checking' && maiaCheckState !== 'ok' && maiaCheckState?.errors && (
+            {/* Error screen — un modal por dispositivo (Desktop / Mobile) */}
+            {isErrorScreen && (
               <div style={{ width: '100%' }}>
-                <div style={{
-                  background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
-                  borderRadius: '10px', padding: '14px', marginBottom: '16px'
-                }}>
-                  {maiaCheckState.errors.map((err, i) => (
-                    <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: i < maiaCheckState.errors.length - 1 ? '8px' : 0 }}>
-                      <span style={{ fontSize: '14px', flexShrink: 0 }}>❌</span>
-                      <div>
-                        <p style={{ margin: 0, fontSize: '12px', fontWeight: '700', color: '#fca5a5' }}>{err.name}</p>
-                        <p style={{ margin: '1px 0 0', fontSize: '11px', color: 'rgba(252,165,165,0.7)' }}>{err.msg}</p>
-                      </div>
+                <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: '16px' }}>
+                  {errGroups.map(group => (
+                    <div key={group.key} style={{
+                      flex: '1 1 280px', minWidth: '280px',
+                      background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
+                      borderRadius: '10px', padding: '14px'
+                    }}>
+                      <p style={{ margin: '0 0 10px', fontSize: '11px', fontWeight: '800', color: '#fca5a5', textTransform: 'uppercase', letterSpacing: '0.08em', borderBottom: '1px solid rgba(239,68,68,0.2)', paddingBottom: '8px' }}>
+                        {group.label} · {group.errors.length} {group.errors.length === 1 ? 'error' : 'errores'}
+                      </p>
+                      {group.errors.map((err, i) => (
+                        <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: i < group.errors.length - 1 ? '12px' : 0 }}>
+                          <span style={{ fontSize: '14px', flexShrink: 0 }}>❌</span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ margin: 0, fontSize: '12px', fontWeight: '700', color: '#fca5a5' }}>{err.name}</p>
+                            <p style={{ margin: '1px 0 0', fontSize: '11px', color: 'rgba(252,165,165,0.7)' }}>{err.msg}</p>
+                            {err.imageUrl && (
+                              <img src={err.imageUrl} alt={err.name}
+                                style={{ marginTop: '6px', maxWidth: '100%', maxHeight: '90px', objectFit: 'contain', borderRadius: '6px', border: '1px solid rgba(239,68,68,0.35)', background: 'rgba(255,255,255,0.05)', display: 'block' }} />
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   ))}
                 </div>
@@ -3018,7 +3059,8 @@ function Editor() {
             )}
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Panel flotante de edición de textos */}
       {textEditorPanel && (() => {
