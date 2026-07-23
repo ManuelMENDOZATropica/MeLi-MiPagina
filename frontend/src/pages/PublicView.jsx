@@ -243,6 +243,71 @@ const MeLiHeaderMobile = () => (
 );
 
 // ─── Main Component ──────────────────────────────────────────────
+// ─── Mock de contexto (referencia visual, para ver RTB/Home Slider "en la página") ──
+const FakeCard = ({ viewMode }) => (
+  <div style={{ width: viewMode === 'desktop' ? 160 : 105, background: 'white', borderRadius: 6, overflow: 'hidden', border: '1px solid #ebebeb', flexShrink: 0 }}>
+    <div style={{ width: '100%', height: viewMode === 'desktop' ? 140 : 95, background: '#e8e8e8' }} />
+    <div style={{ padding: 8 }}>
+      <div style={{ width: '65%', height: 8, background: '#e0e0e0', borderRadius: 2, marginBottom: 6 }} />
+      <div style={{ width: '40%', height: 10, background: '#00a650', borderRadius: 2 }} />
+    </div>
+  </div>
+);
+
+const PageContextMock = ({ section, viewMode, position }) => {
+  const pad = viewMode === 'desktop' ? 40 : 16;
+  const gap = viewMode === 'desktop' ? 14 : 8;
+  if (section === 'homeSlider' && position === 'after') {
+    const cats = ['Celulares', 'Moda', 'Belleza', 'Hogar', 'Electro', 'Deportes', 'Juguetes', 'Vehículos'];
+    return (
+      <div style={{ width: '100%', background: '#f5f5f5' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: viewMode === 'desktop' ? 24 : 12, padding: `20px ${pad}px` }}>
+          {cats.map(c => (
+            <div key={c} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, width: viewMode === 'desktop' ? 90 : 64 }}>
+              <div style={{ width: viewMode === 'desktop' ? 64 : 44, height: viewMode === 'desktop' ? 64 : 44, borderRadius: '50%', background: '#e8e8e8' }} />
+              <span style={{ fontSize: viewMode === 'desktop' ? 11 : 9, color: '#767676', textAlign: 'center' }}>{c}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ padding: `10px ${pad}px 30px` }}>
+          <h3 style={{ fontSize: viewMode === 'desktop' ? 16 : 13, color: '#333', margin: '0 0 12px', fontWeight: 600 }}>Más vendidos</h3>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap }}>
+            {Array.from({ length: viewMode === 'desktop' ? 6 : 3 }).map((_, i) => <FakeCard key={i} viewMode={viewMode} />)}
+          </div>
+        </div>
+      </div>
+    );
+  }
+  if (section === 'rtb') {
+    if (position === 'before') {
+      return (
+        <div style={{ width: '100%', background: '#f5f5f5' }}>
+          <div style={{ padding: `12px ${pad}px 14px` }}>
+            <h3 style={{ fontSize: viewMode === 'desktop' ? 15 : 12, color: '#333', margin: '0 0 12px', fontWeight: 400 }}>
+              <span style={{ fontWeight: 700 }}>1.234 resultados</span> para "zapatillas running"
+            </h3>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap }}>
+              {Array.from({ length: viewMode === 'desktop' ? 4 : 2 }).map((_, i) => <FakeCard key={i} viewMode={viewMode} />)}
+            </div>
+          </div>
+        </div>
+      );
+    }
+    if (position === 'after') {
+      return (
+        <div style={{ width: '100%', background: '#f5f5f5' }}>
+          <div style={{ padding: `14px ${pad}px 30px` }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap }}>
+              {Array.from({ length: viewMode === 'desktop' ? 4 : 2 }).map((_, i) => <FakeCard key={i} viewMode={viewMode} />)}
+            </div>
+          </div>
+        </div>
+      );
+    }
+  }
+  return null;
+};
+
 const SECTION_LABELS = { miPagina: 'Mi página', rtb: "RTB's", homeSlider: 'Home Slider' };
 const SECTION_LAYOUT_KEYS = {
   miPagina: { desktop: 'desktopLayout', mobile: 'mobileLayout' },
@@ -338,10 +403,12 @@ export default function PublicView() {
           margin: isMobile ? 0 : '0 auto',
           boxShadow: isMobile ? 'none' : '0 10px 40px rgba(0,0,0,0.12)'
         }}>
-          {section === 'miPagina' && (viewMode === 'desktop' ? <MeLiHeaderDesktop /> : <MeLiHeaderMobile />)}
+          {viewMode === 'desktop' ? <MeLiHeaderDesktop /> : <MeLiHeaderMobile />}
+          <PageContextMock section={section} viewMode={viewMode} position="before" />
           <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignContent: 'flex-start', padding: 20, gap: 20 }}>
             {canvasItems?.map(item => renderPublicItem(item, viewMode))}
           </div>
+          <PageContextMock section={section} viewMode={viewMode} position="after" />
         </div>
       </div>
 

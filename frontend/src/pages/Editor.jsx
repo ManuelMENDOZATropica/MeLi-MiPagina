@@ -260,6 +260,81 @@ function CommentPanel({
 
 
 
+// Mock de contexto de página MeLi para RTB y Home Slider — solo visual, no editable,
+// no se exporta al PDF (data-html2canvas-ignore) ni ocupa espacio real en el layout.
+const FakeCard = ({ viewMode, priceColor = '#d5d5d5' }) => (
+  <div style={{ width: viewMode === 'desktop' ? 160 : 105, background: 'white', borderRadius: 6, overflow: 'hidden', border: '1px solid #ebebeb', flexShrink: 0 }}>
+    <div style={{ width: '100%', height: viewMode === 'desktop' ? 140 : 95, background: '#e8e8e8' }} />
+    <div style={{ padding: 8 }}>
+      <div style={{ width: '65%', height: 8, background: '#e0e0e0', borderRadius: 2, marginBottom: 6 }} />
+      <div style={{ width: '40%', height: 10, background: priceColor, borderRadius: 2 }} />
+    </div>
+  </div>
+);
+
+const PageContextMock = ({ section, viewMode, position }) => {
+  if (section !== 'rtb' && section !== 'homeSlider') return null;
+  const pad = viewMode === 'desktop' ? '0 40px' : '0 16px';
+  const gap = viewMode === 'desktop' ? 14 : 8;
+  const label = (text) => (
+    <div style={{ textAlign: 'center', fontSize: '10px', color: '#b0b0b0', padding: '8px 0', letterSpacing: '0.04em', textTransform: 'uppercase', fontWeight: 700 }}>{text}</div>
+  );
+
+  if (section === 'homeSlider' && position === 'after') {
+    const cats = ['Celulares', 'Moda', 'Belleza', 'Hogar', 'Electro', 'Deportes', 'Juguetes', 'Vehículos'];
+    return (
+      <div data-html2canvas-ignore="true" style={{ width: '100%', pointerEvents: 'none', userSelect: 'none', background: '#f5f5f5' }}>
+        {label('↑ Contexto de referencia (no se exporta) — resto de la Home')}
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: viewMode === 'desktop' ? 24 : 12, padding: `20px ${viewMode === 'desktop' ? '40px' : '16px'}` }}>
+          {cats.map(c => (
+            <div key={c} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, width: viewMode === 'desktop' ? 90 : 64 }}>
+              <div style={{ width: viewMode === 'desktop' ? 64 : 44, height: viewMode === 'desktop' ? 64 : 44, borderRadius: '50%', background: '#e8e8e8' }} />
+              <span style={{ fontSize: viewMode === 'desktop' ? 11 : 9, color: '#767676', textAlign: 'center' }}>{c}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ padding: `10px ${pad.split(' ')[1]} 30px` }}>
+          <h3 style={{ fontSize: viewMode === 'desktop' ? 16 : 13, color: '#333', margin: '0 0 12px', fontWeight: 600 }}>Más vendidos</h3>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap }}>
+            {Array.from({ length: viewMode === 'desktop' ? 6 : 3 }).map((_, i) => <FakeCard key={i} viewMode={viewMode} />)}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (section === 'rtb') {
+    if (position === 'before') {
+      return (
+        <div data-html2canvas-ignore="true" style={{ width: '100%', pointerEvents: 'none', userSelect: 'none', background: '#f5f5f5' }}>
+          {label('↓ Contexto de referencia (no se exporta) — listado de resultados')}
+          <div style={{ padding: `12px ${pad.split(' ')[1]} 14px` }}>
+            <h3 style={{ fontSize: viewMode === 'desktop' ? 15 : 12, color: '#333', margin: '0 0 12px', fontWeight: 400 }}>
+              <span style={{ fontWeight: 700 }}>1.234 resultados</span> para "zapatillas running"
+            </h3>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap }}>
+              {Array.from({ length: viewMode === 'desktop' ? 4 : 2 }).map((_, i) => <FakeCard key={i} viewMode={viewMode} priceColor="#00a650" />)}
+            </div>
+          </div>
+        </div>
+      );
+    }
+    if (position === 'after') {
+      return (
+        <div data-html2canvas-ignore="true" style={{ width: '100%', pointerEvents: 'none', userSelect: 'none', background: '#f5f5f5' }}>
+          <div style={{ padding: `14px ${pad.split(' ')[1]} 30px` }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap }}>
+              {Array.from({ length: viewMode === 'desktop' ? 4 : 2 }).map((_, i) => <FakeCard key={i} viewMode={viewMode} priceColor="#00a650" />)}
+            </div>
+          </div>
+          {label('↑ Contexto de referencia (no se exporta)')}
+        </div>
+      );
+    }
+  }
+  return null;
+};
+
 // Secciones del proyecto: cada una tiene su propio par de canvases Desktop/Mobile
 const SECTIONS = [
   { key: 'miPagina', label: 'Mi página' },
@@ -2821,6 +2896,8 @@ function Editor() {
                   </div>
                 )}
 
+                <PageContextMock section={activeSection} viewMode={viewMode} position="before" />
+
                 <div
                   className={`drop-zone ${isOverCanvas ? 'is-over' : ''}`}
                   onDragOver={handleDragOverCanvas}
@@ -2875,6 +2952,8 @@ function Editor() {
                     </>
                   )}
                 </div>
+
+                <PageContextMock section={activeSection} viewMode={viewMode} position="after" />
               </div>
             </div>
 
