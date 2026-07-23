@@ -22,13 +22,28 @@ export function useSocket({
     socket.emit('join-project', projectId);
 
     // ─ Canvas (layout) ──────────────────────────────────────────────────────
-    socket.on('canvas:updated', ({ desktopLayout, mobileLayout, title, savedBy }) => {
+    socket.on('canvas:updated', ({
+      desktopLayout, mobileLayout,
+      rtbDesktopLayout, rtbMobileLayout,
+      homeSliderDesktopLayout, homeSliderMobileLayout,
+      title, savedBy
+    }) => {
       // Ignorar si lo guardó este mismo usuario (el backend lo filtra, pero doble seguro)
       if (savedBy === currentUserId) return;
       if (setCanvases) {
         setCanvases(prev => ({
-          desktop: Array.isArray(desktopLayout) ? desktopLayout : prev.desktop,
-          mobile:  Array.isArray(mobileLayout)  ? mobileLayout  : prev.mobile,
+          miPagina: {
+            desktop: Array.isArray(desktopLayout) ? desktopLayout : prev.miPagina.desktop,
+            mobile:  Array.isArray(mobileLayout)  ? mobileLayout  : prev.miPagina.mobile,
+          },
+          rtb: {
+            desktop: Array.isArray(rtbDesktopLayout) ? rtbDesktopLayout : prev.rtb.desktop,
+            mobile:  Array.isArray(rtbMobileLayout)  ? rtbMobileLayout  : prev.rtb.mobile,
+          },
+          homeSlider: {
+            desktop: Array.isArray(homeSliderDesktopLayout) ? homeSliderDesktopLayout : prev.homeSlider.desktop,
+            mobile:  Array.isArray(homeSliderMobileLayout)  ? homeSliderMobileLayout  : prev.homeSlider.mobile,
+          },
         }));
       }
       if (setProjectTitle && title) setProjectTitle(title);

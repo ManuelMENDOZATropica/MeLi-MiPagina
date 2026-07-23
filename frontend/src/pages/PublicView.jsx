@@ -243,8 +243,16 @@ const MeLiHeaderMobile = () => (
 );
 
 // ─── Main Component ──────────────────────────────────────────────
+const SECTION_LABELS = { miPagina: 'Mi página', rtb: "RTB's", homeSlider: 'Home Slider' };
+const SECTION_LAYOUT_KEYS = {
+  miPagina: { desktop: 'desktopLayout', mobile: 'mobileLayout' },
+  rtb: { desktop: 'rtbDesktopLayout', mobile: 'rtbMobileLayout' },
+  homeSlider: { desktop: 'homeSliderDesktopLayout', mobile: 'homeSliderMobileLayout' },
+};
+
 export default function PublicView() {
-  const { id } = useParams();
+  const { id, section: sectionParam } = useParams();
+  const section = SECTION_LAYOUT_KEYS[sectionParam] ? sectionParam : 'miPagina';
   const [project, setProject] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -289,7 +297,8 @@ export default function PublicView() {
     </div>
   );
 
-  const canvasItems = viewMode === 'mobile' ? project.mobileLayout : project.desktopLayout;
+  const layoutKeys = SECTION_LAYOUT_KEYS[section];
+  const canvasItems = viewMode === 'mobile' ? project[layoutKeys.mobile] : project[layoutKeys.desktop];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', maxWidth: '100vw', overflowX: 'hidden', fontFamily: 'sans-serif' }}>
@@ -298,7 +307,7 @@ export default function PublicView() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <img src="https://http2.mlstatic.com/frontend-assets/ml-web-navigation/ui-navigation/6.6.73/mercadolibre/logo_large_25years_v2.png" alt="MeLi" style={{ height: 20 }} />
           <span style={{ width: 1, height: 18, background: '#e6e6e6' }} />
-          <span style={{ fontSize: 12, color: '#aaa' }}>Vista previa · <strong style={{ color: '#333' }}>{project.title}</strong></span>
+          <span style={{ fontSize: 12, color: '#aaa' }}>Vista previa · <strong style={{ color: '#333' }}>{project.title}</strong> · {SECTION_LABELS[section]}</span>
         </div>
         {!isMobile && (
           <div style={{ display: 'flex', background: '#f5f5f5', borderRadius: 8, padding: 3, gap: 2 }}>
@@ -329,7 +338,7 @@ export default function PublicView() {
           margin: isMobile ? 0 : '0 auto',
           boxShadow: isMobile ? 'none' : '0 10px 40px rgba(0,0,0,0.12)'
         }}>
-          {viewMode === 'desktop' ? <MeLiHeaderDesktop /> : <MeLiHeaderMobile />}
+          {section === 'miPagina' && (viewMode === 'desktop' ? <MeLiHeaderDesktop /> : <MeLiHeaderMobile />)}
           <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignContent: 'flex-start', padding: 20, gap: 20 }}>
             {canvasItems?.map(item => renderPublicItem(item, viewMode))}
           </div>

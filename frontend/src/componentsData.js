@@ -1,4 +1,7 @@
 export const componentsList = [
+  // ══════════════════════════════════════════════════════════════
+  // MI PÁGINA
+  // ══════════════════════════════════════════════════════════════
   {
     id: "encabezado_portada_logo",
     name: "Encabezado: Portada + Logo",
@@ -7,7 +10,8 @@ export const componentsList = [
     safeAreaDesktop: "1800 x 180 px",
     safeAreaMobile: "675 x 122 px",
     notes: "Portada (Max: 10 MB) + Logo (1000x1000px, Fondo transparente)",
-    type: "header"
+    type: "header",
+    section: "miPagina"
   },
   {
     id: "banner_principal_pequeno",
@@ -17,7 +21,8 @@ export const componentsList = [
     safeAreaDesktop: "1760 x 320 px",
     safeAreaMobile: "560 x 300 px",
     notes: "Peso máximo: 10 MB",
-    type: "banner"
+    type: "banner",
+    section: "miPagina"
   },
   {
     id: "banner_principal_grande",
@@ -27,7 +32,8 @@ export const componentsList = [
     safeAreaDesktop: "1814 x 555 px",
     safeAreaMobile: "548 x 741 px",
     notes: "Peso máximo: 10 MB",
-    type: "banner"
+    type: "banner",
+    section: "miPagina"
   },
   {
     id: "banner_principal_flotante",
@@ -35,7 +41,8 @@ export const componentsList = [
     desktopSize: { width: 2880, height: 720 },
     mobileSize: { width: 1080, height: 804 },
     notes: "Peso máximo: 10 MB",
-    type: "banner"
+    type: "banner",
+    section: "miPagina"
   },
   {
     id: "banner_secundario_pequeno",
@@ -45,7 +52,8 @@ export const componentsList = [
     safeAreaDesktop: "1460 x 210 px",
     safeAreaMobile: "564 x 160 px",
     notes: "Peso máximo: 10 MB. No admite carrusel.",
-    type: "banner"
+    type: "banner",
+    section: "miPagina"
   },
   {
     id: "banner_secundario_grande",
@@ -53,7 +61,8 @@ export const componentsList = [
     desktopSize: { width: 1500, height: 375 },
     mobileSize: { width: 600, height: 340 },
     notes: "Peso máximo: 10 MB. No admite carrusel.",
-    type: "banner"
+    type: "banner",
+    section: "miPagina"
   },
   {
     id: "lista_contenido",
@@ -61,7 +70,8 @@ export const componentsList = [
     desktopSize: { width: 574, height: 323 },
     mobileSize: { width: 328, height: 323 },
     notes: "Permite hasta 4 elementos por fila. Lleva: Imagen, Título, Párrafo y CTA.",
-    type: "list"
+    type: "list",
+    section: "miPagina"
   },
   {
     id: "carrusel_categorias_2",
@@ -69,7 +79,8 @@ export const componentsList = [
     desktopSize: { width: 574, height: 323 },
     mobileSize: null,
     notes: "Se visualiza en carrusel horizontal",
-    type: "carousel"
+    type: "carousel",
+    section: "miPagina"
   },
   {
     id: "carrusel_categorias_3",
@@ -77,7 +88,8 @@ export const componentsList = [
     desktopSize: { width: 372, height: 209 },
     mobileSize: null,
     notes: "Lleva a un listado de productos",
-    type: "carousel"
+    type: "carousel",
+    section: "miPagina"
   },
   {
     id: "carrusel_categorias_4",
@@ -85,7 +97,8 @@ export const componentsList = [
     desktopSize: { width: 271, height: 153 },
     mobileSize: null,
     notes: "Versión entregable única",
-    type: "carousel"
+    type: "carousel",
+    section: "miPagina"
   },
   {
     id: "galeria_categorias_2",
@@ -93,7 +106,8 @@ export const componentsList = [
     desktopSize: { width: 574, height: 323 },
     mobileSize: { width: 328, height: 184 },
     notes: "Ideal para destacar secciones clave",
-    type: "gallery"
+    type: "gallery",
+    section: "miPagina"
   },
   {
     id: "galeria_categorias_3",
@@ -101,7 +115,8 @@ export const componentsList = [
     desktopSize: { width: 372, height: 209 },
     mobileSize: { width: 328, height: 184 },
     notes: "Personaliza tu marca con imágenes",
-    type: "gallery"
+    type: "gallery",
+    section: "miPagina"
   },
   {
     id: "galeria_categorias_4",
@@ -109,7 +124,8 @@ export const componentsList = [
     desktopSize: { width: 271, height: 153 },
     mobileSize: { width: 156, height: 156 },
     notes: "Organización en cuadrícula",
-    type: "gallery"
+    type: "gallery",
+    section: "miPagina"
   },
   {
     id: "tarjeta_producto",
@@ -117,7 +133,8 @@ export const componentsList = [
     desktopSize: { width: 271, height: 420 },
     mobileSize: { width: 160, height: 300 },
     notes: "Tarjeta de producto estilo MeLi. Subir imagen del producto.",
-    type: "product_card"
+    type: "product_card",
+    section: "miPagina"
   },
   {
     id: "video_portada",
@@ -125,7 +142,8 @@ export const componentsList = [
     desktopSize: { width: 640, height: 360 },
     mobileSize: { width: 640, height: 360 },
     notes: "Requiere URL de YouTube",
-    type: "video"
+    type: "video",
+    section: "miPagina"
   },
   {
     id: "texto_libre",
@@ -133,7 +151,8 @@ export const componentsList = [
     desktopSize: { width: 1920, height: null },
     mobileSize: { width: 800, height: null },
     notes: "Bloque de texto editable. Fuente Proxima Nova.",
-    type: "text_block"
+    type: "text_block",
+    section: "miPagina"
   },
   {
     id: "salto_linea",
@@ -141,7 +160,8 @@ export const componentsList = [
     desktopSize: { width: '100%', height: 40 },
     mobileSize: { width: '100%', height: 40 },
     notes: "Fuerza a los siguientes elementos a una nueva fila",
-    type: "spacer"
+    type: "spacer",
+    section: "miPagina"
   },
   {
     id: "perfil_tienda_mobile",
@@ -149,6 +169,54 @@ export const componentsList = [
     desktopSize: null,
     mobileSize: { width: 800, height: 80 },
     notes: "Encabezado de perfil de tienda oficial MeLi para mobile. Subir ícono y editar nombre de marca.",
-    type: "store_profile"
+    type: "store_profile",
+    section: "miPagina"
+  },
+
+  // ══════════════════════════════════════════════════════════════
+  // HOME SLIDER (Guía de formatos ML)
+  // ══════════════════════════════════════════════════════════════
+  {
+    id: "home_slider",
+    name: "Home Slider",
+    desktopSize: { width: 1920, height: 500 },
+    mobileSize: { width: 984, height: 450 },
+    safeAreaDesktop: "1020 x 340 px",
+    safeAreaMobile: "920 x 298 px",
+    notes: "Titular, volanta (opcional), beneficios, legales, imagen y hasta 3 logos. Versiones entregables: Desktop Nuevo y Mobile.",
+    type: "banner",
+    section: "homeSlider"
+  },
+  {
+    id: "home_slider_app",
+    name: "Home Slider (App)",
+    desktopSize: null,
+    mobileSize: { width: 984, height: 402 },
+    safeAreaMobile: "920 x 330 px",
+    notes: "Versión App del Home Slider. Misma pieza que Mobile, adaptada.",
+    type: "banner",
+    section: "homeSlider"
+  },
+
+  // ══════════════════════════════════════════════════════════════
+  // RTB — Programmatic (Guía de formatos ML)
+  // ══════════════════════════════════════════════════════════════
+  {
+    id: "rtb_imagen",
+    name: "RTB Imagen",
+    desktopSize: { width: 1008, height: 528 },
+    mobileSize: { width: 528, height: 528 },
+    notes: "Imagen Rectangular (Desktop, 1008x528) e Imagen Cuadrada (Mobile, 528x528). Volanta hasta 20 caract., título máx. 34 (2 líneas de 17), CTA máx. 15 caract. Legales sobre la imagen: máx. 80 caract.",
+    type: "banner",
+    section: "rtb"
+  },
+  {
+    id: "rtb_logo",
+    name: "RTB Logo",
+    desktopSize: { width: 258, height: 192 },
+    mobileSize: { width: 258, height: 192 },
+    notes: "Logo sobre fondo blanco. Máximo 2 logos.",
+    type: "banner",
+    section: "rtb"
   }
 ];

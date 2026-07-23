@@ -260,6 +260,13 @@ function CommentPanel({
 
 
 
+// Secciones del proyecto: cada una tiene su propio par de canvases Desktop/Mobile
+const SECTIONS = [
+  { key: 'miPagina', label: 'Mi página' },
+  { key: 'rtb', label: "RTB's" },
+  { key: 'homeSlider', label: 'Home Slider' },
+];
+
 // Helper icon selector
 const getIcon = (type) => {
   switch (type) {
@@ -443,8 +450,13 @@ function Editor() {
   const [textResizing, setTextResizing] = useState(null); // { id, dir, startX, startY, startW, startH }
 
   const [viewMode, setViewMode] = useState('desktop');
-  const [canvases, setCanvases] = useState({ desktop: [], mobile: [] });
-  const canvasItems = canvases[viewMode];
+  const [activeSection, setActiveSection] = useState('miPagina'); // 'miPagina' | 'rtb' | 'homeSlider'
+  const [canvases, setCanvases] = useState({
+    miPagina: { desktop: [], mobile: [] },
+    rtb: { desktop: [], mobile: [] },
+    homeSlider: { desktop: [], mobile: [] },
+  });
+  const canvasItems = canvases[activeSection][viewMode];
 
   const isInitialLoad = useRef(true);
 
@@ -468,8 +480,18 @@ function Editor() {
         .then(data => {
           setProjectTitle(data.title);
           setCanvases({
-            desktop: Array.isArray(data.desktopLayout) ? data.desktopLayout : [],
-            mobile: Array.isArray(data.mobileLayout) ? data.mobileLayout : []
+            miPagina: {
+              desktop: Array.isArray(data.desktopLayout) ? data.desktopLayout : [],
+              mobile: Array.isArray(data.mobileLayout) ? data.mobileLayout : []
+            },
+            rtb: {
+              desktop: Array.isArray(data.rtbDesktopLayout) ? data.rtbDesktopLayout : [],
+              mobile: Array.isArray(data.rtbMobileLayout) ? data.rtbMobileLayout : []
+            },
+            homeSlider: {
+              desktop: Array.isArray(data.homeSliderDesktopLayout) ? data.homeSliderDesktopLayout : [],
+              mobile: Array.isArray(data.homeSliderMobileLayout) ? data.homeSliderMobileLayout : []
+            },
           });
           setIsPublished(data.isPublished || false);
           if (data.slug) setPublishedSlug(data.slug);
@@ -534,8 +556,12 @@ function Editor() {
         },
         body: JSON.stringify({
           title: projectTitle,
-          desktopLayout: canvases.desktop,
-          mobileLayout: canvases.mobile
+          desktopLayout: canvases.miPagina.desktop,
+          mobileLayout: canvases.miPagina.mobile,
+          rtbDesktopLayout: canvases.rtb.desktop,
+          rtbMobileLayout: canvases.rtb.mobile,
+          homeSliderDesktopLayout: canvases.homeSlider.desktop,
+          homeSliderMobileLayout: canvases.homeSlider.mobile
         })
       })
         .then(res => res.json())
@@ -554,8 +580,8 @@ function Editor() {
 
   const setCanvasItems = (updater) => {
     setCanvases(prev => {
-      const newItems = typeof updater === 'function' ? updater(prev[viewMode]) : updater;
-      return { ...prev, [viewMode]: newItems };
+      const newItems = typeof updater === 'function' ? updater(prev[activeSection][viewMode]) : updater;
+      return { ...prev, [activeSection]: { ...prev[activeSection], [viewMode]: newItems } };
     });
   };
 
@@ -586,8 +612,8 @@ function Editor() {
       if (item.type === 'rowGroup' && item.items) item.items.forEach(c => allItems.push({ ...c, _device: device }));
       else allItems.push({ ...item, _device: device });
     });
-    collect(canvases.desktop || [], 'desktop');
-    collect(canvases.mobile || [], 'mobile');
+    collect(canvases[activeSection].desktop || [], 'desktop');
+    collect(canvases[activeSection].mobile || [], 'mobile');
 
     // Solo items con imagen subida (excluir store_profile — ícono de marca, sin validación MAIA)
     const itemsToCheck = allItems.filter(item => item.uploadedImages?.[0] && item.type !== 'store_profile');
@@ -691,8 +717,11 @@ function Editor() {
           });
 
           return {
-            desktop: updateLayout(prev.desktop),
-            mobile: updateLayout(prev.mobile)
+            ...prev,
+            [activeSection]: {
+              desktop: updateLayout(prev[activeSection].desktop),
+              mobile: updateLayout(prev[activeSection].mobile)
+            }
           };
         });
       }
@@ -795,7 +824,7 @@ function Editor() {
         }
       }
     };
-    const allItems = [...(canvases.desktop || []), ...(canvases.mobile || [])];
+    const allItems = [...(canvases[activeSection].desktop || []), ...(canvases[activeSection].mobile || [])];
     findOwner(allItems);
     try {
       const res = await fetch(`${API_URL}/api/analyze-typos`, {
@@ -833,8 +862,8 @@ function Editor() {
       }
     };
     const otherMode = viewMode === 'desktop' ? 'mobile' : 'desktop';
-    searchItem(canvases[viewMode] || [], viewMode);
-    if (!foundItem) searchItem(canvases[otherMode] || [], otherMode);
+    searchItem(canvases[activeSection][viewMode] || [], viewMode);
+    if (!foundItem) searchItem(canvases[activeSection][otherMode] || [], otherMode);
     if (!foundItem) return;
 
     // Cotejar contra las medidas del canvas donde vive el módulo
@@ -1044,6 +1073,12 @@ function Editor() {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [lasso, setLasso] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
+
+  // Al cambiar de sección, limpiar selección/menú contextual (pertenecían a otro canvas)
+  useEffect(() => {
+    setSelectedIds(new Set());
+    setContextMenu(null);
+  }, [activeSection]);
 
   // Sidebar drag events
   const handleDragStartSidebar = (e, component) => {
@@ -2303,7 +2338,8 @@ function Editor() {
 
           {/* Publish Modal */}
           {showPublishModal && (() => {
-            const publicUrl = `${window.location.origin}/view/${publishedSlug || id}`;
+            const sectionPath = activeSection === 'miPagina' ? '' : `/${activeSection}`;
+            const publicUrl = `${window.location.origin}/view/${publishedSlug || id}${sectionPath}`;
             const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(publicUrl)}`;
             return (
               <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowPublishModal(false)}>
@@ -2312,7 +2348,7 @@ function Editor() {
                   <div style={{ textAlign: 'center', marginBottom: '24px' }}>
                     <div style={{ fontSize: '40px', marginBottom: '8px' }}>🎉</div>
                     <h2 style={{ margin: '0 0 4px 0', fontSize: '22px', color: '#1a1a1a' }}>¡Maqueta publicada!</h2>
-                    <p style={{ color: '#888', fontSize: '14px', margin: 0 }}>Cualquier persona con el enlace puede verla</p>
+                    <p style={{ color: '#888', fontSize: '14px', margin: 0 }}>Enlace de <strong>{SECTIONS.find(s => s.key === activeSection)?.label}</strong> · cualquier persona con el enlace puede verla</p>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
                     <img src={qrUrl} alt="QR Code" style={{ width: '160px', height: '160px', borderRadius: '12px', border: '3px solid #1a1f2e', padding: '6px' }} />
@@ -2634,17 +2670,41 @@ function Editor() {
         </div>
       </div>
 
-      <div className="builder-layout" style={{ height: 'calc(100vh - 56px)' }} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
+      {/* ── SECCIONES DEL PROYECTO ── */}
+      <div style={{
+        height: '44px', background: '#f4f6fb', borderBottom: '1px solid #e0e5ef',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        gap: '6px', padding: '0 20px', flexShrink: 0,
+      }}>
+        {SECTIONS.map(sec => (
+          <button
+            key={sec.key}
+            onClick={() => setActiveSection(sec.key)}
+            style={{
+              padding: '6px 16px', border: 'none', borderRadius: '7px', cursor: 'pointer',
+              fontSize: '13px', fontWeight: '700', letterSpacing: '0.01em',
+              background: activeSection === sec.key ? '#1a1f2e' : 'transparent',
+              color: activeSection === sec.key ? '#fff159' : '#6b7280',
+              transition: 'all 0.15s',
+            }}
+          >
+            {sec.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="builder-layout" style={{ height: 'calc(100vh - 100px)' }} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
         {/* ── SIDEBAR ── */}
         {!isPreviewMode && (
           <div className="sidebar">
             <div className="sidebar-header">
-              <h2>Componentes</h2>
+              <h2>Componentes · {SECTIONS.find(s => s.key === activeSection)?.label}</h2>
             </div>
             <div className="sidebar-content">
               <div className="comp-grid">
                 {componentsList
                   .filter((comp) => {
+                    if ((comp.section || 'miPagina') !== activeSection) return false;
                     if (viewMode === 'desktop') {
                       return comp.desktopSize !== null;
                     } else {
@@ -2844,7 +2904,7 @@ function Editor() {
             {contextMenu.targetId && (() => {
               // Buscar el item target en ambos canvases
               let targetItem = null;
-              [...canvases.desktop, ...canvases.mobile].forEach(i => {
+              [...canvases[activeSection].desktop, ...canvases[activeSection].mobile].forEach(i => {
                 if (i.uniqueId === contextMenu.targetId) targetItem = i;
                 if (i.type === 'rowGroup') i.items.forEach(c => { if (c.uniqueId === contextMenu.targetId) targetItem = c; });
               });
@@ -2936,12 +2996,12 @@ function Editor() {
             {/* Toggle Info for Lists */}
             {(() => {
               let targetItem = null;
-              canvases.desktop.forEach(i => {
+              canvases[activeSection].desktop.forEach(i => {
                 if (i.uniqueId === contextMenu.targetId) targetItem = i;
                 if (i.type === 'rowGroup') i.items.forEach(c => { if (c.uniqueId === contextMenu.targetId) targetItem = c; });
               });
               if (!targetItem) {
-                canvases.mobile.forEach(i => {
+                canvases[activeSection].mobile.forEach(i => {
                   if (i.uniqueId === contextMenu.targetId) targetItem = i;
                   if (i.type === 'rowGroup') i.items.forEach(c => { if (c.uniqueId === contextMenu.targetId) targetItem = c; });
                 });

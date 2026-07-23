@@ -21,13 +21,17 @@ model User {
 }
 
 model Project {
-  id            String          @id @default(uuid())
-  title         String
-  desktopLayout Json            @default("[]")
-  mobileLayout  Json            @default("[]")
-  canvasNodes   Json            @default("{}")
-  isPublished   Boolean         @default(false)
-  slug          String?         @unique
+  id                      String          @id @default(uuid())
+  title                   String
+  desktopLayout           Json            @default("[]")
+  mobileLayout            Json            @default("[]")
+  rtbDesktopLayout        Json            @default("[]")
+  rtbMobileLayout         Json            @default("[]")
+  homeSliderDesktopLayout Json            @default("[]")
+  homeSliderMobileLayout  Json            @default("[]")
+  canvasNodes             Json            @default("{}")
+  isPublished             Boolean         @default(false)
+  slug                    String?         @unique
   userId        String
   user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   editors       ProjectEditor[]

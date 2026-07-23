@@ -13,6 +13,7 @@ function App() {
         <Route path="/projects" element={<Projects />} />
         <Route path="/editor/:id" element={<Editor />} />
         <Route path="/view/:id" element={<PublicView />} />
+        <Route path="/view/:id/:section" element={<PublicView />} />
         {/* Default route redirects to login */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>

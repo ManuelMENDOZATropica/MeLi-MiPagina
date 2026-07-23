@@ -46,7 +46,10 @@ router.post('/projects', authenticateToken, async (req, res) => {
     const newProject = await prisma.project.create({
       data: {
         title: title || 'Nuevo Proyecto de Landing',
-        desktopLayout: [], mobileLayout: [], canvasNodes: {},
+        desktopLayout: [], mobileLayout: [],
+        rtbDesktopLayout: [], rtbMobileLayout: [],
+        homeSliderDesktopLayout: [], homeSliderMobileLayout: [],
+        canvasNodes: {},
         userId: req.user.id,
         editors: { create: Array.isArray(editorIds) ? editorIds.map(userId => ({ userId })) : [] }
       },
@@ -80,10 +83,19 @@ router.get('/projects/:id', authenticateToken, async (req, res) => {
 // PATCH actualizar (autoguardado)
 router.patch('/projects/:id', authenticateToken, async (req, res) => {
   try {
-    const { desktopLayout, mobileLayout, canvasNodes, title } = req.body;
+    const {
+      desktopLayout, mobileLayout,
+      rtbDesktopLayout, rtbMobileLayout,
+      homeSliderDesktopLayout, homeSliderMobileLayout,
+      canvasNodes, title
+    } = req.body;
     const updateData = {};
     if (desktopLayout !== undefined) updateData.desktopLayout = desktopLayout;
     if (mobileLayout !== undefined) updateData.mobileLayout = mobileLayout;
+    if (rtbDesktopLayout !== undefined) updateData.rtbDesktopLayout = rtbDesktopLayout;
+    if (rtbMobileLayout !== undefined) updateData.rtbMobileLayout = rtbMobileLayout;
+    if (homeSliderDesktopLayout !== undefined) updateData.homeSliderDesktopLayout = homeSliderDesktopLayout;
+    if (homeSliderMobileLayout !== undefined) updateData.homeSliderMobileLayout = homeSliderMobileLayout;
     if (canvasNodes !== undefined) updateData.canvasNodes = canvasNodes;
     if (title !== undefined) updateData.title = title;
 
@@ -95,11 +107,20 @@ router.patch('/projects/:id', authenticateToken, async (req, res) => {
     const project = await prisma.project.update({ where: { id: req.params.id }, data: updateData });
 
     // Broadcast en tiempo real a los demás colaboradores
-    if (io && (desktopLayout !== undefined || mobileLayout !== undefined || title !== undefined)) {
+    const touchedLayout = [
+      desktopLayout, mobileLayout,
+      rtbDesktopLayout, rtbMobileLayout,
+      homeSliderDesktopLayout, homeSliderMobileLayout
+    ].some(v => v !== undefined);
+    if (io && (touchedLayout || title !== undefined)) {
       const socketId = req.headers['x-socket-id'] || null;
       const payload = {
         desktopLayout: project.desktopLayout,
         mobileLayout: project.mobileLayout,
+        rtbDesktopLayout: project.rtbDesktopLayout,
+        rtbMobileLayout: project.rtbMobileLayout,
+        homeSliderDesktopLayout: project.homeSliderDesktopLayout,
+        homeSliderMobileLayout: project.homeSliderMobileLayout,
         title: project.title,
         savedBy: req.user.id,
       };
@@ -185,7 +206,15 @@ router.get('/public/projects/:key', async (req, res) => {
     if (!project || !project.isPublished) {
       return res.status(404).json({ error: 'Este proyecto no está publicado o no existe.' });
     }
-    res.json({ title: project.title, desktopLayout: project.desktopLayout, mobileLayout: project.mobileLayout });
+    res.json({
+      title: project.title,
+      desktopLayout: project.desktopLayout,
+      mobileLayout: project.mobileLayout,
+      rtbDesktopLayout: project.rtbDesktopLayout,
+      rtbMobileLayout: project.rtbMobileLayout,
+      homeSliderDesktopLayout: project.homeSliderDesktopLayout,
+      homeSliderMobileLayout: project.homeSliderMobileLayout,
+    });
   } catch (error) {
     res.status(500).json({ error: 'Error fetching public project' });
   }

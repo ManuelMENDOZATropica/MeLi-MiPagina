@@ -11,18 +11,25 @@ router.post('/auth/google', async (req, res) => {
   const { credential } = req.body;
   if (!credential) return res.status(400).json({ error: 'Se requiere un credential de Google.' });
 
+  let payload;
   try {
     const ticket = await googleClient.verifyIdToken({
       idToken: credential,
       audience: process.env.GOOGLE_CLIENT_ID,
     });
-    const payload = ticket.getPayload();
-    const { email, name, picture } = payload;
+    payload = ticket.getPayload();
+  } catch (error) {
+    console.error('Error verificando token de Google:', error.message);
+    return res.status(401).json({ error: 'Token de Google inválido o expirado.' });
+  }
 
-    if (!email.endsWith('@tropica.me')) {
-      return res.status(403).json({ error: 'Acceso denegado. Solo se permiten correos @tropica.me' });
-    }
+  const { email, name, picture } = payload;
 
+  if (!email.endsWith('@tropica.me')) {
+    return res.status(403).json({ error: 'Acceso denegado. Solo se permiten correos @tropica.me' });
+  }
+
+  try {
     let user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
       user = await prisma.user.create({ data: { email, name, avatar: picture } });
@@ -33,8 +40,8 @@ router.post('/auth/google', async (req, res) => {
     const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
     res.json({ token, user });
   } catch (error) {
-    console.error('Error verificando token de Google:', error.message);
-    res.status(401).json({ error: 'Token de Google inválido o expirado.' });
+    console.error('Error de base de datos en /auth/google:', error.message);
+    res.status(503).json({ error: 'No se pudo conectar con la base de datos. Intentá de nuevo en unos minutos.' });
   }
 });
 
