@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Monitor, Smartphone, GripVertical, Trash2, Image as ImageIcon, Layout, Type, Video, Search, MapPin, Tag, ChevronDown, Bell, ShoppingCart, User, AlignCenter, MoveHorizontal, ListMinus, AlignJustify, CornerDownLeft, ArrowLeft, CheckCircle2, Play, Edit3, Eye, EyeOff, Layers, Grid, Settings, ArrowRight, FileDown } from 'lucide-react';
+import { Monitor, Smartphone, GripVertical, Trash2, Image as ImageIcon, Layout, Type, Video, Search, MapPin, Tag, ChevronDown, Bell, ShoppingCart, User, AlignCenter, MoveHorizontal, ListMinus, AlignJustify, CornerDownLeft, ArrowLeft, CheckCircle2, Play, Edit3, Eye, EyeOff, Layers, Grid, Settings, ArrowRight, FileDown, Truck, Star } from 'lucide-react';
 import { componentsList } from '../componentsData';
 import API_URL from '../api';
 import '../index.css';
@@ -262,39 +262,67 @@ function CommentPanel({
 
 // Mock de contexto de página MeLi para RTB y Home Slider — solo visual, no editable,
 // no se exporta al PDF (data-html2canvas-ignore) ni ocupa espacio real en el layout.
-const FakeCard = ({ viewMode, priceColor = '#d5d5d5' }) => (
-  <div style={{ width: viewMode === 'desktop' ? 160 : 105, background: 'white', borderRadius: 6, overflow: 'hidden', border: '1px solid #ebebeb', flexShrink: 0 }}>
-    <div style={{ width: '100%', height: viewMode === 'desktop' ? 140 : 95, background: '#e8e8e8' }} />
-    <div style={{ padding: 8 }}>
-      <div style={{ width: '65%', height: 8, background: '#e0e0e0', borderRadius: 2, marginBottom: 6 }} />
-      <div style={{ width: '40%', height: 10, background: priceColor, borderRadius: 2 }} />
+// Íconos y colores extraídos de una copia real de mercadolibre.com.mx (CDN oficial mlstatic.com).
+const MELI_CATEGORY_ICONS = 'https://http2.mlstatic.com/storage/homes-korriban/assets/icons/xxhdpi/';
+const MELI_CATEGORIES = [
+  { label: 'Celulares', icon: 'home_mobile-button-category.webp' },
+  { label: 'Moda', icon: 'home_style_summer_female-2-category.webp' },
+  { label: 'Hogar', icon: 'home_armchair_blue-category.webp' },
+  { label: 'Electrónica', icon: 'home_audio-92-category.webp' },
+  { label: 'Deportes', icon: 'home_ball-soccer-category.webp' },
+  { label: 'Juguetes', icon: 'home_bear-2-category.webp' },
+  { label: 'Belleza', icon: 'home_makeup-category.webp' },
+  { label: 'Vehículos', icon: 'home_car-front-new-category.webp' },
+];
+
+const FakeCard = ({ viewMode }) => {
+  const w = viewMode === 'desktop' ? 168 : 108;
+  const fs = (n) => `${Math.round(n * (w / 168))}px`;
+  return (
+    <div style={{ width: w, background: 'white', borderRadius: 6, overflow: 'hidden', border: '1px solid #ebebeb', flexShrink: 0, fontFamily: "'Proxima Nova','Inter',-apple-system,sans-serif" }}>
+      <div style={{ width: '100%', height: viewMode === 'desktop' ? 150 : 100, background: '#f0f0f0' }} />
+      <div style={{ padding: `${fs(8)} ${fs(9)}`, display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <s style={{ fontSize: fs(10), color: '#999', lineHeight: 1 }}>$ X.XXX</s>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: fs(17), color: '#1a1a2e', fontWeight: 400 }}>$ X.XXX</span>
+          <span style={{ fontSize: fs(9), fontWeight: 700, background: '#00a650', color: 'white', padding: `1px ${fs(5)}`, borderRadius: '10px' }}>XX% OFF</span>
+        </div>
+        <span style={{ fontSize: fs(10), color: '#00a650', fontWeight: 500 }}>en 3 MSI</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+          <Truck size={Math.max(9, Math.round(11 * (w / 168)))} color="#00a650" />
+          <span style={{ fontSize: fs(10), color: '#00a650', fontWeight: 500 }}>Llega gratis mañana</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 1 }}>
+          {[...Array(4)].map((_, i) => <Star key={i} size={Math.max(8, Math.round(10 * (w / 168)))} fill="#3483fa" color="#3483fa" />)}
+          <Star size={Math.max(8, Math.round(10 * (w / 168)))} color="#c9c9c9" />
+        </div>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const PageContextMock = ({ section, viewMode, position }) => {
   if (section !== 'rtb' && section !== 'homeSlider') return null;
-  const pad = viewMode === 'desktop' ? '0 40px' : '0 16px';
+  const padPx = viewMode === 'desktop' ? 40 : 16;
   const gap = viewMode === 'desktop' ? 14 : 8;
   const label = (text) => (
-    <div style={{ textAlign: 'center', fontSize: '10px', color: '#b0b0b0', padding: '8px 0', letterSpacing: '0.04em', textTransform: 'uppercase', fontWeight: 700 }}>{text}</div>
+    <div style={{ textAlign: 'center', fontSize: '10px', color: '#b0b0b0', padding: '8px 0', letterSpacing: '0.04em', textTransform: 'uppercase', fontWeight: 700, background: 'white' }}>{text}</div>
   );
 
   if (section === 'homeSlider' && position === 'after') {
-    const cats = ['Celulares', 'Moda', 'Belleza', 'Hogar', 'Electro', 'Deportes', 'Juguetes', 'Vehículos'];
     return (
-      <div data-html2canvas-ignore="true" style={{ width: '100%', pointerEvents: 'none', userSelect: 'none', background: '#f5f5f5' }}>
+      <div data-html2canvas-ignore="true" style={{ width: '100%', pointerEvents: 'none', userSelect: 'none', fontFamily: "'Proxima Nova','Inter',-apple-system,sans-serif" }}>
         {label('↑ Contexto de referencia (no se exporta) — resto de la Home')}
-        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: viewMode === 'desktop' ? 24 : 12, padding: `20px ${viewMode === 'desktop' ? '40px' : '16px'}` }}>
-          {cats.map(c => (
-            <div key={c} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, width: viewMode === 'desktop' ? 90 : 64 }}>
-              <div style={{ width: viewMode === 'desktop' ? 64 : 44, height: viewMode === 'desktop' ? 64 : 44, borderRadius: '50%', background: '#e8e8e8' }} />
-              <span style={{ fontSize: viewMode === 'desktop' ? 11 : 9, color: '#767676', textAlign: 'center' }}>{c}</span>
+        <div style={{ background: 'white', padding: `18px ${padPx}px`, display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: viewMode === 'desktop' ? 28 : 14, borderBottom: '8px solid #f5f5f5' }}>
+          {MELI_CATEGORIES.map(({ label: cat, icon }) => (
+            <div key={cat} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, width: viewMode === 'desktop' ? 84 : 60 }}>
+              <img src={MELI_CATEGORY_ICONS + icon} alt="" style={{ width: viewMode === 'desktop' ? 48 : 34, height: viewMode === 'desktop' ? 48 : 34, objectFit: 'contain' }} />
+              <span style={{ fontSize: viewMode === 'desktop' ? 11 : 9, color: '#4b4b4b', textAlign: 'center' }}>{cat}</span>
             </div>
           ))}
         </div>
-        <div style={{ padding: `10px ${pad.split(' ')[1]} 30px` }}>
-          <h3 style={{ fontSize: viewMode === 'desktop' ? 16 : 13, color: '#333', margin: '0 0 12px', fontWeight: 600 }}>Más vendidos</h3>
+        <div style={{ background: '#f5f5f5', padding: `18px ${padPx}px 30px` }}>
+          <h3 style={{ fontSize: viewMode === 'desktop' ? 17 : 13, color: '#333', margin: '0 0 12px', fontWeight: 600 }}>Más vendidos para ti</h3>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap }}>
             {Array.from({ length: viewMode === 'desktop' ? 6 : 3 }).map((_, i) => <FakeCard key={i} viewMode={viewMode} />)}
           </div>
@@ -306,14 +334,14 @@ const PageContextMock = ({ section, viewMode, position }) => {
   if (section === 'rtb') {
     if (position === 'before') {
       return (
-        <div data-html2canvas-ignore="true" style={{ width: '100%', pointerEvents: 'none', userSelect: 'none', background: '#f5f5f5' }}>
+        <div data-html2canvas-ignore="true" style={{ width: '100%', pointerEvents: 'none', userSelect: 'none', fontFamily: "'Proxima Nova','Inter',-apple-system,sans-serif" }}>
           {label('↓ Contexto de referencia (no se exporta) — listado de resultados')}
-          <div style={{ padding: `12px ${pad.split(' ')[1]} 14px` }}>
+          <div style={{ background: '#f5f5f5', padding: `14px ${padPx}px 14px` }}>
             <h3 style={{ fontSize: viewMode === 'desktop' ? 15 : 12, color: '#333', margin: '0 0 12px', fontWeight: 400 }}>
               <span style={{ fontWeight: 700 }}>1.234 resultados</span> para "zapatillas running"
             </h3>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap }}>
-              {Array.from({ length: viewMode === 'desktop' ? 4 : 2 }).map((_, i) => <FakeCard key={i} viewMode={viewMode} priceColor="#00a650" />)}
+              {Array.from({ length: viewMode === 'desktop' ? 4 : 2 }).map((_, i) => <FakeCard key={i} viewMode={viewMode} />)}
             </div>
           </div>
         </div>
@@ -321,10 +349,10 @@ const PageContextMock = ({ section, viewMode, position }) => {
     }
     if (position === 'after') {
       return (
-        <div data-html2canvas-ignore="true" style={{ width: '100%', pointerEvents: 'none', userSelect: 'none', background: '#f5f5f5' }}>
-          <div style={{ padding: `14px ${pad.split(' ')[1]} 30px` }}>
+        <div data-html2canvas-ignore="true" style={{ width: '100%', pointerEvents: 'none', userSelect: 'none', fontFamily: "'Proxima Nova','Inter',-apple-system,sans-serif" }}>
+          <div style={{ background: '#f5f5f5', padding: `14px ${padPx}px 30px` }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap }}>
-              {Array.from({ length: viewMode === 'desktop' ? 4 : 2 }).map((_, i) => <FakeCard key={i} viewMode={viewMode} priceColor="#00a650" />)}
+              {Array.from({ length: viewMode === 'desktop' ? 4 : 2 }).map((_, i) => <FakeCard key={i} viewMode={viewMode} />)}
             </div>
           </div>
           {label('↑ Contexto de referencia (no se exporta)')}
@@ -554,6 +582,16 @@ function Editor() {
         })
         .then(data => {
           setProjectTitle(data.title);
+          // El Home Slider es una pieza única de la home real de MeLi: si el proyecto
+          // todavía no tiene una, la agregamos por defecto (solo falta subir la imagen).
+          const seedHomeSlider = () => {
+            const base = componentsList.find(c => c.id === 'home_slider');
+            return base ? { ...base, uniqueId: 'comp-homeslider-default-' + Date.now() } : null;
+          };
+          const hsDesktop = Array.isArray(data.homeSliderDesktopLayout) ? data.homeSliderDesktopLayout : [];
+          const hsMobile = Array.isArray(data.homeSliderMobileLayout) ? data.homeSliderMobileLayout : [];
+          const defaultHs = seedHomeSlider();
+
           setCanvases({
             miPagina: {
               desktop: Array.isArray(data.desktopLayout) ? data.desktopLayout : [],
@@ -564,8 +602,8 @@ function Editor() {
               mobile: Array.isArray(data.rtbMobileLayout) ? data.rtbMobileLayout : []
             },
             homeSlider: {
-              desktop: Array.isArray(data.homeSliderDesktopLayout) ? data.homeSliderDesktopLayout : [],
-              mobile: Array.isArray(data.homeSliderMobileLayout) ? data.homeSliderMobileLayout : []
+              desktop: hsDesktop.length > 0 ? hsDesktop : (defaultHs ? [{ ...defaultHs, uniqueId: defaultHs.uniqueId + '-d' }] : []),
+              mobile: hsMobile.length > 0 ? hsMobile : (defaultHs ? [{ ...defaultHs, uniqueId: defaultHs.uniqueId + '-m' }] : [])
             },
           });
           setIsPublished(data.isPublished || false);
