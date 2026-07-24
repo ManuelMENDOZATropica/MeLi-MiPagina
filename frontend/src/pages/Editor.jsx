@@ -3021,7 +3021,7 @@ function Editor() {
 
           <div className="canvas-container" onMouseDown={handleMouseDown} ref={containerRef}>
             <div style={{ width: (viewMode === 'desktop' ? 1920 : 800) * scale, display: 'flex', justifyContent: 'center', transition: 'width 0.3s ease' }}>
-              <div className={`canvas-wrapper ${viewMode}`} ref={pdfCanvasRef} style={{ transform: `scale(${scale})`, transformOrigin: 'top center' }}>
+              <div className={`canvas-wrapper ${viewMode} ${activeSection !== 'miPagina' ? 'compact' : ''}`} ref={pdfCanvasRef} style={{ transform: `scale(${scale})`, transformOrigin: 'top center' }}>
                 {viewMode === 'mobile' ? (
                   <div className="mobile-app-header">
                     {/* Status bar */}

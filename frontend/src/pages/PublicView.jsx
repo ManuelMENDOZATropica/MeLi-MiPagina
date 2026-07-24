@@ -317,8 +317,7 @@ const PageContextMock = ({ section, viewMode, position }) => {
     const isD = viewMode === 'desktop';
     const scaleB = isD ? 1 : 0.74;
     // Las tarjetas se superponen al borde inferior del slider, como en la home real.
-    // El -20 extra compensa el padding del contenedor del canvas.
-    const overlap = Math.round(120 * scaleB) + 20;
+    const overlap = Math.round(120 * scaleB);
     return (
       <div style={{
         width: '100%', fontFamily: "'Proxima Nova','Inter',-apple-system,sans-serif",
@@ -572,7 +571,7 @@ export default function PublicView() {
         }}>
           {viewMode === 'desktop' ? <MeLiHeaderDesktop /> : <MeLiHeaderMobile />}
           <PageContextMock section={section} viewMode={viewMode} position="before" />
-          <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignContent: 'flex-start', padding: 20, gap: 20 }}>
+          <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignContent: 'flex-start', padding: section === 'miPagina' ? 20 : 0, gap: 20 }}>
             {canvasItems?.map(item => renderPublicItem(item, viewMode))}
           </div>
           <PageContextMock section={section} viewMode={viewMode} position="after" />

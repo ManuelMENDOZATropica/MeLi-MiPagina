@@ -225,6 +225,19 @@ body {
   width: 1920px; /* Adjusted back to 1920px as requested */
 }
 
+/* Secciones RTB / Home Slider: el mock de contexto va pegado al contenido,
+   sin el alto mínimo ni el colchón inferior del canvas de Mi página */
+.canvas-wrapper.compact {
+  min-height: auto;
+  padding-bottom: 0;
+}
+
+.canvas-wrapper.compact .drop-zone {
+  flex: 0 0 auto;
+  min-height: auto;
+  padding: 0;
+}
+
 .canvas-wrapper.mobile {
   width: 800px;
 }
