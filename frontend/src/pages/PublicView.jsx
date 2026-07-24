@@ -244,18 +244,72 @@ const MeLiHeaderMobile = () => (
 
 // ─── Main Component ──────────────────────────────────────────────
 // ─── Mock de contexto (referencia visual, para ver RTB/Home Slider "en la página") ──
-// Íconos y colores extraídos de una copia real de mercadolibre.com.mx (CDN oficial mlstatic.com).
-const MELI_CATEGORY_ICONS = 'https://http2.mlstatic.com/storage/homes-korriban/assets/icons/xxhdpi/';
-const MELI_CATEGORIES = [
-  { label: 'Celulares', icon: 'home_mobile-button-category.webp' },
-  { label: 'Moda', icon: 'home_style_summer_female-2-category.webp' },
-  { label: 'Hogar', icon: 'home_armchair_blue-category.webp' },
-  { label: 'Electrónica', icon: 'home_audio-92-category.webp' },
-  { label: 'Deportes', icon: 'home_ball-soccer-category.webp' },
-  { label: 'Juguetes', icon: 'home_bear-2-category.webp' },
-  { label: 'Belleza', icon: 'home_makeup-category.webp' },
-  { label: 'Vehículos', icon: 'home_car-front-new-category.webp' },
+// Estructura y copys tomados de una captura real de mercadolibre.com.mx (fila de accesos
+// dinámicos debajo del Home Slider). Íconos ilustrados a mano (sin CDN externo).
+const BENEFIT_CARDS = [
+  { title: 'Envío gratis', desc: 'Beneficio por ser tu primera compra.', cta: 'Mostrar productos', variant: 'shipping' },
+  { title: 'Ingresa a tu cuenta', desc: 'Disfruta de ofertas y compra sin límites.', cta: 'Ingresar a tu cuenta', variant: 'account' },
+  { title: 'Ingresa tu ubicación', desc: 'Consulta costos y tiempos de entrega.', cta: 'Ingresar ubicación', variant: 'location' },
+  { title: 'Menos de $500', desc: 'Descubre productos con precios bajos.', cta: 'Mostrar productos', variant: 'price' },
+  { title: 'Más vendidos', desc: 'Explora los productos que son tendencia.', cta: 'Ir a Más vendidos', variant: 'trending' },
+  { title: 'Compra protegida', desc: 'Puedes devolver tu compra gratis.', cta: 'Cómo funciona', variant: 'protected' },
 ];
+
+const BenefitIcon = ({ variant, size }) => {
+  const yellow = '#FFE600', dark = '#2d2d2d';
+  const box = { width: size, height: size, viewBox: '0 0 80 80' };
+  switch (variant) {
+    case 'shipping':
+      return (
+        <svg {...box}>
+          <path d="M18 34 L40 22 L62 34 L62 58 L40 70 L18 58 Z" fill={yellow} stroke={dark} strokeWidth="2.5" strokeLinejoin="round" />
+          <path d="M18 34 L40 46 L62 34" fill="none" stroke={dark} strokeWidth="2.5" strokeLinejoin="round" />
+          <path d="M40 46 L40 70" stroke={dark} strokeWidth="2.5" />
+          <path d="M13 18 l3 4 M67 18 l-3 4 M40 8 v6" stroke={dark} strokeWidth="2" strokeLinecap="round" />
+        </svg>
+      );
+    case 'account':
+      return (
+        <svg {...box}>
+          <rect x="14" y="18" width="52" height="38" rx="4" fill={yellow} stroke={dark} strokeWidth="2.5" />
+          <circle cx="40" cy="33" r="7" fill="white" stroke={dark} strokeWidth="2" />
+          <path d="M26 50c2-7 8-10 14-10s12 3 14 10" fill="white" stroke={dark} strokeWidth="2" strokeLinecap="round" />
+          <rect x="30" y="60" width="20" height="6" rx="3" fill={dark} />
+        </svg>
+      );
+    case 'location':
+      return (
+        <svg {...box}>
+          <path d="M40 12c-11 0-20 8.5-20 20 0 15 20 36 20 36s20-21 20-36c0-11.5-9-20-20-20z" fill={yellow} stroke={dark} strokeWidth="2.5" strokeLinejoin="round" />
+          <circle cx="40" cy="32" r="8" fill="white" stroke={dark} strokeWidth="2" />
+        </svg>
+      );
+    case 'price':
+      return (
+        <svg {...box}>
+          <rect x="15" y="24" width="50" height="34" rx="5" fill={yellow} stroke={dark} strokeWidth="2.5" />
+          <path d="M15 34h50" stroke={dark} strokeWidth="2" />
+          <text x="40" y="50" fontSize="18" fontWeight="700" textAnchor="middle" fill={dark}>$</text>
+        </svg>
+      );
+    case 'trending':
+      return (
+        <svg {...box}>
+          <path d="M18 30 L34 30 L30 18 L54 18 L62 32 L62 62 L18 62 Z" fill={yellow} stroke={dark} strokeWidth="2.5" strokeLinejoin="round" />
+          <circle cx="40" cy="45" r="6" fill="white" stroke={dark} strokeWidth="2" />
+        </svg>
+      );
+    case 'protected':
+      return (
+        <svg {...box}>
+          <path d="M40 10 L64 20 V38 C64 54 54 64 40 70 C26 64 16 54 16 38 V20 Z" fill={yellow} stroke={dark} strokeWidth="2.5" strokeLinejoin="round" />
+          <path d="M29 40 L37 48 L52 30" fill="none" stroke={dark} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+};
 
 const FakeCard = ({ viewMode }) => {
   const w = viewMode === 'desktop' ? 168 : 108;
@@ -289,13 +343,21 @@ const PageContextMock = ({ section, viewMode, position }) => {
   if (section === 'homeSlider' && position === 'after') {
     return (
       <div style={{ width: '100%', fontFamily: "'Proxima Nova','Inter',-apple-system,sans-serif" }}>
-        <div style={{ background: 'white', padding: `18px ${padPx}px`, display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: viewMode === 'desktop' ? 28 : 14, borderBottom: '8px solid #f5f5f5' }}>
-          {MELI_CATEGORIES.map(({ label: cat, icon }) => (
-            <div key={cat} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, width: viewMode === 'desktop' ? 84 : 60 }}>
-              <img src={MELI_CATEGORY_ICONS + icon} alt="" style={{ width: viewMode === 'desktop' ? 48 : 34, height: viewMode === 'desktop' ? 48 : 34, objectFit: 'contain' }} />
-              <span style={{ fontSize: viewMode === 'desktop' ? 11 : 9, color: '#4b4b4b', textAlign: 'center' }}>{cat}</span>
-            </div>
-          ))}
+        <div style={{ background: 'white', padding: `18px 0 22px` }}>
+          <div style={{ display: 'flex', overflowX: 'auto', gap: 14, padding: `0 ${padPx}px`, scrollbarWidth: 'none' }}>
+            {BENEFIT_CARDS.map(b => (
+              <div key={b.title} style={{
+                minWidth: viewMode === 'desktop' ? 176 : 140, maxWidth: viewMode === 'desktop' ? 176 : 140,
+                background: 'white', border: '1px solid #ebebeb', borderRadius: 8,
+                padding: viewMode === 'desktop' ? 16 : 12, display: 'flex', flexDirection: 'column', gap: 10, flexShrink: 0,
+              }}>
+                <h4 style={{ margin: 0, fontSize: viewMode === 'desktop' ? 14 : 12, fontWeight: 700, color: '#1a1a1a' }}>{b.title}</h4>
+                <div style={{ alignSelf: 'center' }}><BenefitIcon variant={b.variant} size={viewMode === 'desktop' ? 76 : 56} /></div>
+                <p style={{ margin: 0, fontSize: viewMode === 'desktop' ? 12 : 10, color: '#4a4a4a', lineHeight: 1.35, minHeight: viewMode === 'desktop' ? 32 : 26 }}>{b.desc}</p>
+                <div style={{ background: '#eaf3ff', color: '#3483fa', fontSize: viewMode === 'desktop' ? 12 : 10, fontWeight: 600, textAlign: 'center', padding: '8px 6px', borderRadius: 6, marginTop: 'auto' }}>{b.cta}</div>
+              </div>
+            ))}
+          </div>
         </div>
         <div style={{ background: '#f5f5f5', padding: `18px ${padPx}px 30px` }}>
           <h3 style={{ fontSize: viewMode === 'desktop' ? 17 : 13, color: '#333', margin: '0 0 12px', fontWeight: 600 }}>Más vendidos para ti</h3>
