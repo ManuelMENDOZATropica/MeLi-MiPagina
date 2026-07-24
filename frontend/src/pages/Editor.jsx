@@ -260,6 +260,11 @@ function CommentPanel({
 
 
 
+// Colores disponibles para la card de los ADN RTB (GUIA-FORMATOS-ML.pdf, pág. "Colores disponibles")
+const RTB_CARD_COLORS = ['#00A650', '#0166C4', '#4BBCF6', '#FED261', '#FE8143', '#FE7695', '#8D38AD'];
+// Colores claros que necesitan texto oscuro para contrastar
+const RTB_LIGHT_CARDS = ['#FED261', '#4BBCF6'];
+
 // Imágenes de ejemplo para el Home Slider por defecto (frontend/public)
 const HOME_SLIDER_DEFAULT_IMAGES = [
   encodeURI('/Slide home 1 (1).webp'),
@@ -528,6 +533,7 @@ const getIcon = (type) => {
     case 'text_block': return <Type size={20} />;
     case 'product_card': return <ShoppingCart size={20} />;
     case 'store_profile': return <User size={20} />;
+    case 'rtb_card': return <Tag size={20} />;
     default: return <Layout size={20} />;
   }
 };
@@ -909,8 +915,8 @@ function Editor() {
           continue;
         }
 
-        // ── Check 1: dimensiones (omitido para tarjetas de producto) ──
-        if (size?.width && size?.height && item.type !== 'product_card') {
+        // ── Check 1: dimensiones (omitido para tarjetas de producto y RTB cards) ──
+        if (size?.width && size?.height && item.type !== 'product_card' && item.type !== 'rtb_card') {
           await new Promise(res2 => {
             const imgEl = new window.Image();
             imgEl.onload = () => {
@@ -1131,8 +1137,8 @@ function Editor() {
     // Cotejar contra las medidas del canvas donde vive el módulo
     const expectedSize = foundDevice === 'mobile' ? foundItem.mobileSize : foundItem.desktopSize;
     if (!expectedSize?.width || !expectedSize?.height) return;
-    // Las tarjetas de producto aceptan cualquier imagen sin validar dimensiones
-    if (foundItem.type === 'product_card') return;
+    // Las tarjetas de producto y RTB cards aceptan cualquier imagen sin validar dimensiones
+    if (foundItem.type === 'product_card' || foundItem.type === 'rtb_card') return;
 
     const img = new window.Image();
     img.onload = async () => {
@@ -2257,6 +2263,155 @@ function Editor() {
       );
     }
 
+    // ── ADN RTB Cards (horizontal / imagen rectangular / imagen cuadrada) ──
+    if (item.type === 'rtb_card') {
+      const cardColor = item.cardColor || '#00A650';
+      const txtColor = RTB_LIGHT_CARDS.includes(cardColor) ? '#1a1a2e' : 'white';
+      const imgUrl = item.uploadedImages?.[0] || null;
+      const logoUrl = item.uploadedImages?.[1] || null;
+      const isHorizontal = item.id === 'rtb_card_horizontal';
+      const sc = width / (item.desktopSize?.width || width);
+
+      const startUpload = (idx) => {
+        if (isPreviewMode) return;
+        setUploadTargetId(item.uniqueId);
+        setUploadIndex(idx);
+        if (fileInputRef.current) fileInputRef.current.click();
+      };
+
+      const logoBox = (size) => (
+        <div
+          title={!isPreviewMode ? 'Click para subir logo' : ''}
+          onClick={(e) => { e.stopPropagation(); startUpload(1); }}
+          style={{
+            width: size, height: Math.round(size * 0.74),
+            background: 'white', borderRadius: 8,
+            border: logoUrl ? '1px solid rgba(0,0,0,0.08)' : '2px dashed #3483fa',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            overflow: 'hidden', cursor: !isPreviewMode ? 'pointer' : 'default', flexShrink: 0,
+            boxSizing: 'border-box',
+          }}
+        >
+          {logoUrl
+            ? <img src={logoUrl} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 4, boxSizing: 'border-box' }} />
+            : <span style={{ fontSize: Math.max(9, Math.round(12 * sc)), color: '#3483fa', fontWeight: 700, textAlign: 'center', pointerEvents: 'none' }}>{isPreviewMode ? 'Logo' : 'Subir logo'}</span>}
+        </div>
+      );
+
+      const imageArea = (style) => (
+        <div
+          title={!isPreviewMode ? 'Click para subir imagen' : ''}
+          onClick={(e) => { e.stopPropagation(); startUpload(0); }}
+          style={{ background: '#e8f0f8', position: 'relative', overflow: 'hidden', cursor: !isPreviewMode ? 'pointer' : 'default', ...style }}
+        >
+          {imgUrl
+            ? <img src={imgUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            : !isPreviewMode && (
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, color: '#3483fa', pointerEvents: 'none' }}>
+                <ImageIcon size={26} />
+                <span style={{ fontSize: 12, fontWeight: 700 }}>Subir imagen</span>
+              </div>
+            )}
+        </div>
+      );
+
+      const editableText = (field, defaultVal, style) => (
+        editingField.id === item.uniqueId && editingField.field === field ? (
+          <input
+            autoFocus
+            defaultValue={item[field] || defaultVal}
+            onBlur={(e) => { updateItemText(item.uniqueId, field, e.target.value); setEditingField({ id: null, field: null }); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
+            onClick={e => e.stopPropagation()}
+            style={{ border: '1px solid rgba(255,255,255,0.7)', background: 'rgba(0,0,0,0.18)', borderRadius: 4, outline: 'none', width: '92%', fontFamily: 'inherit', ...style }}
+          />
+        ) : (
+          <span
+            onDoubleClick={(e) => { e.stopPropagation(); if (!isPreviewMode) setEditingField({ id: item.uniqueId, field }); }}
+            title={!isPreviewMode ? 'Doble clic para editar' : ''}
+            style={{ cursor: isPreviewMode ? 'default' : 'text', ...style }}
+          >{item[field] || defaultVal}</span>
+        )
+      );
+
+      return (
+        <div
+          key={item.uniqueId}
+          data-id={item.uniqueId}
+          className={`canvas-item ${isSelected ? 'selected' : ''} ${indicatorClass} ${draggedIndex === index ? 'is-dragging' : ''}`}
+          draggable={!isInsideGroup}
+          style={{ width: `${width}px` }}
+          onDragStart={!isInsideGroup ? (e) => handleDragStartCanvas(e, index) : undefined}
+          onDragEnd={() => { setDraggedIndex(null); setDragOverTarget(null); }}
+          onDragOver={(e) => handleItemDragOver(e, index)}
+          onDrop={!isInsideGroup ? (e) => handleDropCanvas(e, index) : undefined}
+          onContextMenu={(e) => handleItemContextMenu(e, item.uniqueId)}
+        >
+          {!isPreviewMode && (
+            <button className="delete-btn" onClick={() => removeItem(item.uniqueId)}><Trash2 size={16} /></button>
+          )}
+          {!isPreviewMode && comments.some(c => c.elementId === item.uniqueId && !c.resolved) && (
+            <div onClick={e => { e.stopPropagation(); setActiveCommentElId(item.uniqueId); }} title="Ver comentarios" style={{ position: 'absolute', top: '6px', right: '8px', background: '#3483fa', color: 'white', borderRadius: '10px', fontSize: '10px', fontWeight: '800', padding: '2px 7px', zIndex: 20, cursor: 'pointer', boxShadow: '0 2px 8px rgba(52,131,250,0.4)', display: 'flex', alignItems: 'center', gap: '3px' }}>
+              💬 {comments.filter(c => c.elementId === item.uniqueId && !c.resolved).length}
+            </div>
+          )}
+          {!isPreviewMode && activeCommentElId === item.uniqueId && (
+            <CommentPanel
+              elementId={item.uniqueId}
+              elementName={item.name || 'RTB Card'}
+              comments={comments} projectCollabs={projectCollabs}
+              replyingTo={replyingTo} setReplyingTo={setReplyingTo}
+              commentInputs={commentInputs} setCommentInputs={setCommentInputs}
+              mentionQuery={mentionQuery} setMentionQuery={setMentionQuery}
+              onClose={() => setActiveCommentElId(null)} onSubmit={submitComment}
+              onResolve={resolveComment} onDelete={deleteComment}
+              onException={handleException} getCollabColor={getCollabColor}
+            />
+          )}
+
+          <div style={{ width: '100%', height: `${height}px`, position: 'relative', fontFamily: "'Proxima Nova','Inter',-apple-system,sans-serif" }}>
+            {isHorizontal ? (
+              /* ── Horizontal (estructura THB): card + imagen a la derecha ── */
+              <div style={{ display: 'flex', width: '100%', height: '100%', borderRadius: 12, overflow: 'hidden' }}>
+                <div style={{ flex: 1, background: cardColor, display: 'flex', alignItems: 'center', gap: Math.round(24 * sc), padding: `0 ${Math.round(32 * sc)}px`, minWidth: 0 }}>
+                  {logoBox(Math.round(110 * sc))}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0, flex: 1 }}>
+                    {editableText('rtbTitle', 'Card', { fontSize: Math.round(42 * sc), fontWeight: 800, color: txtColor, lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' })}
+                    {editableText('rtbCta', 'Ver más', { fontSize: Math.round(18 * sc), fontWeight: 600, color: txtColor, opacity: 0.9 })}
+                  </div>
+                </div>
+                {imageArea({ width: '42%', height: '100%', flexShrink: 0 })}
+              </div>
+            ) : (
+              /* ── Vertical: imagen arriba + pestaña de logo + card de color ── */
+              (() => {
+                const isSquare = item.id === 'rtb_card_cuadrada';
+                const imgH = Math.round(width * (isSquare ? 1 : 528 / 1008));
+                const tabScale = isSquare ? 1.35 : 1;
+                const tabW = Math.round(150 * sc * tabScale);
+                const tabH = Math.round(100 * sc * tabScale);
+                return (
+                  <div style={{ width: '100%', height: '100%', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                    {imageArea({ width: '100%', height: imgH, flexShrink: 0 })}
+                    <div style={{ flex: 1, background: cardColor, position: 'relative', padding: `${Math.round(28 * sc)}px ${Math.round(32 * sc)}px`, boxSizing: 'border-box' }}>
+                      {/* Pestaña del logo superpuesta al borde inferior de la imagen */}
+                      <div style={{ position: 'absolute', top: -tabH, left: Math.round(32 * sc), width: tabW, height: tabH, background: cardColor, borderRadius: '10px 10px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {logoBox(Math.round(tabW * 0.74))}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: Math.round(10 * sc), marginTop: Math.round(8 * sc) }}>
+                        {editableText('rtbTitle', 'Card', { fontSize: Math.round(46 * sc), fontWeight: 800, color: txtColor, lineHeight: 1.15 })}
+                        {editableText('rtbCta', 'Ver más', { fontSize: Math.round(20 * sc), fontWeight: 600, color: txtColor, opacity: 0.9 })}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()
+            )}
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div
         key={item.uniqueId}
@@ -3201,6 +3356,43 @@ function Editor() {
                   {/* Opciones dinámicas de subir imagen */}
                   {(() => {
                     const imgs = targetItem?.uploadedImages?.filter(Boolean) || [];
+                    if (targetItem?.type === 'rtb_card') {
+                      return (
+                        <>
+                          <div className="context-menu-item" onClick={() => { setUploadTargetId(contextMenu.targetId); setUploadIndex(0); if (fileInputRef.current) fileInputRef.current.click(); setContextMenu(null); }} style={{ fontWeight: 'bold', color: '#3483fa' }}>
+                            <ImageIcon size={16} /> {targetItem.uploadedImages?.[0] ? 'Cambiar imagen' : 'Subir imagen'}
+                          </div>
+                          <div className="context-menu-item" onClick={() => { setUploadTargetId(contextMenu.targetId); setUploadIndex(1); if (fileInputRef.current) fileInputRef.current.click(); setContextMenu(null); }} style={{ fontWeight: 'bold', color: '#3483fa' }}>
+                            <ImageIcon size={16} /> {targetItem.uploadedImages?.[1] ? 'Cambiar logo' : 'Subir logo'}
+                          </div>
+                          <div style={{ padding: '8px 14px', borderTop: '1px solid #eee', marginTop: 4 }}>
+                            <div style={{ fontSize: 10, fontWeight: 800, color: '#9ba3b5', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 7 }}>Color de card</div>
+                            <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+                              {RTB_CARD_COLORS.map(c => (
+                                <div
+                                  key={c}
+                                  onClick={() => { updateItemText(contextMenu.targetId, 'cardColor', c); setContextMenu(null); }}
+                                  title={c}
+                                  style={{ width: 20, height: 20, borderRadius: '50%', background: c, cursor: 'pointer', border: (targetItem.cardColor || '#00A650') === c ? '2.5px solid #1a1f2e' : '2px solid white', boxShadow: '0 0 0 1px #d5dae3', boxSizing: 'border-box' }}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          {imgs.length > 0 && (
+                            <div className="context-menu-item" onClick={() => {
+                              setCanvasItems(prev => prev.map(it => {
+                                if (it.uniqueId === contextMenu.targetId) return { ...it, uploadedImages: [], passedCheck: false };
+                                if (it.type === 'rowGroup') return { ...it, items: it.items.map(cc => cc.uniqueId === contextMenu.targetId ? { ...cc, uploadedImages: [], passedCheck: false } : cc) };
+                                return it;
+                              }));
+                              setContextMenu(null);
+                            }} style={{ color: '#e53e3e' }}>
+                              <Trash2 size={16} /> Quitar imágenes
+                            </div>
+                          )}
+                        </>
+                      );
+                    }
                     const isMultiType = ['banner', 'carousel'].includes(targetItem?.type);
                     if (isMultiType) {
                       // Mostrar opción para subir la siguiente imagen

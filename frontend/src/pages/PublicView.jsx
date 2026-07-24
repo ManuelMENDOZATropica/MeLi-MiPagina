@@ -75,6 +75,68 @@ const renderPublicItem = (item, viewMode) => {
     );
   }
 
+  if (item.type === 'rtb_card') {
+    const RTB_LIGHT = ['#FED261', '#4BBCF6'];
+    const cardColor = item.cardColor || '#00A650';
+    const txtColor = RTB_LIGHT.includes(cardColor) ? '#1a1a2e' : 'white';
+    const imgUrl = item.uploadedImages?.[0] || null;
+    const logoUrl = item.uploadedImages?.[1] || null;
+    const sc = width / (item.desktopSize?.width || width);
+    const font = "'Proxima Nova','Inter',-apple-system,sans-serif";
+
+    const logoBox = (size) => (
+      <div style={{ width: size, height: Math.round(size * 0.74), background: 'white', borderRadius: 8, border: '1px solid rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0, boxSizing: 'border-box' }}>
+        {logoUrl
+          ? <img src={logoUrl} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 4, boxSizing: 'border-box' }} />
+          : <span style={{ fontSize: Math.max(9, Math.round(12 * sc)), color: '#bbb', fontWeight: 700 }}>Logo</span>}
+      </div>
+    );
+    const imageArea = (style) => (
+      <div style={{ background: '#e8f0f8', overflow: 'hidden', ...style }}>
+        {imgUrl && <img src={imgUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
+      </div>
+    );
+
+    if (item.id === 'rtb_card_horizontal') {
+      return (
+        <div key={item.uniqueId} style={{ width, height, fontFamily: font }}>
+          <div style={{ display: 'flex', width: '100%', height: '100%', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ flex: 1, background: cardColor, display: 'flex', alignItems: 'center', gap: Math.round(24 * sc), padding: `0 ${Math.round(32 * sc)}px`, minWidth: 0 }}>
+              {logoBox(Math.round(110 * sc))}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0, flex: 1 }}>
+                <span style={{ fontSize: Math.round(42 * sc), fontWeight: 800, color: txtColor, lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.rtbTitle || 'Card'}</span>
+                <span style={{ fontSize: Math.round(18 * sc), fontWeight: 600, color: txtColor, opacity: 0.9 }}>{item.rtbCta || 'Ver más'}</span>
+              </div>
+            </div>
+            {imageArea({ width: '42%', height: '100%', flexShrink: 0 })}
+          </div>
+        </div>
+      );
+    }
+
+    const isSquare = item.id === 'rtb_card_cuadrada';
+    const imgH = Math.round(width * (isSquare ? 1 : 528 / 1008));
+    const tabScale = isSquare ? 1.35 : 1;
+    const tabW = Math.round(150 * sc * tabScale);
+    const tabH = Math.round(100 * sc * tabScale);
+    return (
+      <div key={item.uniqueId} style={{ width, height, fontFamily: font }}>
+        <div style={{ width: '100%', height: '100%', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          {imageArea({ width: '100%', height: imgH, flexShrink: 0 })}
+          <div style={{ flex: 1, background: cardColor, position: 'relative', padding: `${Math.round(28 * sc)}px ${Math.round(32 * sc)}px`, boxSizing: 'border-box' }}>
+            <div style={{ position: 'absolute', top: -tabH, left: Math.round(32 * sc), width: tabW, height: tabH, background: cardColor, borderRadius: '10px 10px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {logoBox(Math.round(tabW * 0.74))}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: Math.round(10 * sc), marginTop: Math.round(8 * sc) }}>
+              <span style={{ fontSize: Math.round(46 * sc), fontWeight: 800, color: txtColor, lineHeight: 1.15 }}>{item.rtbTitle || 'Card'}</span>
+              <span style={{ fontSize: Math.round(20 * sc), fontWeight: 600, color: txtColor, opacity: 0.9 }}>{item.rtbCta || 'Ver más'}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (item.type === 'product_card') {
     const fs = (base) => `${Math.round(base * (width / 271))}px`;
     return (

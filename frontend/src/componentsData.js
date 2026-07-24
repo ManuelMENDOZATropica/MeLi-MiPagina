@@ -218,5 +218,32 @@ export const componentsList = [
     notes: "Logo sobre fondo blanco. Máximo 2 logos.",
     type: "banner",
     section: "rtb"
+  },
+  {
+    id: "rtb_card_horizontal",
+    name: "RTB Card Horizontal",
+    desktopSize: { width: 984, height: 240 },
+    mobileSize: { width: 720, height: 176 },
+    notes: "ADN RTB con estructura THB: logo + textos sobre el color de card + imagen a la derecha. Clic derecho: subir logo/imagen, editar textos y elegir color de card. Un solo logo, sin volanta.",
+    type: "rtb_card",
+    section: "rtb"
+  },
+  {
+    id: "rtb_card_rectangular",
+    name: "RTB Card Imagen Rectangular",
+    desktopSize: { width: 1008, height: 888 },
+    mobileSize: { width: 600, height: 528 },
+    notes: "ADN RTB vertical: imagen rectangular (1008x528) arriba + pestaña de logo + card de color con textos. Clic derecho: subir logo/imagen, editar textos y elegir color de card.",
+    type: "rtb_card",
+    section: "rtb"
+  },
+  {
+    id: "rtb_card_cuadrada",
+    name: "RTB Card Imagen Cuadrada",
+    desktopSize: { width: 528, height: 858 },
+    mobileSize: { width: 400, height: 650 },
+    notes: "ADN RTB vertical: imagen cuadrada (528x528) arriba + pestaña de logo + card de color con textos. En la versión cuadrada, reducir cantidad de productos en la imagen. Clic derecho: subir logo/imagen, editar textos y elegir color de card.",
+    type: "rtb_card",
+    section: "rtb"
   }
 ];
