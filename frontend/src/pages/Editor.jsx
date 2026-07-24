@@ -268,72 +268,44 @@ const HOME_SLIDER_DEFAULT_IMAGES = [
 
 // Mock de contexto de página MeLi para RTB y Home Slider — solo visual, no editable,
 // no se exporta al PDF (data-html2canvas-ignore) ni ocupa espacio real en el layout.
-// Estructura y copys tomados de una captura real de mercadolibre.com.mx (fila de accesos
-// dinámicos debajo del Home Slider: Envío gratis / Ingresa a tu cuenta / Ingresa tu ubicación /
-// Menos de $500 / Más vendidos / Compra protegida). Íconos ilustrados a mano (sin CDN externo).
+// Fila de "accesos dinámicos" real de mercadolibre.com.mx debajo del Home Slider.
+// Íconos: 4 son los SVG reales exportados de la página (frontend/public/meli-icons),
+// los otros 2 (cuenta/ubicación) no estaban en esa sesión guardada, van dibujados a mano
+// con el mismo estilo (círculo #EEE de fondo, 105x105) para que no desentonen.
 const BENEFIT_CARDS = [
-  { title: 'Envío gratis', desc: 'Beneficio por ser tu primera compra.', cta: 'Mostrar productos', variant: 'shipping' },
+  { title: 'Envío gratis', desc: 'Beneficio por ser tu primera compra.', cta: 'Mostrar productos', icon: '/meli-icons/envio-gratis.svg' },
   { title: 'Ingresa a tu cuenta', desc: 'Disfruta de ofertas y compra sin límites.', cta: 'Ingresar a tu cuenta', variant: 'account' },
   { title: 'Ingresa tu ubicación', desc: 'Consulta costos y tiempos de entrega.', cta: 'Ingresar ubicación', variant: 'location' },
-  { title: 'Menos de $500', desc: 'Descubre productos con precios bajos.', cta: 'Mostrar productos', variant: 'price' },
-  { title: 'Más vendidos', desc: 'Explora los productos que son tendencia.', cta: 'Ir a Más vendidos', variant: 'trending' },
-  { title: 'Compra protegida', desc: 'Puedes devolver tu compra gratis.', cta: 'Cómo funciona', variant: 'protected' },
+  { title: 'Menos de $500', desc: 'Descubre productos con precios bajos.', cta: 'Mostrar productos', icon: '/meli-icons/menos-de-500.svg' },
+  { title: 'Más vendidos', desc: 'Explora los productos que son tendencia.', cta: 'Ir a Más vendidos', icon: '/meli-icons/mas-vendidos.svg' },
+  { title: 'Compra protegida', desc: 'Puedes devolver tu compra gratis.', cta: 'Cómo funciona', icon: '/meli-icons/compra-protegida.svg' },
 ];
 
-const BenefitIcon = ({ variant, size }) => {
-  const yellow = '#FFE600', dark = '#2d2d2d';
-  const box = { width: size, height: size, viewBox: '0 0 80 80' };
-  switch (variant) {
-    case 'shipping':
-      return (
-        <svg {...box}>
-          <path d="M18 34 L40 22 L62 34 L62 58 L40 70 L18 58 Z" fill={yellow} stroke={dark} strokeWidth="2.5" strokeLinejoin="round" />
-          <path d="M18 34 L40 46 L62 34" fill="none" stroke={dark} strokeWidth="2.5" strokeLinejoin="round" />
-          <path d="M40 46 L40 70" stroke={dark} strokeWidth="2.5" />
-          <path d="M13 18 l3 4 M67 18 l-3 4 M40 8 v6" stroke={dark} strokeWidth="2" strokeLinecap="round" />
-        </svg>
-      );
-    case 'account':
-      return (
-        <svg {...box}>
-          <rect x="14" y="18" width="52" height="38" rx="4" fill={yellow} stroke={dark} strokeWidth="2.5" />
-          <circle cx="40" cy="33" r="7" fill="white" stroke={dark} strokeWidth="2" />
-          <path d="M26 50c2-7 8-10 14-10s12 3 14 10" fill="white" stroke={dark} strokeWidth="2" strokeLinecap="round" />
-          <rect x="30" y="60" width="20" height="6" rx="3" fill={dark} />
-        </svg>
-      );
-    case 'location':
-      return (
-        <svg {...box}>
-          <path d="M40 12c-11 0-20 8.5-20 20 0 15 20 36 20 36s20-21 20-36c0-11.5-9-20-20-20z" fill={yellow} stroke={dark} strokeWidth="2.5" strokeLinejoin="round" />
-          <circle cx="40" cy="32" r="8" fill="white" stroke={dark} strokeWidth="2" />
-        </svg>
-      );
-    case 'price':
-      return (
-        <svg {...box}>
-          <rect x="15" y="24" width="50" height="34" rx="5" fill={yellow} stroke={dark} strokeWidth="2.5" />
-          <path d="M15 34h50" stroke={dark} strokeWidth="2" />
-          <text x="40" y="50" fontSize="18" fontWeight="700" textAnchor="middle" fill={dark}>$</text>
-        </svg>
-      );
-    case 'trending':
-      return (
-        <svg {...box}>
-          <path d="M18 30 L34 30 L30 18 L54 18 L62 32 L62 62 L18 62 Z" fill={yellow} stroke={dark} strokeWidth="2.5" strokeLinejoin="round" />
-          <circle cx="40" cy="45" r="6" fill="white" stroke={dark} strokeWidth="2" />
-        </svg>
-      );
-    case 'protected':
-      return (
-        <svg {...box}>
-          <path d="M40 10 L64 20 V38 C64 54 54 64 40 70 C26 64 16 54 16 38 V20 Z" fill={yellow} stroke={dark} strokeWidth="2.5" strokeLinejoin="round" />
-          <path d="M29 40 L37 48 L52 30" fill="none" stroke={dark} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      );
-    default:
-      return null;
+const BenefitIcon = ({ icon, variant, size }) => {
+  if (icon) return <img src={icon} alt="" style={{ width: size, height: size }} />;
+  const dark = '#2d2d2d';
+  const box = { width: size, height: size, viewBox: '0 0 105 105' };
+  const bg = <circle cx="53" cy="53" r="45.54" fill="#EEE" />;
+  if (variant === 'account') {
+    return (
+      <svg {...box}>
+        {bg}
+        <rect x="28" y="34" width="50" height="36" rx="4" fill="#FFE600" stroke={dark} strokeWidth="2.5" />
+        <circle cx="53" cy="48" r="7" fill="white" stroke={dark} strokeWidth="2" />
+        <path d="M39 64c2-7 8-10 14-10s12 3 14 10" fill="white" stroke={dark} strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    );
   }
+  if (variant === 'location') {
+    return (
+      <svg {...box}>
+        {bg}
+        <path d="M53 28c-10 0-18 7.5-18 18 0 13 18 32 18 32s18-19 18-32c0-10.5-8-18-18-18z" fill="#FFE600" stroke={dark} strokeWidth="2.5" strokeLinejoin="round" />
+        <circle cx="53" cy="46" r="7" fill="white" stroke={dark} strokeWidth="2" />
+      </svg>
+    );
+  }
+  return null;
 };
 
 const FakeCard = ({ viewMode }) => {
@@ -374,20 +346,28 @@ const PageContextMock = ({ section, viewMode, position }) => {
     return (
       <div data-html2canvas-ignore="true" style={{ width: '100%', pointerEvents: 'none', userSelect: 'none', fontFamily: "'Proxima Nova','Inter',-apple-system,sans-serif" }}>
         {label('↑ Contexto de referencia (no se exporta) — resto de la Home')}
-        <div style={{ background: 'white', padding: `18px 0 22px`, position: 'relative' }}>
-          <div style={{ display: 'flex', overflowX: 'auto', gap: 14, padding: `0 ${padPx}px`, scrollbarWidth: 'none' }}>
-            {BENEFIT_CARDS.map(b => (
-              <div key={b.title} style={{
-                minWidth: viewMode === 'desktop' ? 176 : 140, maxWidth: viewMode === 'desktop' ? 176 : 140,
-                background: 'white', border: '1px solid #ebebeb', borderRadius: 8,
-                padding: viewMode === 'desktop' ? 16 : 12, display: 'flex', flexDirection: 'column', gap: 10, flexShrink: 0,
-              }}>
-                <h4 style={{ margin: 0, fontSize: viewMode === 'desktop' ? 14 : 12, fontWeight: 700, color: '#1a1a1a' }}>{b.title}</h4>
-                <div style={{ alignSelf: 'center' }}><BenefitIcon variant={b.variant} size={viewMode === 'desktop' ? 76 : 56} /></div>
-                <p style={{ margin: 0, fontSize: viewMode === 'desktop' ? 12 : 10, color: '#4a4a4a', lineHeight: 1.35, minHeight: viewMode === 'desktop' ? 32 : 26 }}>{b.desc}</p>
-                <div style={{ background: '#eaf3ff', color: '#3483fa', fontSize: viewMode === 'desktop' ? 12 : 10, fontWeight: 600, textAlign: 'center', padding: '8px 6px', borderRadius: 6, marginTop: 'auto' }}>{b.cta}</div>
-              </div>
-            ))}
+        <div style={{ background: 'white', padding: viewMode === 'desktop' ? '20px 0' : '14px 0', position: 'relative' }}>
+          <div style={{ display: 'flex', overflowX: 'auto', gap: 16, padding: `0 ${padPx}px`, scrollbarWidth: 'none' }}>
+            {BENEFIT_CARDS.map(b => {
+              const scale = viewMode === 'desktop' ? 1 : 0.74;
+              return (
+                <div key={b.title} style={{
+                  width: 183 * scale, flexShrink: 0,
+                  background: 'white', borderRadius: 6,
+                  boxShadow: '0 1px 2px 0 rgba(0,0,0,.12)',
+                  display: 'flex', flexDirection: 'column',
+                }}>
+                  <h4 style={{ margin: 0, fontSize: 16 * scale, lineHeight: `${20 * scale}px`, fontWeight: 600, color: 'rgba(0,0,0,.9)', padding: `${16 * scale}px ${12 * scale}px 0 ${16 * scale}px`, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.title}</h4>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 105 * scale, margin: 'auto' }}>
+                    <BenefitIcon icon={b.icon} variant={b.variant} size={105 * scale} />
+                  </div>
+                  <p style={{ margin: 0, fontSize: 14 * scale, lineHeight: `${18 * scale}px`, fontWeight: 400, color: 'rgba(0,0,0,.9)', padding: `${12 * scale}px ${16 * scale}px`, textAlign: 'center', height: 52 * scale, overflow: 'hidden' }}>{b.desc}</p>
+                  <div style={{ margin: `${17 * scale}px`, background: 'rgba(65,137,230,.15)', borderRadius: 4, display: 'flex', justifyContent: 'center' }}>
+                    <span style={{ color: '#3483fa', fontSize: 12 * scale, fontWeight: 600, padding: `${6 * scale}px ${8 * scale}px`, whiteSpace: 'nowrap' }}>{b.cta}</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
         <div style={{ background: '#f5f5f5', padding: `18px ${padPx}px 30px` }}>

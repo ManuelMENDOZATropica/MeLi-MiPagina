@@ -24,3 +24,7 @@ dist-ssr
 *.sw?
 .env
 backend/.env
+
+# Página de referencia (MeLi real) usada solo para sacar specs/íconos — no es parte del repo
+Mercado Libre México - Envíos Gratis en el día.html
+Mercado Libre México - Envíos Gratis en el día_files/
