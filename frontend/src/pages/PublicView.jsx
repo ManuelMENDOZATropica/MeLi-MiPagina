@@ -378,18 +378,15 @@ const PageContextMock = ({ section, viewMode, position }) => {
   if (section === 'homeSlider' && position === 'after') {
     const isD = viewMode === 'desktop';
     const scaleB = isD ? 1 : 0.74;
-    // Las tarjetas se superponen al borde inferior del slider, como en la home real.
-    const overlap = Math.round(120 * scaleB);
     return (
       <div style={{
         width: '100%', fontFamily: "'Proxima Nova','Inter',-apple-system,sans-serif",
-        marginTop: -overlap, position: 'relative', zIndex: 5,
-        background: `linear-gradient(180deg, rgba(255,230,0,0) 0px, rgba(255,230,0,0) ${overlap}px, #FFE600 ${overlap}px, rgba(255,230,0,0.45) ${overlap + Math.round(160 * scaleB)}px, #EBEBEB ${overlap + Math.round(340 * scaleB)}px)`,
+        background: `linear-gradient(180deg, #FFE600 0px, rgba(255,230,0,0.45) ${Math.round(160 * scaleB)}px, #EBEBEB ${Math.round(340 * scaleB)}px)`,
       }}>
 
-        {/* ── 1. Benefit cards (superpuestas al slider) ── */}
-        <div style={{ padding: isD ? '0 0 20px' : '0 0 14px' }}>
-          <div style={{ display: 'flex', overflowX: 'auto', gap: 16, padding: `0 ${padPx}px`, scrollbarWidth: 'none' }}>
+        {/* ── 1. Benefit cards ── */}
+        <div style={{ padding: isD ? '20px 0' : '14px 0' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 16, padding: `0 ${padPx}px` }}>
             {BENEFIT_CARDS.map(b => (
               <div key={b.title} style={{ width: 183 * scaleB, flexShrink: 0, background: 'white', borderRadius: 6, boxShadow: '0 1px 2px 0 rgba(0,0,0,.12)', display: 'flex', flexDirection: 'column' }}>
                 <h4 style={{ margin: 0, fontSize: 16 * scaleB, lineHeight: `${20 * scaleB}px`, fontWeight: 600, color: 'rgba(0,0,0,.9)', padding: `${16 * scaleB}px ${12 * scaleB}px 0 ${16 * scaleB}px`, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.title}</h4>

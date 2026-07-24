@@ -271,8 +271,8 @@ const HOME_SLIDER_DEFAULT_IMAGES = [
   encodeURI('/Slide home 1 (2).webp'),
 ];
 
-// Mock de contexto de página MeLi para RTB y Home Slider — solo visual, no editable,
-// no se exporta al PDF (data-html2canvas-ignore) ni ocupa espacio real en el layout.
+// Mock de contexto de página MeLi para RTB y Home Slider — solo visual, no editable.
+// Se incluye en el export a PDF y en el link publicado, igual que se ve en el editor.
 // Fila de "accesos dinámicos" real de mercadolibre.com.mx debajo del Home Slider.
 // Íconos: 4 son los SVG reales exportados de la página (frontend/public/meli-icons),
 // los otros 2 (cuenta/ubicación) no estaban en esa sesión guardada, van dibujados a mano
@@ -313,25 +313,27 @@ const BenefitIcon = ({ icon, variant, size }) => {
   return null;
 };
 
+// Nota: sin `gap` de flexbox — html2canvas (export a PDF) no lo soporta; usamos márgenes.
 const FakeCard = ({ viewMode }) => {
   const w = viewMode === 'desktop' ? 168 : 108;
   const fs = (n) => `${Math.round(n * (w / 168))}px`;
+  const m = viewMode === 'desktop' ? 7 : 4;
   return (
-    <div style={{ width: w, background: 'white', borderRadius: 6, overflow: 'hidden', border: '1px solid #ebebeb', flexShrink: 0, fontFamily: "'Proxima Nova','Inter',-apple-system,sans-serif" }}>
+    <div style={{ width: w, margin: m, background: 'white', borderRadius: 6, overflow: 'hidden', border: '1px solid #ebebeb', flexShrink: 0, fontFamily: "'Proxima Nova','Inter',-apple-system,sans-serif" }}>
       <div style={{ width: '100%', height: viewMode === 'desktop' ? 150 : 100, background: '#f0f0f0' }} />
-      <div style={{ padding: `${fs(8)} ${fs(9)}`, display: 'flex', flexDirection: 'column', gap: 3 }}>
-        <s style={{ fontSize: fs(10), color: '#999', lineHeight: 1 }}>$ X.XXX</s>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: fs(17), color: '#1a1a2e', fontWeight: 400 }}>$ X.XXX</span>
+      <div style={{ padding: `${fs(8)} ${fs(9)}`, display: 'flex', flexDirection: 'column' }}>
+        <s style={{ fontSize: fs(10), color: '#999', lineHeight: 1, marginBottom: 3 }}>$ X.XXX</s>
+        <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', marginBottom: 3 }}>
+          <span style={{ fontSize: fs(17), color: '#1a1a2e', fontWeight: 400, marginRight: 5 }}>$ X.XXX</span>
           <span style={{ fontSize: fs(9), fontWeight: 700, background: '#00a650', color: 'white', padding: `1px ${fs(5)}`, borderRadius: '10px' }}>XX% OFF</span>
         </div>
-        <span style={{ fontSize: fs(10), color: '#00a650', fontWeight: 500 }}>en 3 MSI</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-          <Truck size={Math.max(9, Math.round(11 * (w / 168)))} color="#00a650" />
+        <span style={{ fontSize: fs(10), color: '#00a650', fontWeight: 500, marginBottom: 3 }}>en 3 MSI</span>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 3 }}>
+          <Truck size={Math.max(9, Math.round(11 * (w / 168)))} color="#00a650" style={{ marginRight: 3 }} />
           <span style={{ fontSize: fs(10), color: '#00a650', fontWeight: 500 }}>Llega gratis mañana</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 1 }}>
-          {[...Array(4)].map((_, i) => <Star key={i} size={Math.max(8, Math.round(10 * (w / 168)))} fill="#3483fa" color="#3483fa" />)}
+        <div style={{ display: 'flex', alignItems: 'center', marginTop: 1 }}>
+          {[...Array(4)].map((_, i) => <Star key={i} size={Math.max(8, Math.round(10 * (w / 168)))} fill="#3483fa" color="#3483fa" style={{ marginRight: 3 }} />)}
           <Star size={Math.max(8, Math.round(10 * (w / 168)))} color="#c9c9c9" />
         </div>
       </div>
@@ -342,29 +344,21 @@ const FakeCard = ({ viewMode }) => {
 const PageContextMock = ({ section, viewMode, position }) => {
   if (section !== 'rtb' && section !== 'homeSlider') return null;
   const padPx = viewMode === 'desktop' ? 40 : 16;
-  const gap = viewMode === 'desktop' ? 14 : 8;
-  const label = (text) => (
-    <div style={{ textAlign: 'center', fontSize: '10px', color: '#b0b0b0', padding: '8px 0', letterSpacing: '0.04em', textTransform: 'uppercase', fontWeight: 700, background: 'white' }}>{text}</div>
-  );
 
   if (section === 'homeSlider' && position === 'after') {
     const isD = viewMode === 'desktop';
     const scaleB = isD ? 1 : 0.74;
-    // Las tarjetas de accesos dinámicos se superponen al borde inferior del slider,
-    // igual que en la home real de MeLi. El fondo hace el fade amarillo → gris detrás.
-    const overlap = Math.round(120 * scaleB);
     return (
-      <div data-html2canvas-ignore="true" style={{
+      <div style={{
         width: '100%', pointerEvents: 'none', userSelect: 'none',
         fontFamily: "'Proxima Nova','Inter',-apple-system,sans-serif",
-        marginTop: -overlap, position: 'relative', zIndex: 5,
-        background: `linear-gradient(180deg, rgba(255,230,0,0) 0px, rgba(255,230,0,0) ${overlap}px, #FFE600 ${overlap}px, rgba(255,230,0,0.45) ${overlap + Math.round(160 * scaleB)}px, #EBEBEB ${overlap + Math.round(340 * scaleB)}px)`,
+        background: `linear-gradient(180deg, #FFE600 0px, rgba(255,230,0,0.45) ${Math.round(160 * scaleB)}px, #EBEBEB ${Math.round(340 * scaleB)}px)`,
       }}>
-        {/* ── 1. Benefit cards (superpuestas al slider) ── */}
-        <div style={{ padding: isD ? '0 0 20px' : '0 0 14px', position: 'relative' }}>
-          <div style={{ display: 'flex', overflowX: 'auto', gap: 16, padding: `0 ${padPx}px`, scrollbarWidth: 'none' }}>
+        {/* ── 1. Benefit cards ── */}
+        <div style={{ padding: isD ? '20px 0' : '14px 0' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', padding: `0 ${padPx}px` }}>
             {BENEFIT_CARDS.map(b => (
-              <div key={b.title} style={{ width: 183 * scaleB, flexShrink: 0, background: 'white', borderRadius: 6, boxShadow: '0 1px 2px 0 rgba(0,0,0,.12)', display: 'flex', flexDirection: 'column' }}>
+              <div key={b.title} style={{ width: 183 * scaleB, margin: 8, flexShrink: 0, background: 'white', borderRadius: 6, boxShadow: '0 1px 2px 0 rgba(0,0,0,.12)', display: 'flex', flexDirection: 'column' }}>
                 <h4 style={{ margin: 0, fontSize: 16 * scaleB, lineHeight: `${20 * scaleB}px`, fontWeight: 600, color: 'rgba(0,0,0,.9)', padding: `${16 * scaleB}px ${12 * scaleB}px 0 ${16 * scaleB}px`, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.title}</h4>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 105 * scaleB, margin: 'auto' }}>
                   <BenefitIcon icon={b.icon} variant={b.variant} size={105 * scaleB} />
@@ -380,19 +374,19 @@ const PageContextMock = ({ section, viewMode, position }) => {
 
         {/* ── 2. Oferta del día + Ofertas ── */}
         <div style={{ background: 'transparent', padding: `${isD ? 16 : 10}px ${padPx}px` }}>
-          <div style={{ display: 'flex', gap: 16, flexDirection: isD ? 'row' : 'column', maxWidth: 1200, margin: '0 auto' }}>
+          <div style={{ display: 'flex', flexDirection: isD ? 'row' : 'column', maxWidth: 1200, margin: '0 auto' }}>
             {/* Oferta del día */}
-            <div style={{ width: isD ? 300 : '100%', background: 'white', borderRadius: 6, padding: isD ? 20 : 14, flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ width: isD ? 300 : '100%', background: 'white', borderRadius: 6, padding: isD ? 20 : 14, flexShrink: 0, display: 'flex', flexDirection: 'column', marginRight: isD ? 16 : 0, marginBottom: isD ? 0 : 16, boxSizing: 'border-box' }}>
               <h3 style={{ margin: '0 0 12px', fontSize: isD ? 20 : 16, fontWeight: 600, color: '#1a1a2e' }}>Oferta del día</h3>
               <div style={{ width: '100%', height: isD ? 200 : 150, background: '#f0f0f0', borderRadius: 4, marginBottom: 12 }} />
               <span style={{ fontSize: isD ? 14 : 12, color: '#666', marginBottom: 4, display: 'block' }}>Mochila Táctica Militar Impermeable</span>
               <s style={{ fontSize: isD ? 12 : 10, color: '#999' }}>$ 608.42</s>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
-                <span style={{ fontSize: isD ? 22 : 18, color: '#1a1a2e', fontWeight: 400 }}>$ 430</span>
+              <div style={{ display: 'flex', alignItems: 'baseline', marginTop: 2 }}>
+                <span style={{ fontSize: isD ? 22 : 18, color: '#1a1a2e', fontWeight: 400, marginRight: 6 }}>$ 430</span>
                 <span style={{ fontSize: isD ? 11 : 9, fontWeight: 700, background: '#00a650', color: 'white', padding: '1px 6px', borderRadius: 10 }}>28% OFF</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6 }}>
-                <Truck size={isD ? 12 : 10} color="#00a650" />
+              <div style={{ display: 'flex', alignItems: 'center', marginTop: 6 }}>
+                <Truck size={isD ? 12 : 10} color="#00a650" style={{ marginRight: 4 }} />
                 <span style={{ fontSize: isD ? 11 : 9, color: '#00a650', fontWeight: 500 }}>Envío gratis</span>
                 <span style={{ fontSize: isD ? 10 : 8, background: '#00a650', color: 'white', fontWeight: 700, padding: '0 4px', borderRadius: 2, marginLeft: 2 }}>FULL</span>
               </div>
@@ -403,18 +397,18 @@ const PageContextMock = ({ section, viewMode, position }) => {
                 <h3 style={{ margin: 0, fontSize: isD ? 20 : 16, fontWeight: 600, color: '#1a1a2e' }}>Ofertas</h3>
                 <span style={{ fontSize: isD ? 14 : 11, color: '#3483fa', cursor: 'pointer' }}>Mostrar todas las ofertas</span>
               </div>
-              <div style={{ display: 'flex', gap: isD ? 12 : 8, overflow: 'hidden' }}>
+              <div style={{ display: 'flex', overflow: 'hidden' }}>
                 {Array.from({ length: isD ? 5 : 3 }).map((_, i) => (
-                  <div key={i} style={{ width: isD ? 140 : 100, flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
+                  <div key={i} style={{ width: isD ? 140 : 100, flexShrink: 0, display: 'flex', flexDirection: 'column', marginRight: isD ? 12 : 8 }}>
                     <div style={{ width: '100%', height: isD ? 130 : 90, background: '#f0f0f0', borderRadius: 4, marginBottom: 8 }} />
                     <span style={{ fontSize: isD ? 11 : 9, color: '#666', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }}>Producto de oferta {i + 1}</span>
                     <s style={{ fontSize: isD ? 10 : 8, color: '#999', lineHeight: 1 }}>$ X.XXX</s>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginTop: 2, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: isD ? 15 : 12, color: '#1a1a2e', fontWeight: 400 }}>$ X.XXX</span>
+                    <div style={{ display: 'flex', alignItems: 'baseline', marginTop: 2, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: isD ? 15 : 12, color: '#1a1a2e', fontWeight: 400, marginRight: 4 }}>$ X.XXX</span>
                       <span style={{ fontSize: isD ? 9 : 7, fontWeight: 700, background: '#00a650', color: 'white', padding: '1px 4px', borderRadius: 8 }}>XX% OFF</span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 4 }}>
-                      <Truck size={isD ? 10 : 8} color="#00a650" />
+                    <div style={{ display: 'flex', alignItems: 'center', marginTop: 4 }}>
+                      <Truck size={isD ? 10 : 8} color="#00a650" style={{ marginRight: 3 }} />
                       <span style={{ fontSize: isD ? 10 : 8, color: '#00a650', fontWeight: 500 }}>Envío gratis</span>
                     </div>
                   </div>
@@ -426,8 +420,8 @@ const PageContextMock = ({ section, viewMode, position }) => {
 
         {/* ── 3. Category promo banners ── */}
         <div style={{ background: 'transparent', padding: `0 ${padPx}px ${isD ? 16 : 10}px` }}>
-          <div style={{ display: 'flex', gap: 16, flexDirection: isD ? 'row' : 'column', maxWidth: 1200, margin: '0 auto' }}>
-            <div style={{ flex: 1, background: 'linear-gradient(135deg, #00B4E6 0%, #0077B6 100%)', borderRadius: 6, height: isD ? 180 : 120, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `0 ${isD ? 28 : 16}px`, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', flexDirection: isD ? 'row' : 'column', maxWidth: 1200, margin: '0 auto' }}>
+            <div style={{ flex: 1, background: 'linear-gradient(135deg, #00B4E6 0%, #0077B6 100%)', borderRadius: 6, height: isD ? 180 : 120, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `0 ${isD ? 28 : 16}px`, overflow: 'hidden', marginRight: isD ? 16 : 0, marginBottom: isD ? 0 : 16 }}>
               <div>
                 <span style={{ fontSize: isD ? 12 : 9, color: 'rgba(255,255,255,.8)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>CELULARES</span>
                 <span style={{ fontSize: isD ? 22 : 15, color: 'white', fontWeight: 700, lineHeight: 1.2, display: 'block' }}>HASTA 30%{'\n'}DE DESCUENTO</span>
@@ -448,7 +442,7 @@ const PageContextMock = ({ section, viewMode, position }) => {
         <div style={{ background: 'transparent', padding: `0 ${padPx}px ${isD ? 16 : 10}px` }}>
           <div style={{ background: 'white', borderRadius: 6, padding: isD ? 20 : 14, maxWidth: 1200, margin: '0 auto' }}>
             <h3 style={{ fontSize: isD ? 17 : 13, color: '#333', margin: '0 0 12px', fontWeight: 600 }}>Más vendidos para ti</h3>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap' }}>
               {Array.from({ length: isD ? 6 : 3 }).map((_, i) => <FakeCard key={i} viewMode={viewMode} />)}
             </div>
           </div>
@@ -456,8 +450,8 @@ const PageContextMock = ({ section, viewMode, position }) => {
 
         {/* ── 5. Meli+ banner ── */}
         <div style={{ background: 'linear-gradient(90deg, #A90F90 0%, #520E6E 100%)', padding: isD ? '16px 40px' : '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: isD ? 16 : 10 }}>
-            <span style={{ color: 'white', fontSize: isD ? 18 : 13, fontWeight: 800, letterSpacing: '-0.02em' }}>meli+</span>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <span style={{ color: 'white', fontSize: isD ? 18 : 13, fontWeight: 800, letterSpacing: '-0.02em', marginRight: isD ? 16 : 10 }}>meli+</span>
             <span style={{ color: 'white', fontSize: isD ? 15 : 10, fontWeight: 600, letterSpacing: '0.02em' }}>VIVE MERCADO LIBRE COMO UN EXPERTO</span>
           </div>
           <div style={{ border: '1px solid rgba(255,255,255,.6)', borderRadius: 4, padding: isD ? '6px 16px' : '4px 10px', color: 'white', fontSize: isD ? 13 : 9, fontWeight: 600, whiteSpace: 'nowrap' }}>Suscríbete desde $ 49.90</div>
@@ -465,13 +459,13 @@ const PageContextMock = ({ section, viewMode, position }) => {
 
         {/* ── 6. Streaming services ── */}
         <div style={{ background: 'white', padding: `${isD ? 24 : 14}px ${padPx}px` }}>
-          <div style={{ display: 'flex', gap: isD ? 24 : 12, justifyContent: 'center', maxWidth: 1200, margin: '0 auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', maxWidth: 1200, margin: '0 auto' }}>
             {[{ name: 'Disney+', color: '#113CCF' }, { name: 'HBO Max', color: '#5822B4' }, { name: 'Star+', color: '#C70D3A' }, ...(isD ? [{ name: 'Paramount+', color: '#0068C8' }] : [])].map(s => (
-              <div key={s.name} style={{ width: isD ? 160 : 90, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+              <div key={s.name} style={{ width: isD ? 160 : 90, display: 'flex', flexDirection: 'column', alignItems: 'center', margin: `0 ${isD ? 12 : 6}px` }}>
                 <div style={{ width: isD ? 100 : 60, height: isD ? 100 : 60, borderRadius: 16, background: s.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <span style={{ color: 'white', fontSize: isD ? 14 : 9, fontWeight: 700 }}>{s.name}</span>
                 </div>
-                <span style={{ fontSize: isD ? 12 : 8, color: '#00a650', fontWeight: 500, textAlign: 'center' }}>Llega gratis mañana</span>
+                <span style={{ fontSize: isD ? 12 : 8, color: '#00a650', fontWeight: 500, textAlign: 'center', marginTop: 8 }}>Llega gratis mañana</span>
               </div>
             ))}
           </div>
@@ -483,13 +477,12 @@ const PageContextMock = ({ section, viewMode, position }) => {
   if (section === 'rtb') {
     if (position === 'before') {
       return (
-        <div data-html2canvas-ignore="true" style={{ width: '100%', pointerEvents: 'none', userSelect: 'none', fontFamily: "'Proxima Nova','Inter',-apple-system,sans-serif" }}>
-          {label('↓ Contexto de referencia (no se exporta) — listado de resultados')}
+        <div style={{ width: '100%', pointerEvents: 'none', userSelect: 'none', fontFamily: "'Proxima Nova','Inter',-apple-system,sans-serif" }}>
           <div style={{ background: '#f5f5f5', padding: `14px ${padPx}px 14px` }}>
             <h3 style={{ fontSize: viewMode === 'desktop' ? 15 : 12, color: '#333', margin: '0 0 12px', fontWeight: 400 }}>
               <span style={{ fontWeight: 700 }}>1.234 resultados</span> para "zapatillas running"
             </h3>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap' }}>
               {Array.from({ length: viewMode === 'desktop' ? 4 : 2 }).map((_, i) => <FakeCard key={i} viewMode={viewMode} />)}
             </div>
           </div>
@@ -498,13 +491,12 @@ const PageContextMock = ({ section, viewMode, position }) => {
     }
     if (position === 'after') {
       return (
-        <div data-html2canvas-ignore="true" style={{ width: '100%', pointerEvents: 'none', userSelect: 'none', fontFamily: "'Proxima Nova','Inter',-apple-system,sans-serif" }}>
+        <div style={{ width: '100%', pointerEvents: 'none', userSelect: 'none', fontFamily: "'Proxima Nova','Inter',-apple-system,sans-serif" }}>
           <div style={{ background: '#f5f5f5', padding: `14px ${padPx}px 30px` }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap' }}>
               {Array.from({ length: viewMode === 'desktop' ? 4 : 2 }).map((_, i) => <FakeCard key={i} viewMode={viewMode} />)}
             </div>
           </div>
-          {label('↑ Contexto de referencia (no se exporta)')}
         </div>
       );
     }
@@ -2373,10 +2365,10 @@ function Editor() {
             {isHorizontal ? (
               /* ── Horizontal (estructura THB): card + imagen a la derecha ── */
               <div style={{ display: 'flex', width: '100%', height: '100%', borderRadius: 12, overflow: 'hidden' }}>
-                <div style={{ flex: 1, background: cardColor, display: 'flex', alignItems: 'center', gap: Math.round(24 * sc), padding: `0 ${Math.round(32 * sc)}px`, minWidth: 0 }}>
+                <div style={{ flex: 1, background: cardColor, display: 'flex', alignItems: 'center', padding: `0 ${Math.round(32 * sc)}px`, minWidth: 0 }}>
                   {logoBox(Math.round(110 * sc))}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0, flex: 1 }}>
-                    {editableText('rtbTitle', 'Card', { fontSize: Math.round(42 * sc), fontWeight: 800, color: txtColor, lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' })}
+                  <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1, marginLeft: Math.round(24 * sc) }}>
+                    {editableText('rtbTitle', 'Card', { fontSize: Math.round(42 * sc), fontWeight: 800, color: txtColor, lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 4 })}
                     {editableText('rtbCta', 'Ver más', { fontSize: Math.round(18 * sc), fontWeight: 600, color: txtColor, opacity: 0.9 })}
                   </div>
                 </div>
@@ -2398,8 +2390,8 @@ function Editor() {
                       <div style={{ position: 'absolute', top: -tabH, left: Math.round(32 * sc), width: tabW, height: tabH, background: cardColor, borderRadius: '10px 10px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {logoBox(Math.round(tabW * 0.74))}
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: Math.round(10 * sc), marginTop: Math.round(8 * sc) }}>
-                        {editableText('rtbTitle', 'Card', { fontSize: Math.round(46 * sc), fontWeight: 800, color: txtColor, lineHeight: 1.15 })}
+                      <div style={{ display: 'flex', flexDirection: 'column', marginTop: Math.round(8 * sc) }}>
+                        {editableText('rtbTitle', 'Card', { fontSize: Math.round(46 * sc), fontWeight: 800, color: txtColor, lineHeight: 1.15, marginBottom: Math.round(10 * sc) })}
                         {editableText('rtbCta', 'Ver más', { fontSize: Math.round(20 * sc), fontWeight: 600, color: txtColor, opacity: 0.9 })}
                       </div>
                     </div>
