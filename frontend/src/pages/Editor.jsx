@@ -343,37 +343,132 @@ const PageContextMock = ({ section, viewMode, position }) => {
   );
 
   if (section === 'homeSlider' && position === 'after') {
+    const isD = viewMode === 'desktop';
+    const scaleB = isD ? 1 : 0.74;
+    // Las tarjetas de accesos dinámicos se superponen al borde inferior del slider,
+    // igual que en la home real de MeLi. El fondo hace el fade amarillo → gris detrás.
+    const overlap = Math.round(120 * scaleB);
     return (
-      <div data-html2canvas-ignore="true" style={{ width: '100%', pointerEvents: 'none', userSelect: 'none', fontFamily: "'Proxima Nova','Inter',-apple-system,sans-serif" }}>
-        {label('↑ Contexto de referencia (no se exporta) — resto de la Home')}
-        <div style={{ background: 'white', padding: viewMode === 'desktop' ? '20px 0' : '14px 0', position: 'relative' }}>
+      <div data-html2canvas-ignore="true" style={{
+        width: '100%', pointerEvents: 'none', userSelect: 'none',
+        fontFamily: "'Proxima Nova','Inter',-apple-system,sans-serif",
+        marginTop: -overlap, position: 'relative', zIndex: 5,
+        background: `linear-gradient(180deg, rgba(255,230,0,0) 0px, rgba(255,230,0,0) ${overlap}px, #FFE600 ${overlap}px, rgba(255,230,0,0.45) ${overlap + Math.round(160 * scaleB)}px, #EBEBEB ${overlap + Math.round(340 * scaleB)}px)`,
+      }}>
+        {/* ── 1. Benefit cards (superpuestas al slider) ── */}
+        <div style={{ padding: isD ? '0 0 20px' : '0 0 14px', position: 'relative' }}>
           <div style={{ display: 'flex', overflowX: 'auto', gap: 16, padding: `0 ${padPx}px`, scrollbarWidth: 'none' }}>
-            {BENEFIT_CARDS.map(b => {
-              const scale = viewMode === 'desktop' ? 1 : 0.74;
-              return (
-                <div key={b.title} style={{
-                  width: 183 * scale, flexShrink: 0,
-                  background: 'white', borderRadius: 6,
-                  boxShadow: '0 1px 2px 0 rgba(0,0,0,.12)',
-                  display: 'flex', flexDirection: 'column',
-                }}>
-                  <h4 style={{ margin: 0, fontSize: 16 * scale, lineHeight: `${20 * scale}px`, fontWeight: 600, color: 'rgba(0,0,0,.9)', padding: `${16 * scale}px ${12 * scale}px 0 ${16 * scale}px`, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.title}</h4>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 105 * scale, margin: 'auto' }}>
-                    <BenefitIcon icon={b.icon} variant={b.variant} size={105 * scale} />
-                  </div>
-                  <p style={{ margin: 0, fontSize: 14 * scale, lineHeight: `${18 * scale}px`, fontWeight: 400, color: 'rgba(0,0,0,.9)', padding: `${12 * scale}px ${16 * scale}px`, textAlign: 'center', height: 52 * scale, overflow: 'hidden' }}>{b.desc}</p>
-                  <div style={{ margin: `${17 * scale}px`, background: 'rgba(65,137,230,.15)', borderRadius: 4, display: 'flex', justifyContent: 'center' }}>
-                    <span style={{ color: '#3483fa', fontSize: 12 * scale, fontWeight: 600, padding: `${6 * scale}px ${8 * scale}px`, whiteSpace: 'nowrap' }}>{b.cta}</span>
-                  </div>
+            {BENEFIT_CARDS.map(b => (
+              <div key={b.title} style={{ width: 183 * scaleB, flexShrink: 0, background: 'white', borderRadius: 6, boxShadow: '0 1px 2px 0 rgba(0,0,0,.12)', display: 'flex', flexDirection: 'column' }}>
+                <h4 style={{ margin: 0, fontSize: 16 * scaleB, lineHeight: `${20 * scaleB}px`, fontWeight: 600, color: 'rgba(0,0,0,.9)', padding: `${16 * scaleB}px ${12 * scaleB}px 0 ${16 * scaleB}px`, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.title}</h4>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 105 * scaleB, margin: 'auto' }}>
+                  <BenefitIcon icon={b.icon} variant={b.variant} size={105 * scaleB} />
                 </div>
-              );
-            })}
+                <p style={{ margin: 0, fontSize: 14 * scaleB, lineHeight: `${18 * scaleB}px`, fontWeight: 400, color: 'rgba(0,0,0,.9)', padding: `${12 * scaleB}px ${16 * scaleB}px`, textAlign: 'center', height: 52 * scaleB, overflow: 'hidden' }}>{b.desc}</p>
+                <div style={{ margin: `${17 * scaleB}px`, background: 'rgba(65,137,230,.15)', borderRadius: 4, display: 'flex', justifyContent: 'center' }}>
+                  <span style={{ color: '#3483fa', fontSize: 12 * scaleB, fontWeight: 600, padding: `${6 * scaleB}px ${8 * scaleB}px`, whiteSpace: 'nowrap' }}>{b.cta}</span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-        <div style={{ background: '#f5f5f5', padding: `18px ${padPx}px 30px` }}>
-          <h3 style={{ fontSize: viewMode === 'desktop' ? 17 : 13, color: '#333', margin: '0 0 12px', fontWeight: 600 }}>Más vendidos para ti</h3>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap }}>
-            {Array.from({ length: viewMode === 'desktop' ? 6 : 3 }).map((_, i) => <FakeCard key={i} viewMode={viewMode} />)}
+
+        {/* ── 2. Oferta del día + Ofertas ── */}
+        <div style={{ background: 'transparent', padding: `${isD ? 16 : 10}px ${padPx}px` }}>
+          <div style={{ display: 'flex', gap: 16, flexDirection: isD ? 'row' : 'column', maxWidth: 1200, margin: '0 auto' }}>
+            {/* Oferta del día */}
+            <div style={{ width: isD ? 300 : '100%', background: 'white', borderRadius: 6, padding: isD ? 20 : 14, flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
+              <h3 style={{ margin: '0 0 12px', fontSize: isD ? 20 : 16, fontWeight: 600, color: '#1a1a2e' }}>Oferta del día</h3>
+              <div style={{ width: '100%', height: isD ? 200 : 150, background: '#f0f0f0', borderRadius: 4, marginBottom: 12 }} />
+              <span style={{ fontSize: isD ? 14 : 12, color: '#666', marginBottom: 4, display: 'block' }}>Mochila Táctica Militar Impermeable</span>
+              <s style={{ fontSize: isD ? 12 : 10, color: '#999' }}>$ 608.42</s>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
+                <span style={{ fontSize: isD ? 22 : 18, color: '#1a1a2e', fontWeight: 400 }}>$ 430</span>
+                <span style={{ fontSize: isD ? 11 : 9, fontWeight: 700, background: '#00a650', color: 'white', padding: '1px 6px', borderRadius: 10 }}>28% OFF</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6 }}>
+                <Truck size={isD ? 12 : 10} color="#00a650" />
+                <span style={{ fontSize: isD ? 11 : 9, color: '#00a650', fontWeight: 500 }}>Envío gratis</span>
+                <span style={{ fontSize: isD ? 10 : 8, background: '#00a650', color: 'white', fontWeight: 700, padding: '0 4px', borderRadius: 2, marginLeft: 2 }}>FULL</span>
+              </div>
+            </div>
+            {/* Ofertas */}
+            <div style={{ flex: 1, background: 'white', borderRadius: 6, padding: isD ? 20 : 14, overflow: 'hidden' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <h3 style={{ margin: 0, fontSize: isD ? 20 : 16, fontWeight: 600, color: '#1a1a2e' }}>Ofertas</h3>
+                <span style={{ fontSize: isD ? 14 : 11, color: '#3483fa', cursor: 'pointer' }}>Mostrar todas las ofertas</span>
+              </div>
+              <div style={{ display: 'flex', gap: isD ? 12 : 8, overflow: 'hidden' }}>
+                {Array.from({ length: isD ? 5 : 3 }).map((_, i) => (
+                  <div key={i} style={{ width: isD ? 140 : 100, flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ width: '100%', height: isD ? 130 : 90, background: '#f0f0f0', borderRadius: 4, marginBottom: 8 }} />
+                    <span style={{ fontSize: isD ? 11 : 9, color: '#666', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }}>Producto de oferta {i + 1}</span>
+                    <s style={{ fontSize: isD ? 10 : 8, color: '#999', lineHeight: 1 }}>$ X.XXX</s>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginTop: 2, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: isD ? 15 : 12, color: '#1a1a2e', fontWeight: 400 }}>$ X.XXX</span>
+                      <span style={{ fontSize: isD ? 9 : 7, fontWeight: 700, background: '#00a650', color: 'white', padding: '1px 4px', borderRadius: 8 }}>XX% OFF</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 4 }}>
+                      <Truck size={isD ? 10 : 8} color="#00a650" />
+                      <span style={{ fontSize: isD ? 10 : 8, color: '#00a650', fontWeight: 500 }}>Envío gratis</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── 3. Category promo banners ── */}
+        <div style={{ background: 'transparent', padding: `0 ${padPx}px ${isD ? 16 : 10}px` }}>
+          <div style={{ display: 'flex', gap: 16, flexDirection: isD ? 'row' : 'column', maxWidth: 1200, margin: '0 auto' }}>
+            <div style={{ flex: 1, background: 'linear-gradient(135deg, #00B4E6 0%, #0077B6 100%)', borderRadius: 6, height: isD ? 180 : 120, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `0 ${isD ? 28 : 16}px`, overflow: 'hidden' }}>
+              <div>
+                <span style={{ fontSize: isD ? 12 : 9, color: 'rgba(255,255,255,.8)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>CELULARES</span>
+                <span style={{ fontSize: isD ? 22 : 15, color: 'white', fontWeight: 700, lineHeight: 1.2, display: 'block' }}>HASTA 30%{'\n'}DE DESCUENTO</span>
+              </div>
+              <div style={{ width: isD ? 140 : 80, height: isD ? 140 : 80, background: 'rgba(255,255,255,.15)', borderRadius: 8, flexShrink: 0 }} />
+            </div>
+            <div style={{ flex: 1, background: 'linear-gradient(135deg, #7B2D8E 0%, #4A0E5C 100%)', borderRadius: 6, height: isD ? 180 : 120, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `0 ${isD ? 28 : 16}px`, overflow: 'hidden' }}>
+              <div>
+                <span style={{ fontSize: isD ? 12 : 9, color: 'rgba(255,255,255,.8)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>FULL</span>
+                <span style={{ fontSize: isD ? 22 : 15, color: 'white', fontWeight: 700, lineHeight: 1.2, display: 'block' }}>HASTA 50%{'\n'}DE DESCUENTO</span>
+              </div>
+              <div style={{ width: isD ? 140 : 80, height: isD ? 140 : 80, background: 'rgba(255,255,255,.15)', borderRadius: 8, flexShrink: 0 }} />
+            </div>
+          </div>
+        </div>
+
+        {/* ── 4. Más vendidos para ti ── */}
+        <div style={{ background: 'transparent', padding: `0 ${padPx}px ${isD ? 16 : 10}px` }}>
+          <div style={{ background: 'white', borderRadius: 6, padding: isD ? 20 : 14, maxWidth: 1200, margin: '0 auto' }}>
+            <h3 style={{ fontSize: isD ? 17 : 13, color: '#333', margin: '0 0 12px', fontWeight: 600 }}>Más vendidos para ti</h3>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap }}>
+              {Array.from({ length: isD ? 6 : 3 }).map((_, i) => <FakeCard key={i} viewMode={viewMode} />)}
+            </div>
+          </div>
+        </div>
+
+        {/* ── 5. Meli+ banner ── */}
+        <div style={{ background: 'linear-gradient(90deg, #A90F90 0%, #520E6E 100%)', padding: isD ? '16px 40px' : '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isD ? 16 : 10 }}>
+            <span style={{ color: 'white', fontSize: isD ? 18 : 13, fontWeight: 800, letterSpacing: '-0.02em' }}>meli+</span>
+            <span style={{ color: 'white', fontSize: isD ? 15 : 10, fontWeight: 600, letterSpacing: '0.02em' }}>VIVE MERCADO LIBRE COMO UN EXPERTO</span>
+          </div>
+          <div style={{ border: '1px solid rgba(255,255,255,.6)', borderRadius: 4, padding: isD ? '6px 16px' : '4px 10px', color: 'white', fontSize: isD ? 13 : 9, fontWeight: 600, whiteSpace: 'nowrap' }}>Suscríbete desde $ 49.90</div>
+        </div>
+
+        {/* ── 6. Streaming services ── */}
+        <div style={{ background: 'white', padding: `${isD ? 24 : 14}px ${padPx}px` }}>
+          <div style={{ display: 'flex', gap: isD ? 24 : 12, justifyContent: 'center', maxWidth: 1200, margin: '0 auto' }}>
+            {[{ name: 'Disney+', color: '#113CCF' }, { name: 'HBO Max', color: '#5822B4' }, { name: 'Star+', color: '#C70D3A' }, ...(isD ? [{ name: 'Paramount+', color: '#0068C8' }] : [])].map(s => (
+              <div key={s.name} style={{ width: isD ? 160 : 90, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: isD ? 100 : 60, height: isD ? 100 : 60, borderRadius: 16, background: s.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ color: 'white', fontSize: isD ? 14 : 9, fontWeight: 700 }}>{s.name}</span>
+                </div>
+                <span style={{ fontSize: isD ? 12 : 8, color: '#00a650', fontWeight: 500, textAlign: 'center' }}>Llega gratis mañana</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
