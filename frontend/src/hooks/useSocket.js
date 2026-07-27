@@ -26,25 +26,34 @@ export function useSocket({
       desktopLayout, mobileLayout,
       rtbDesktopLayout, rtbMobileLayout,
       homeSliderDesktopLayout, homeSliderMobileLayout,
-      title, savedBy
+      title
     }) => {
-      // Ignorar si lo guardó este mismo usuario (el backend lo filtra, pero doble seguro)
-      if (savedBy === currentUserId) return;
+      // Antes se ignoraba el evento si savedBy era el mismo usuario. Eso rompía el
+      // caso de tener el editor abierto en dos pestañas: la segunda nunca se
+      // enteraba de los cambios de la primera y su autoguardado los pisaba con
+      // estado viejo. El backend ya excluye al socket que guardó, así que
+      // cualquier evento que llegue viene de otra pestaña y hay que aplicarlo.
       if (setCanvases) {
-        setCanvases(prev => ({
-          miPagina: {
-            desktop: Array.isArray(desktopLayout) ? desktopLayout : prev.miPagina.desktop,
-            mobile:  Array.isArray(mobileLayout)  ? mobileLayout  : prev.miPagina.mobile,
-          },
-          rtb: {
-            desktop: Array.isArray(rtbDesktopLayout) ? rtbDesktopLayout : prev.rtb.desktop,
-            mobile:  Array.isArray(rtbMobileLayout)  ? rtbMobileLayout  : prev.rtb.mobile,
-          },
-          homeSlider: {
-            desktop: Array.isArray(homeSliderDesktopLayout) ? homeSliderDesktopLayout : prev.homeSlider.desktop,
-            mobile:  Array.isArray(homeSliderMobileLayout)  ? homeSliderMobileLayout  : prev.homeSlider.mobile,
-          },
-        }));
+        setCanvases(prev => {
+          const next = {
+            miPagina: {
+              desktop: Array.isArray(desktopLayout) ? desktopLayout : prev.miPagina.desktop,
+              mobile:  Array.isArray(mobileLayout)  ? mobileLayout  : prev.miPagina.mobile,
+            },
+            rtb: {
+              desktop: Array.isArray(rtbDesktopLayout) ? rtbDesktopLayout : prev.rtb.desktop,
+              mobile:  Array.isArray(rtbMobileLayout)  ? rtbMobileLayout  : prev.rtb.mobile,
+            },
+            homeSlider: {
+              desktop: Array.isArray(homeSliderDesktopLayout) ? homeSliderDesktopLayout : prev.homeSlider.desktop,
+              mobile:  Array.isArray(homeSliderMobileLayout)  ? homeSliderMobileLayout  : prev.homeSlider.mobile,
+            },
+          };
+          // Si el contenido es idéntico devolvemos la misma referencia. Sin esto,
+          // recibir el eco de nuestro propio guardado crearía un objeto nuevo, que
+          // dispara el autoguardado, que emite otro evento: un loop infinito.
+          return JSON.stringify(next) === JSON.stringify(prev) ? prev : next;
+        });
       }
       if (setProjectTitle && title) setProjectTitle(title);
     });

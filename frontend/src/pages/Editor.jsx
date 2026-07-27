@@ -665,6 +665,8 @@ function Editor() {
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [showPublishMenu, setShowPublishMenu] = useState(false);
+  // Mensaje del último error de guardado (null si el último guardado salió bien)
+  const [saveError, setSaveError] = useState(null);
   // true cuando se publicó en modo prueba (sin verificación de MAIA)
   const [isTestPublish, setIsTestPublish] = useState(false);
   // Feedback de los botones del QR: 'copied' | 'downloaded' | 'error' | null
@@ -851,12 +853,19 @@ function Editor() {
           homeSliderMobileLayout: canvases.homeSlider.mobile
         })
       });
-      if (!res.ok) throw new Error(`PATCH ${res.status}`);
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`HTTP ${res.status}${body ? ` · ${body.slice(0, 200)}` : ''}`);
+      }
       await res.json();
       setLastSaved(new Date());
+      setSaveError(null);
       return true;
     } catch (err) {
+      // Antes esto solo hacía console.error y el guardado fallaba en silencio:
+      // el editor se veía bien pero nada llegaba a la base.
       console.error('Error guardando el proyecto:', err);
+      setSaveError(err.message || 'Error desconocido');
       return false;
     }
   };
@@ -2838,7 +2847,14 @@ function Editor() {
             </h2>
           )}
 
-          {isSaving ? (
+          {saveError ? (
+            <span
+              title={`No se pudo guardar: ${saveError}`}
+              style={{ fontSize: '11px', color: '#fca5a5', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 700, background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '5px', padding: '2px 8px', cursor: 'help' }}
+            >
+              ⚠ Sin guardar · {saveError}
+            </span>
+          ) : isSaving ? (
             <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', fontStyle: 'italic' }}>Guardando…</span>
           ) : lastSaved ? (
             <span style={{ fontSize: '11px', color: '#4ade80', display: 'flex', alignItems: 'center', gap: '4px' }}>
