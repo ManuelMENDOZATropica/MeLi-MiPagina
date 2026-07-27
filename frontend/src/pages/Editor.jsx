@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Monitor, Smartphone, GripVertical, Trash2, Image as ImageIcon, Layout, Type, Video, Search, MapPin, Tag, ChevronDown, Bell, ShoppingCart, User, AlignCenter, MoveHorizontal, ListMinus, AlignJustify, CornerDownLeft, ArrowLeft, CheckCircle2, Play, Edit3, Eye, EyeOff, Layers, Grid, Settings, ArrowRight, FileDown, Truck, Star, ShieldCheck, Zap, Copy, Download } from 'lucide-react';
 import { componentsList } from '../componentsData';
+import { RTB_CARD_COLORS, resolveRtbColor } from '../rtbColors';
 import API_URL from '../api';
 import '../index.css';
 import html2canvas from 'html2canvas';
@@ -260,10 +261,8 @@ function CommentPanel({
 
 
 
-// Colores disponibles para la card de los ADN RTB (GUIA-FORMATOS-ML.pdf, pág. "Colores disponibles")
-const RTB_CARD_COLORS = ['#00A650', '#0166C4', '#4BBCF6', '#FED261', '#FE8143', '#FE7695', '#8D38AD'];
-// Colores claros que necesitan texto oscuro para contrastar
-const RTB_LIGHT_CARDS = ['#FED261', '#4BBCF6'];
+// Paleta de colores de las cards RTB: vive en ../rtbColors para compartirla con
+// la vista pública. Cada color trae su color de texto definido por la guía.
 
 // Límites de caracteres de los textos RTB (GUIA-FORMATOS-ML.pdf)
 // Volanta: 20 · Título: 34 en 2 líneas de máx. 17 c/u · CTA: 15
@@ -2373,8 +2372,7 @@ function Editor() {
 
     // ── ADN RTB Cards (horizontal / imagen rectangular / imagen cuadrada) ──
     if (item.type === 'rtb_card') {
-      const cardColor = item.cardColor || '#00A650';
-      const txtColor = RTB_LIGHT_CARDS.includes(cardColor) ? '#1a1a2e' : 'white';
+      const { bg: cardColor, text: txtColor } = resolveRtbColor(item.cardColor);
       const imgUrl = item.uploadedImages?.[0] || null;
       const logoUrl = item.uploadedImages?.[1] || null;
       const isHorizontal = item.id === 'rtb_card_horizontal';
@@ -3648,15 +3646,20 @@ function Editor() {
                           </div>
                           <div style={{ padding: '8px 14px', borderTop: '1px solid #eee', marginTop: 4 }}>
                             <div style={{ fontSize: 10, fontWeight: 800, color: '#9ba3b5', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 7 }}>Color de card</div>
-                            <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
-                              {RTB_CARD_COLORS.map(c => (
-                                <div
-                                  key={c}
-                                  onClick={() => { updateItemText(contextMenu.targetId, 'cardColor', c); setContextMenu(null); }}
-                                  title={c}
-                                  style={{ width: 20, height: 20, borderRadius: '50%', background: c, cursor: 'pointer', border: (targetItem.cardColor || '#00A650') === c ? '2.5px solid #1a1f2e' : '2px solid white', boxShadow: '0 0 0 1px #d5dae3', boxSizing: 'border-box' }}
-                                />
-                              ))}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 20px)', gap: 8 }}>
+                              {RTB_CARD_COLORS.map(c => {
+                                // Comparamos contra el color ya resuelto, así una card
+                                // guardada con un tono viejo marca su equivalente nuevo
+                                const activo = resolveRtbColor(targetItem.cardColor).bg.toUpperCase() === c.bg.toUpperCase();
+                                return (
+                                  <div
+                                    key={c.bg}
+                                    onClick={() => { updateItemText(contextMenu.targetId, 'cardColor', c.bg); setContextMenu(null); }}
+                                    title={`${c.name} · ${c.bg}`}
+                                    style={{ width: 20, height: 20, borderRadius: '50%', background: c.bg, cursor: 'pointer', border: activo ? '2.5px solid #1a1f2e' : '2px solid white', boxShadow: '0 0 0 1px #d5dae3', boxSizing: 'border-box' }}
+                                  />
+                                );
+                              })}
                             </div>
                           </div>
                           {imgs.length > 0 && (

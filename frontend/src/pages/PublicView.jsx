@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { Monitor, Smartphone, ChevronDown, Search, Tag, MapPin, Bell, ShoppingCart, Menu, ChevronRight, Truck, Star } from 'lucide-react';
 import API_URL from '../api';
+import { resolveRtbColor } from '../rtbColors';
 
 const isMobileDevice = () => /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768;
 
@@ -99,9 +100,7 @@ const renderPublicItem = (item, viewMode) => {
   }
 
   if (item.type === 'rtb_card') {
-    const RTB_LIGHT = ['#FED261', '#4BBCF6'];
-    const cardColor = item.cardColor || '#00A650';
-    const txtColor = RTB_LIGHT.includes(cardColor) ? '#1a1a2e' : 'white';
+    const { bg: cardColor, text: txtColor } = resolveRtbColor(item.cardColor);
     const imgUrl = item.uploadedImages?.[0] || null;
     const logoUrl = item.uploadedImages?.[1] || null;
     const sc = width / (item.desktopSize?.width || width);
