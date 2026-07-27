@@ -537,33 +537,7 @@ const PageContextMock = ({ section, viewMode, position }) => {
       </div>
     );
   }
-  if (section === 'rtb') {
-    if (position === 'before') {
-      return (
-        <div style={{ width: '100%', background: '#f5f5f5', fontFamily: "'Proxima Nova','Inter',-apple-system,sans-serif" }}>
-          <div style={{ padding: `14px ${padPx}px 14px` }}>
-            <h3 style={{ fontSize: viewMode === 'desktop' ? 15 : 12, color: '#333', margin: '0 0 12px', fontWeight: 400 }}>
-              <span style={{ fontWeight: 700 }}>1.234 resultados</span> para "zapatillas running"
-            </h3>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap }}>
-              {Array.from({ length: viewMode === 'desktop' ? 4 : 2 }).map((_, i) => <FakeCard key={i} viewMode={viewMode} />)}
-            </div>
-          </div>
-        </div>
-      );
-    }
-    if (position === 'after') {
-      return (
-        <div style={{ width: '100%', background: '#f5f5f5', fontFamily: "'Proxima Nova','Inter',-apple-system,sans-serif" }}>
-          <div style={{ padding: `14px ${padPx}px 30px` }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap }}>
-              {Array.from({ length: viewMode === 'desktop' ? 4 : 2 }).map((_, i) => <FakeCard key={i} viewMode={viewMode} />)}
-            </div>
-          </div>
-        </div>
-      );
-    }
-  }
+  // RTB no lleva contexto simulado: solo se muestra el header de MeLi.
   return null;
 };
 

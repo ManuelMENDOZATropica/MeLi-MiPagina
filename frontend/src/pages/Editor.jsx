@@ -388,7 +388,8 @@ const FakeCard = ({ viewMode }) => {
 };
 
 const PageContextMock = ({ section, viewMode, position }) => {
-  if (section !== 'rtb' && section !== 'homeSlider') return null;
+  // Solo el Home Slider simula el contexto de la home. RTB muestra únicamente el header.
+  if (section !== 'homeSlider') return null;
   const padPx = viewMode === 'desktop' ? 40 : 16;
 
   if (section === 'homeSlider' && position === 'after') {
@@ -520,33 +521,7 @@ const PageContextMock = ({ section, viewMode, position }) => {
     );
   }
 
-  if (section === 'rtb') {
-    if (position === 'before') {
-      return (
-        <div style={{ width: '100%', pointerEvents: 'none', userSelect: 'none', fontFamily: "'Proxima Nova','Inter',-apple-system,sans-serif" }}>
-          <div style={{ background: '#f5f5f5', padding: `14px ${padPx}px 14px` }}>
-            <h3 style={{ fontSize: viewMode === 'desktop' ? 15 : 12, color: '#333', margin: '0 0 12px', fontWeight: 400 }}>
-              <span style={{ fontWeight: 700 }}>1.234 resultados</span> para "zapatillas running"
-            </h3>
-            <div style={{ display: 'flex', flexWrap: 'wrap' }}>
-              {Array.from({ length: viewMode === 'desktop' ? 4 : 2 }).map((_, i) => <FakeCard key={i} viewMode={viewMode} />)}
-            </div>
-          </div>
-        </div>
-      );
-    }
-    if (position === 'after') {
-      return (
-        <div style={{ width: '100%', pointerEvents: 'none', userSelect: 'none', fontFamily: "'Proxima Nova','Inter',-apple-system,sans-serif" }}>
-          <div style={{ background: '#f5f5f5', padding: `14px ${padPx}px 30px` }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap' }}>
-              {Array.from({ length: viewMode === 'desktop' ? 4 : 2 }).map((_, i) => <FakeCard key={i} viewMode={viewMode} />)}
-            </div>
-          </div>
-        </div>
-      );
-    }
-  }
+  // RTB no lleva contexto simulado: solo se muestra el header de MeLi.
   return null;
 };
 
