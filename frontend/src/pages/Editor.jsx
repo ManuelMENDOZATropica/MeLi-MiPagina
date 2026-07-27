@@ -265,11 +265,57 @@ const RTB_CARD_COLORS = ['#00A650', '#0166C4', '#4BBCF6', '#FED261', '#FE8143', 
 // Colores claros que necesitan texto oscuro para contrastar
 const RTB_LIGHT_CARDS = ['#FED261', '#4BBCF6'];
 
+// Límites de caracteres de los textos RTB (GUIA-FORMATOS-ML.pdf)
+// Volanta: 20 · Título: 34 en 2 líneas de máx. 17 c/u · CTA: 15
+const RTB_TEXT_LIMITS = {
+  rtbVolanta: { max: 20, label: 'Volanta' },
+  rtbTitle: { max: 34, perLine: 17, lines: 2, label: 'Título' },
+  rtbCta: { max: 15, label: 'CTA' },
+};
+
+// Reparte el título en hasta 2 líneas de máx. 17 caracteres, respetando palabras
+const splitRtbTitle = (text, perLine = 17, maxLines = 2) => {
+  const words = String(text || '').trim().split(/\s+/).filter(Boolean);
+  const lines = [];
+  let current = '';
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (candidate.length <= perLine || !current) {
+      current = candidate;
+    } else {
+      lines.push(current);
+      current = word;
+      if (lines.length === maxLines - 1) break;
+    }
+  }
+  if (current) lines.push(current);
+  // Si sobran palabras, las concatena en la última línea permitida
+  const used = lines.join(' ').split(/\s+/).filter(Boolean).length;
+  if (used < words.length) {
+    lines[lines.length - 1] = `${lines[lines.length - 1]} ${words.slice(used).join(' ')}`.trim();
+  }
+  return lines.slice(0, maxLines);
+};
+
+// true si algún renglón del título supera el máximo por línea
+const rtbTitleOverflows = (text) => {
+  const { perLine, lines } = RTB_TEXT_LIMITS.rtbTitle;
+  return splitRtbTitle(text, perLine, lines).some(l => l.length > perLine);
+};
+
 // Imágenes de ejemplo para el Home Slider por defecto (frontend/public)
-const HOME_SLIDER_DEFAULT_IMAGES = [
-  encodeURI('/Slide home 1 (1).webp'),
-  encodeURI('/Slide home 1 (2).webp'),
-];
+const HOME_SLIDER_DEFAULT_IMAGES = ['/home-slider-1.webp', '/home-slider-2.webp'];
+
+// Migra rutas viejas de las imágenes por defecto (con espacios/paréntesis, rompían el CSS)
+const fixDefaultSliderUrls = (layout) => Array.isArray(layout) ? layout.map(it => ({
+  ...it,
+  uploadedImages: (it.uploadedImages || []).map(u => {
+    if (typeof u === 'string' && (u.includes('Slide%20home%201') || u.includes('Slide home 1'))) {
+      return (u.includes('(1)') || u.includes('%281%29')) ? '/home-slider-1.webp' : '/home-slider-2.webp';
+    }
+    return u;
+  })
+})) : [];
 
 // Mock de contexto de página MeLi para RTB y Home Slider — solo visual, no editable.
 // Se incluye en el export a PDF y en el link publicado, igual que se ve en el editor.
@@ -569,7 +615,7 @@ const AnimatedBanner = ({ item, isPreviewMode }) => {
             width: `${100 / images.length}%`,
             height: '100%',
             flexShrink: 0,
-            backgroundImage: `url(${img})`,
+            backgroundImage: `url("${img}")`,
             backgroundSize: 'cover',
             backgroundPosition: 'center center',
           }} />
@@ -692,6 +738,8 @@ function Editor() {
 
   const [isHoveringText, setIsHoveringText] = useState(false);
   const [editingField, setEditingField] = useState({ id: null, field: null });
+  // Valor en vivo del texto RTB que se está editando (para el contador de caracteres)
+  const [rtbDraft, setRtbDraft] = useState(null);
   const [textResizing, setTextResizing] = useState(null); // { id, dir, startX, startY, startW, startH }
 
   const [viewMode, setViewMode] = useState('desktop');
@@ -735,8 +783,8 @@ function Editor() {
               uploadedImages: [...HOME_SLIDER_DEFAULT_IMAGES]
             } : null;
           };
-          const hsDesktop = Array.isArray(data.homeSliderDesktopLayout) ? data.homeSliderDesktopLayout : [];
-          const hsMobile = Array.isArray(data.homeSliderMobileLayout) ? data.homeSliderMobileLayout : [];
+          const hsDesktop = fixDefaultSliderUrls(data.homeSliderDesktopLayout);
+          const hsMobile = fixDefaultSliderUrls(data.homeSliderMobileLayout);
           const defaultHs = seedHomeSlider();
 
           setCanvases({
@@ -875,8 +923,13 @@ function Editor() {
     collect(canvases[activeSection].desktop || [], 'desktop');
     collect(canvases[activeSection].mobile || [], 'mobile');
 
-    // Solo items con imagen subida (excluir store_profile — ícono de marca, sin validación MAIA)
-    const itemsToCheck = allItems.filter(item => item.uploadedImages?.[0] && item.type !== 'store_profile');
+    // Solo items con imagen subida (excluir store_profile — ícono de marca — y el
+    // carrusel del Home Slider, que no se valida con MAIA)
+    const itemsToCheck = allItems.filter(item =>
+      item.uploadedImages?.[0] &&
+      item.type !== 'store_profile' &&
+      !String(item.id || '').startsWith('home_slider')
+    );
 
     if (itemsToCheck.length === 0) { resolve({ errors: [] }); return; }
 
@@ -1074,18 +1127,21 @@ function Editor() {
   const analyzeImageForTypos = async (imageUrl, elementId) => {
     const tok = JSON.parse(localStorage.getItem('tropica_user'))?.token;
     let elementOwnerId = null;
+    let targetItemId = null;
     const findOwner = (items) => {
       for (const item of items) {
-        if (item.uniqueId === elementId) { elementOwnerId = item.addedBy || null; return; }
+        if (item.uniqueId === elementId) { elementOwnerId = item.addedBy || null; targetItemId = item.id || null; return; }
         if (item.type === 'rowGroup' && item.items) {
           for (const child of item.items) {
-            if (child.uniqueId === elementId) { elementOwnerId = child.addedBy || null; return; }
+            if (child.uniqueId === elementId) { elementOwnerId = child.addedBy || null; targetItemId = child.id || null; return; }
           }
         }
       }
     };
     const allItems = [...(canvases[activeSection].desktop || []), ...(canvases[activeSection].mobile || [])];
     findOwner(allItems);
+    // El carrusel del Home Slider no se analiza con MAIA
+    if (String(targetItemId || '').startsWith('home_slider')) return;
     try {
       const res = await fetch(`${API_URL}/api/analyze-typos`, {
         method: 'POST',
@@ -1129,8 +1185,9 @@ function Editor() {
     // Cotejar contra las medidas del canvas donde vive el módulo
     const expectedSize = foundDevice === 'mobile' ? foundItem.mobileSize : foundItem.desktopSize;
     if (!expectedSize?.width || !expectedSize?.height) return;
-    // Las tarjetas de producto y RTB cards aceptan cualquier imagen sin validar dimensiones
+    // Las tarjetas de producto, RTB cards y el Home Slider aceptan cualquier imagen sin validar dimensiones
     if (foundItem.type === 'product_card' || foundItem.type === 'rtb_card') return;
+    if (String(foundItem.id || '').startsWith('home_slider')) return;
 
     const img = new window.Image();
     img.onload = async () => {
@@ -2307,24 +2364,68 @@ function Editor() {
         </div>
       );
 
-      const editableText = (field, defaultVal, style) => (
-        editingField.id === item.uniqueId && editingField.field === field ? (
-          <input
-            autoFocus
-            defaultValue={item[field] || defaultVal}
-            onBlur={(e) => { updateItemText(item.uniqueId, field, e.target.value); setEditingField({ id: null, field: null }); }}
-            onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
-            onClick={e => e.stopPropagation()}
-            style={{ border: '1px solid rgba(255,255,255,0.7)', background: 'rgba(0,0,0,0.18)', borderRadius: 4, outline: 'none', width: '92%', fontFamily: 'inherit', ...style }}
-          />
-        ) : (
-          <span
-            onDoubleClick={(e) => { e.stopPropagation(); if (!isPreviewMode) setEditingField({ id: item.uniqueId, field }); }}
-            title={!isPreviewMode ? 'Doble clic para editar' : ''}
-            style={{ cursor: isPreviewMode ? 'default' : 'text', ...style }}
-          >{item[field] || defaultVal}</span>
-        )
-      );
+      const editableText = (field, defaultVal, style) => {
+        const limit = RTB_TEXT_LIMITS[field];
+        const value = item[field] ?? defaultVal;
+        const isEditing = editingField.id === item.uniqueId && editingField.field === field;
+
+        if (isEditing) {
+          const hint = limit
+            ? (field === 'rtbTitle'
+              ? `${String(rtbDraft ?? value).length}/${limit.max} · ${limit.lines} líneas de ${limit.perLine}`
+              : `${String(rtbDraft ?? value).length}/${limit.max}`)
+            : null;
+          const over = field === 'rtbTitle' && rtbTitleOverflows(rtbDraft ?? value);
+          return (
+            <div style={{ position: 'relative', width: '100%' }} onClick={e => e.stopPropagation()}>
+              <input
+                autoFocus
+                defaultValue={value}
+                maxLength={limit?.max}
+                onChange={(e) => setRtbDraft(e.target.value)}
+                onBlur={(e) => {
+                  updateItemText(item.uniqueId, field, e.target.value);
+                  setEditingField({ id: null, field: null });
+                  setRtbDraft(null);
+                }}
+                onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
+                style={{ border: `1px solid ${over ? '#ff5c5c' : 'rgba(255,255,255,0.7)'}`, background: 'rgba(0,0,0,0.18)', borderRadius: 4, outline: 'none', width: '92%', fontFamily: 'inherit', ...style }}
+              />
+              {hint && (
+                <span style={{ position: 'absolute', right: '8%', bottom: -14, fontSize: 10, fontWeight: 700, letterSpacing: '0.02em', color: over ? '#ff5c5c' : txtColor, opacity: over ? 1 : 0.7, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+                  {hint}{over ? ' · línea larga' : ''}
+                </span>
+              )}
+            </div>
+          );
+        }
+
+        const startEdit = (e) => {
+          e.stopPropagation();
+          if (isPreviewMode) return;
+          setRtbDraft(String(value));
+          setEditingField({ id: item.uniqueId, field });
+        };
+        const tooltip = !isPreviewMode
+          ? `Doble clic para editar${limit ? ` · máx. ${limit.max} caract.${limit.perLine ? ` (${limit.lines} líneas de ${limit.perLine})` : ''}` : ''}`
+          : '';
+
+        // El título se reparte en hasta 2 líneas de 17 caracteres
+        if (field === 'rtbTitle') {
+          const lines = splitRtbTitle(value, limit.perLine, limit.lines);
+          return (
+            <span onDoubleClick={startEdit} title={tooltip} style={{ cursor: isPreviewMode ? 'default' : 'text', display: 'block', ...style }}>
+              {lines.map((l, i) => <span key={i} style={{ display: 'block' }}>{l}</span>)}
+            </span>
+          );
+        }
+
+        return (
+          <span onDoubleClick={startEdit} title={tooltip} style={{ cursor: isPreviewMode ? 'default' : 'text', ...style }}>
+            {value}
+          </span>
+        );
+      };
 
       return (
         <div
@@ -2368,8 +2469,10 @@ function Editor() {
                 <div style={{ flex: 1, background: cardColor, display: 'flex', alignItems: 'center', padding: `0 ${Math.round(32 * sc)}px`, minWidth: 0 }}>
                   {logoBox(Math.round(110 * sc))}
                   <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1, marginLeft: Math.round(24 * sc) }}>
-                    {editableText('rtbTitle', 'Card', { fontSize: Math.round(42 * sc), fontWeight: 800, color: txtColor, lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 4 })}
-                    {editableText('rtbCta', 'Ver más', { fontSize: Math.round(18 * sc), fontWeight: 600, color: txtColor, opacity: 0.9 })}
+                    {/* Jerarquía RTB: volanta chica · título grande (2 líneas) · CTA chico */}
+                    {editableText('rtbVolanta', 'Volanta', { fontSize: Math.round(18 * sc), fontWeight: 700, color: txtColor, opacity: 0.85, lineHeight: 1.2, letterSpacing: '0.02em', marginBottom: Math.round(6 * sc) })}
+                    {editableText('rtbTitle', 'Título de la card', { fontSize: Math.round(40 * sc), fontWeight: 800, color: txtColor, lineHeight: 1.05, marginBottom: Math.round(8 * sc) })}
+                    {editableText('rtbCta', 'Ver más', { fontSize: Math.round(16 * sc), fontWeight: 600, color: txtColor, opacity: 0.9, lineHeight: 1.2 })}
                   </div>
                 </div>
                 {imageArea({ width: '42%', height: '100%', flexShrink: 0 })}
@@ -2391,8 +2494,10 @@ function Editor() {
                         {logoBox(Math.round(tabW * 0.74))}
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', marginTop: Math.round(8 * sc) }}>
-                        {editableText('rtbTitle', 'Card', { fontSize: Math.round(46 * sc), fontWeight: 800, color: txtColor, lineHeight: 1.15, marginBottom: Math.round(10 * sc) })}
-                        {editableText('rtbCta', 'Ver más', { fontSize: Math.round(20 * sc), fontWeight: 600, color: txtColor, opacity: 0.9 })}
+                        {/* Jerarquía RTB: volanta chica · título grande (2 líneas) · CTA chico */}
+                        {editableText('rtbVolanta', 'Volanta', { fontSize: Math.round(20 * sc), fontWeight: 700, color: txtColor, opacity: 0.85, lineHeight: 1.2, letterSpacing: '0.02em', marginBottom: Math.round(8 * sc) })}
+                        {editableText('rtbTitle', 'Título de la card', { fontSize: Math.round(46 * sc), fontWeight: 800, color: txtColor, lineHeight: 1.08, marginBottom: Math.round(12 * sc) })}
+                        {editableText('rtbCta', 'Ver más', { fontSize: Math.round(18 * sc), fontWeight: 600, color: txtColor, opacity: 0.9, lineHeight: 1.2 })}
                       </div>
                     </div>
                   </div>
@@ -3322,7 +3427,7 @@ function Editor() {
                 if (i.type === 'rowGroup') i.items.forEach(c => { if (c.uniqueId === contextMenu.targetId) targetItem = c; });
               });
               const hasImage = targetItem?.uploadedImages?.length > 0;
-              const hasTexts = targetItem?.type === 'list'; // Solo 'list' tiene textos editables
+              const hasTexts = targetItem?.type === 'list' || targetItem?.type === 'rtb_card';
               const hasStoreProfile = targetItem?.type === 'store_profile';
               return (
                 <>
@@ -3656,8 +3761,15 @@ function Editor() {
       {textEditorPanel && (() => {
         const panelItem = textEditorPanel.item;
         const isStoreProfileMode = panelItem?._mode === 'store_profile' || panelItem?.type === 'store_profile';
+        const isRtbCard = panelItem?.type === 'rtb_card';
         const fields = isStoreProfileMode
           ? [{ key: 'brandName', label: 'Nombre de Marca', type: 'input', placeholder: 'Ej: Nike, Adidas, Mi Tienda…' }]
+          : isRtbCard
+          ? [
+              { key: 'rtbVolanta', label: 'Volanta', type: 'input', placeholder: 'Volanta', maxLength: 20, hint: 'Máx. 20 caracteres · va arriba, en tamaño chico' },
+              { key: 'rtbTitle', label: 'Título', type: 'input', placeholder: 'Título de la card', maxLength: 34, hint: 'Máx. 34 caracteres · 2 líneas de 17 · es el texto más grande' },
+              { key: 'rtbCta', label: 'Texto del CTA', type: 'input', placeholder: 'Ver más', maxLength: 15, hint: 'Máx. 15 caracteres · va abajo, en tamaño chico' },
+            ]
           : [
               { key: 'contentTitle', label: 'Título', type: 'input', placeholder: 'Título de la tarjeta' },
               { key: 'contentParagraph', label: 'Párrafo', type: 'textarea', placeholder: 'Describe el evento o promoción.' },
@@ -3724,11 +3836,15 @@ function Editor() {
                         name={f.key}
                         defaultValue={panelItem[f.key] || ''}
                         placeholder={f.placeholder}
+                        maxLength={f.maxLength}
                         autoFocus={isStoreProfileMode}
                         style={{ width: '100%', border: '1.5px solid #e6e6e6', borderRadius: '8px', padding: '10px 12px', fontSize: '14px', color: '#333', outline: 'none', fontFamily: 'inherit', transition: 'border-color 0.2s', boxSizing: 'border-box' }}
                         onFocus={e => e.target.style.borderColor = '#3483fa'}
                         onBlur={e => e.target.style.borderColor = '#e6e6e6'}
                       />
+                    )}
+                    {f.hint && (
+                      <p style={{ margin: '5px 0 0', fontSize: '11px', color: '#9ba3b5' }}>{f.hint}</p>
                     )}
                   </div>
                 ))}

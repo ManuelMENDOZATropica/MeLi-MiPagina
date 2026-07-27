@@ -5,6 +5,29 @@ import API_URL from '../api';
 
 const isMobileDevice = () => /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768;
 
+// Reparte el título RTB en hasta 2 líneas de máx. 17 caracteres (GUIA-FORMATOS-ML.pdf)
+const splitRtbTitle = (text, perLine = 17, maxLines = 2) => {
+  const words = String(text || '').trim().split(/\s+/).filter(Boolean);
+  const lines = [];
+  let current = '';
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (candidate.length <= perLine || !current) {
+      current = candidate;
+    } else {
+      lines.push(current);
+      current = word;
+      if (lines.length === maxLines - 1) break;
+    }
+  }
+  if (current) lines.push(current);
+  const used = lines.join(' ').split(/\s+/).filter(Boolean).length;
+  if (used < words.length) {
+    lines[lines.length - 1] = `${lines[lines.length - 1]} ${words.slice(used).join(' ')}`.trim();
+  }
+  return lines.slice(0, maxLines);
+};
+
 // ─── Animated Banner ────────────────────────────────────────────
 const AnimatedBanner = ({ item, height }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -24,7 +47,7 @@ const AnimatedBanner = ({ item, height }) => {
       {images.map((img, idx) => (
         <div key={idx} style={{
           position: 'absolute', inset: 0,
-          backgroundImage: `url(${img})`, backgroundSize: 'cover', backgroundPosition: 'center',
+          backgroundImage: `url("${img}")`, backgroundSize: 'cover', backgroundPosition: 'center',
           opacity: currentIndex === idx ? 1 : 0, transition: 'opacity 0.8s ease-in-out'
         }} />
       ))}
@@ -103,9 +126,13 @@ const renderPublicItem = (item, viewMode) => {
           <div style={{ display: 'flex', width: '100%', height: '100%', borderRadius: 12, overflow: 'hidden' }}>
             <div style={{ flex: 1, background: cardColor, display: 'flex', alignItems: 'center', gap: Math.round(24 * sc), padding: `0 ${Math.round(32 * sc)}px`, minWidth: 0 }}>
               {logoBox(Math.round(110 * sc))}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0, flex: 1 }}>
-                <span style={{ fontSize: Math.round(42 * sc), fontWeight: 800, color: txtColor, lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.rtbTitle || 'Card'}</span>
-                <span style={{ fontSize: Math.round(18 * sc), fontWeight: 600, color: txtColor, opacity: 0.9 }}>{item.rtbCta || 'Ver más'}</span>
+              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+                {/* Jerarquía RTB: volanta chica · título grande (2 líneas) · CTA chico */}
+                <span style={{ fontSize: Math.round(18 * sc), fontWeight: 700, color: txtColor, opacity: 0.85, lineHeight: 1.2, letterSpacing: '0.02em', marginBottom: Math.round(6 * sc) }}>{item.rtbVolanta || 'Volanta'}</span>
+                <span style={{ fontSize: Math.round(40 * sc), fontWeight: 800, color: txtColor, lineHeight: 1.05, marginBottom: Math.round(8 * sc), display: 'block' }}>
+                  {splitRtbTitle(item.rtbTitle || 'Título de la card').map((l, i) => <span key={i} style={{ display: 'block' }}>{l}</span>)}
+                </span>
+                <span style={{ fontSize: Math.round(16 * sc), fontWeight: 600, color: txtColor, opacity: 0.9, lineHeight: 1.2 }}>{item.rtbCta || 'Ver más'}</span>
               </div>
             </div>
             {imageArea({ width: '42%', height: '100%', flexShrink: 0 })}
@@ -127,9 +154,13 @@ const renderPublicItem = (item, viewMode) => {
             <div style={{ position: 'absolute', top: -tabH, left: Math.round(32 * sc), width: tabW, height: tabH, background: cardColor, borderRadius: '10px 10px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {logoBox(Math.round(tabW * 0.74))}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: Math.round(10 * sc), marginTop: Math.round(8 * sc) }}>
-              <span style={{ fontSize: Math.round(46 * sc), fontWeight: 800, color: txtColor, lineHeight: 1.15 }}>{item.rtbTitle || 'Card'}</span>
-              <span style={{ fontSize: Math.round(20 * sc), fontWeight: 600, color: txtColor, opacity: 0.9 }}>{item.rtbCta || 'Ver más'}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', marginTop: Math.round(8 * sc) }}>
+              {/* Jerarquía RTB: volanta chica · título grande (2 líneas) · CTA chico */}
+              <span style={{ fontSize: Math.round(20 * sc), fontWeight: 700, color: txtColor, opacity: 0.85, lineHeight: 1.2, letterSpacing: '0.02em', marginBottom: Math.round(8 * sc) }}>{item.rtbVolanta || 'Volanta'}</span>
+              <span style={{ fontSize: Math.round(46 * sc), fontWeight: 800, color: txtColor, lineHeight: 1.08, marginBottom: Math.round(12 * sc), display: 'block' }}>
+                {splitRtbTitle(item.rtbTitle || 'Título de la card').map((l, i) => <span key={i} style={{ display: 'block' }}>{l}</span>)}
+              </span>
+              <span style={{ fontSize: Math.round(18 * sc), fontWeight: 600, color: txtColor, opacity: 0.9, lineHeight: 1.2 }}>{item.rtbCta || 'Ver más'}</span>
             </div>
           </div>
         </div>
@@ -551,10 +582,28 @@ export default function PublicView() {
   const containerRef = useRef(null);
   const [scale, setScale] = useState(1);
 
+  // Migra rutas viejas de las imágenes por defecto del Home Slider (con espacios/paréntesis, rompían el CSS)
+  const fixDefaultSliderUrls = (layout) => Array.isArray(layout) ? layout.map(it => ({
+    ...it,
+    uploadedImages: (it.uploadedImages || []).map(u => {
+      if (typeof u === 'string' && (u.includes('Slide%20home%201') || u.includes('Slide home 1'))) {
+        return (u.includes('(1)') || u.includes('%281%29')) ? '/home-slider-1.webp' : '/home-slider-2.webp';
+      }
+      return u;
+    })
+  })) : [];
+
   useEffect(() => {
     fetch(`${API_URL}/api/public/projects/${id}`)
       .then(res => { if (!res.ok) throw new Error(); return res.json(); })
-      .then(data => { setProject(data); setLoading(false); })
+      .then(data => {
+        setProject({
+          ...data,
+          homeSliderDesktopLayout: fixDefaultSliderUrls(data.homeSliderDesktopLayout),
+          homeSliderMobileLayout: fixDefaultSliderUrls(data.homeSliderMobileLayout),
+        });
+        setLoading(false);
+      })
       .catch(() => { setError(true); setLoading(false); });
   }, [id]);
 

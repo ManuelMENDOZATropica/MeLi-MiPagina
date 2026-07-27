@@ -206,7 +206,7 @@ export const componentsList = [
     name: "RTB Imagen",
     desktopSize: { width: 1008, height: 528 },
     mobileSize: { width: 528, height: 528 },
-    notes: "Imagen Rectangular (Desktop, 1008x528) e Imagen Cuadrada (Mobile, 528x528). Volanta hasta 20 caract., título máx. 34 (2 líneas de 17), CTA máx. 15 caract. Legales sobre la imagen: máx. 80 caract.",
+    notes: "Imagen Rectangular (Desktop, 1008x528) e Imagen Cuadrada (Mobile, 528x528). Jerarquía de textos: volanta arriba en tamaño chico (máx. 20 caract.), debajo el título en 2 líneas y tamaño grande (máx. 17 caract. c/u, 34 en total) y al final el CTA en tamaño chico (máx. 15 caract.). Legales sobre la imagen: máx. 80 caract.",
     type: "banner",
     section: "rtb"
   },
@@ -224,7 +224,7 @@ export const componentsList = [
     name: "RTB Card Horizontal",
     desktopSize: { width: 984, height: 240 },
     mobileSize: { width: 720, height: 176 },
-    notes: "ADN RTB con estructura THB: logo + textos sobre el color de card + imagen a la derecha. Clic derecho: subir logo/imagen, editar textos y elegir color de card. Un solo logo, sin volanta.",
+    notes: "ADN RTB con estructura THB: logo + textos sobre el color de card + imagen a la derecha. Jerarquía de textos: volanta arriba (chica, máx. 20 caract.), título (más grande, máx. 34 en 2 líneas de 17) y CTA abajo (chico, máx. 15 caract.). Clic derecho: subir logo/imagen, editar textos y elegir color de card. Un solo logo.",
     type: "rtb_card",
     section: "rtb"
   },
@@ -233,7 +233,7 @@ export const componentsList = [
     name: "RTB Card Imagen Rectangular",
     desktopSize: { width: 1008, height: 888 },
     mobileSize: { width: 600, height: 528 },
-    notes: "ADN RTB vertical: imagen rectangular (1008x528) arriba + pestaña de logo + card de color con textos. Clic derecho: subir logo/imagen, editar textos y elegir color de card.",
+    notes: "ADN RTB vertical: imagen rectangular (1008x528) arriba + pestaña de logo + card de color con textos. Jerarquía de textos: volanta arriba (chica, máx. 20 caract.), título (más grande, máx. 34 en 2 líneas de 17) y CTA abajo (chico, máx. 15 caract.). Clic derecho: subir logo/imagen, editar textos y elegir color de card.",
     type: "rtb_card",
     section: "rtb"
   },
@@ -242,7 +242,7 @@ export const componentsList = [
     name: "RTB Card Imagen Cuadrada",
     desktopSize: { width: 528, height: 858 },
     mobileSize: { width: 400, height: 650 },
-    notes: "ADN RTB vertical: imagen cuadrada (528x528) arriba + pestaña de logo + card de color con textos. En la versión cuadrada, reducir cantidad de productos en la imagen. Clic derecho: subir logo/imagen, editar textos y elegir color de card.",
+    notes: "ADN RTB vertical: imagen cuadrada (528x528) arriba + pestaña de logo + card de color con textos. Jerarquía de textos: volanta arriba (chica, máx. 20 caract.), título (más grande, máx. 34 en 2 líneas de 17) y CTA abajo (chico, máx. 15 caract.). En la versión cuadrada, reducir cantidad de productos en la imagen. Clic derecho: subir logo/imagen, editar textos y elegir color de card.",
     type: "rtb_card",
     section: "rtb"
   }
