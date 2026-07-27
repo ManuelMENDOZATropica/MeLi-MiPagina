@@ -108,7 +108,7 @@ const renderPublicItem = (item, viewMode) => {
     const font = "'Proxima Nova','Inter',-apple-system,sans-serif";
 
     const logoBox = (size) => (
-      <div style={{ width: size, height: Math.round(size * 0.74), background: 'white', borderRadius: 8, border: '1px solid rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0, boxSizing: 'border-box' }}>
+      <div style={{ width: size, height: Math.round(size * 0.74), background: 'white', borderRadius: 8, border: '1px solid rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0, boxSizing: 'border-box', boxShadow: '0 2px 10px rgba(0,0,0,0.14)' }}>
         {logoUrl
           ? <img src={logoUrl} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 4, boxSizing: 'border-box' }} />
           : <span style={{ fontSize: Math.max(9, Math.round(12 * sc)), color: '#bbb', fontWeight: 700 }}>Logo</span>}
@@ -143,18 +143,21 @@ const renderPublicItem = (item, viewMode) => {
 
     const isSquare = item.id === 'rtb_card_cuadrada';
     const imgH = Math.round(width * (isSquare ? 1 : 528 / 1008));
-    const tabScale = isSquare ? 1.35 : 1;
-    const tabW = Math.round(150 * sc * tabScale);
-    const tabH = Math.round(100 * sc * tabScale);
+    const logoScale = isSquare ? 1.35 : 1;
+    const logoW = Math.round(150 * sc * logoScale);
+    const logoH = Math.round(logoW * 0.74);
+    // El logo queda mitad sobre la imagen y mitad sobre el color, sin fondo detrás
+    const logoOffset = Math.round(logoH / 2);
     return (
       <div key={item.uniqueId} style={{ width, height, fontFamily: font }}>
         <div style={{ width: '100%', height: '100%', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           {imageArea({ width: '100%', height: imgH, flexShrink: 0 })}
           <div style={{ flex: 1, background: cardColor, position: 'relative', padding: `${Math.round(28 * sc)}px ${Math.round(32 * sc)}px`, boxSizing: 'border-box' }}>
-            <div style={{ position: 'absolute', top: -tabH, left: Math.round(32 * sc), width: tabW, height: tabH, background: cardColor, borderRadius: '10px 10px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {logoBox(Math.round(tabW * 0.74))}
+            {/* Logo montado sobre el borde: 50% imagen / 50% card, sin pestaña de color */}
+            <div style={{ position: 'absolute', top: -logoOffset, left: Math.round(32 * sc), zIndex: 2 }}>
+              {logoBox(logoW)}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', marginTop: Math.round(8 * sc) }}>
+            <div style={{ display: 'flex', flexDirection: 'column', marginTop: logoOffset + Math.round(16 * sc) }}>
               {/* Jerarquía RTB: volanta chica · título grande (2 líneas) · CTA chico */}
               <span style={{ fontSize: Math.round(20 * sc), fontWeight: 700, color: txtColor, opacity: 0.85, lineHeight: 1.2, letterSpacing: '0.02em', marginBottom: Math.round(8 * sc) }}>{item.rtbVolanta || 'Volanta'}</span>
               <span style={{ fontSize: Math.round(46 * sc), fontWeight: 800, color: txtColor, lineHeight: 1.08, marginBottom: Math.round(12 * sc), display: 'block' }}>

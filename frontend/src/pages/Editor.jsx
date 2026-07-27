@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Monitor, Smartphone, GripVertical, Trash2, Image as ImageIcon, Layout, Type, Video, Search, MapPin, Tag, ChevronDown, Bell, ShoppingCart, User, AlignCenter, MoveHorizontal, ListMinus, AlignJustify, CornerDownLeft, ArrowLeft, CheckCircle2, Play, Edit3, Eye, EyeOff, Layers, Grid, Settings, ArrowRight, FileDown, Truck, Star } from 'lucide-react';
+import { Monitor, Smartphone, GripVertical, Trash2, Image as ImageIcon, Layout, Type, Video, Search, MapPin, Tag, ChevronDown, Bell, ShoppingCart, User, AlignCenter, MoveHorizontal, ListMinus, AlignJustify, CornerDownLeft, ArrowLeft, CheckCircle2, Play, Edit3, Eye, EyeOff, Layers, Grid, Settings, ArrowRight, FileDown, Truck, Star, ShieldCheck, Zap, Copy, Download } from 'lucide-react';
 import { componentsList } from '../componentsData';
 import API_URL from '../api';
 import '../index.css';
@@ -689,6 +689,11 @@ function Editor() {
   const [publishedSlug, setPublishedSlug] = useState(null);
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [showPublishMenu, setShowPublishMenu] = useState(false);
+  // true cuando se publicó en modo prueba (sin verificación de MAIA)
+  const [isTestPublish, setIsTestPublish] = useState(false);
+  // Feedback de los botones del QR: 'copied' | 'downloaded' | 'error' | null
+  const [qrFeedback, setQrFeedback] = useState(null);
   const [maiaCheckState, setMaiaCheckState] = useState(null); // null | 'checking' | { errors } | 'ok'
   const [maiaCheckItems, setMaiaCheckItems] = useState([]); // [{name, status:'pending'|'ok'|'error', msg}]
   const [textEditorPanel, setTextEditorPanel] = useState(null); // { item, x, y }
@@ -914,6 +919,36 @@ function Editor() {
   };
 
   // Verifica todos los elementos antes de publicar
+  // Publica la maqueta. Con skipCheck (modo prueba) se saltea la verificación de MAIA
+  // y va directo al enlace + QR. El slug y la URL son los mismos en ambos modos.
+  const doPublish = async ({ skipCheck = false } = {}) => {
+    if (!skipCheck) {
+      setMaiaCheckState('checking');
+      setMaiaCheckItems([]);
+      const { errors } = await runMaiaPrePublishCheck();
+      if (errors.length > 0) {
+        setMaiaCheckState({ errors });
+        return;
+      }
+      setMaiaCheckState('ok');
+    }
+
+    setIsTestPublish(skipCheck);
+    setIsPublishing(true);
+    try {
+      const res = await fetch(`${API_URL}/api/projects/${id}/publish`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      setIsPublished(data.isPublished);
+      if (data.slug) setPublishedSlug(data.slug);
+      if (data.isPublished) { setQrFeedback(null); setShowPublishModal(true); }
+    } catch (e) { console.error(e); }
+    setIsPublishing(false);
+    if (!skipCheck) setMaiaCheckState(null);
+  };
+
   const runMaiaPrePublishCheck = () => new Promise((resolve) => {
     const allItems = [];
     const collect = (items, device) => items.forEach(item => {
@@ -1617,6 +1652,16 @@ function Editor() {
     window.addEventListener('click', hideMenu);
     return () => window.removeEventListener('click', hideMenu);
   }, []);
+
+  // Cierra el dropdown de Publicar al hacer clic afuera
+  useEffect(() => {
+    if (!showPublishMenu) return;
+    const onDocClick = (e) => {
+      if (!e.target.closest('#publish-menu-wrap')) setShowPublishMenu(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [showPublishMenu]);
 
   // Resize handler para text_block
   useEffect(() => {
@@ -2339,6 +2384,7 @@ function Editor() {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             overflow: 'hidden', cursor: !isPreviewMode ? 'pointer' : 'default', flexShrink: 0,
             boxSizing: 'border-box',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.14)',
           }}
         >
           {logoUrl
@@ -2478,22 +2524,24 @@ function Editor() {
                 {imageArea({ width: '42%', height: '100%', flexShrink: 0 })}
               </div>
             ) : (
-              /* ── Vertical: imagen arriba + pestaña de logo + card de color ── */
+              /* ── Vertical: imagen arriba + logo a caballo del borde + card de color ── */
               (() => {
                 const isSquare = item.id === 'rtb_card_cuadrada';
                 const imgH = Math.round(width * (isSquare ? 1 : 528 / 1008));
-                const tabScale = isSquare ? 1.35 : 1;
-                const tabW = Math.round(150 * sc * tabScale);
-                const tabH = Math.round(100 * sc * tabScale);
+                const logoScale = isSquare ? 1.35 : 1;
+                const logoW = Math.round(150 * sc * logoScale);
+                const logoH = Math.round(logoW * 0.74);
+                // El logo queda mitad sobre la imagen y mitad sobre el color, sin fondo detrás
+                const logoOffset = Math.round(logoH / 2);
                 return (
                   <div style={{ width: '100%', height: '100%', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                     {imageArea({ width: '100%', height: imgH, flexShrink: 0 })}
                     <div style={{ flex: 1, background: cardColor, position: 'relative', padding: `${Math.round(28 * sc)}px ${Math.round(32 * sc)}px`, boxSizing: 'border-box' }}>
-                      {/* Pestaña del logo superpuesta al borde inferior de la imagen */}
-                      <div style={{ position: 'absolute', top: -tabH, left: Math.round(32 * sc), width: tabW, height: tabH, background: cardColor, borderRadius: '10px 10px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {logoBox(Math.round(tabW * 0.74))}
+                      {/* Logo montado sobre el borde: 50% imagen / 50% card, sin pestaña de color */}
+                      <div style={{ position: 'absolute', top: -logoOffset, left: Math.round(32 * sc), zIndex: 2 }}>
+                        {logoBox(logoW)}
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', marginTop: Math.round(8 * sc) }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', marginTop: logoOffset + Math.round(16 * sc) }}>
                         {/* Jerarquía RTB: volanta chica · título grande (2 líneas) · CTA chico */}
                         {editableText('rtbVolanta', 'Volanta', { fontSize: Math.round(20 * sc), fontWeight: 700, color: txtColor, opacity: 0.85, lineHeight: 1.2, letterSpacing: '0.02em', marginBottom: Math.round(8 * sc) })}
                         {editableText('rtbTitle', 'Título de la card', { fontSize: Math.round(46 * sc), fontWeight: 800, color: txtColor, lineHeight: 1.08, marginBottom: Math.round(12 * sc) })}
@@ -2817,55 +2865,170 @@ function Editor() {
             </button>
           )}
 
-          <button
-            onClick={async () => {
-              // Paso 1: verificación MAIA
-              setMaiaCheckState('checking');
-              setMaiaCheckItems([]);
-              const { errors } = await runMaiaPrePublishCheck();
-              if (errors.length > 0) {
-                setMaiaCheckState({ errors });
-                return;
-              }
-              setMaiaCheckState('ok');
-              // Paso 2: publicar
-              setIsPublishing(true);
-              try {
-                const res = await fetch(`${API_URL}/api/projects/${id}/publish`, {
-                  method: 'POST',
-                  headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const data = await res.json();
-                setIsPublished(data.isPublished);
-                if (data.slug) setPublishedSlug(data.slug);
-                if (data.isPublished) setShowPublishModal(true);
-              } catch (e) { console.error(e); }
-              setIsPublishing(false);
-              setMaiaCheckState(null);
-            }}
-            style={{ background: '#fff159', color: '#1a1f2e', border: 'none', padding: '7px 18px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '800', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.06em', transition: 'all 0.18s' }}
-            onMouseEnter={e => e.currentTarget.style.background = '#ffe800'}
-            onMouseLeave={e => e.currentTarget.style.background = '#fff159'}
-          >
-            {isPublishing ? '...' : isPublished ? '✓ Publicado' : 'Publicar'}
-          </button>
+          {/* Publicar — dropdown con Verificación / Modo prueba */}
+          <div style={{ position: 'relative' }} id="publish-menu-wrap">
+            <button
+              onClick={() => setShowPublishMenu(p => !p)}
+              disabled={isPublishing}
+              style={{ background: '#fff159', color: '#1a1f2e', border: 'none', padding: '7px 16px', borderRadius: '6px', cursor: isPublishing ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '800', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.06em', transition: 'all 0.18s' }}
+              onMouseEnter={e => { if (!isPublishing) e.currentTarget.style.background = '#ffe800'; }}
+              onMouseLeave={e => { if (!isPublishing) e.currentTarget.style.background = '#fff159'; }}
+            >
+              {isPublishing ? '...' : isPublished ? '✓ Publicado' : 'Publicar'}
+              <ChevronDown size={13} style={{ transform: showPublishMenu ? 'rotate(180deg)' : 'none', transition: 'transform 0.18s' }} />
+            </button>
+
+            {showPublishMenu && (
+              <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, width: '270px', background: 'white', borderRadius: '10px', boxShadow: '0 12px 34px rgba(0,0,0,0.28)', overflow: 'hidden', zIndex: 3000 }}>
+                <div
+                  onClick={() => { setShowPublishMenu(false); doPublish({ skipCheck: false }); }}
+                  style={{ padding: '13px 16px', cursor: 'pointer', borderBottom: '1px solid #f0f2f6' }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#f7f9fc'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'white'}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '13px', fontWeight: 800, color: '#1a1f2e' }}>
+                    <ShieldCheck size={15} color="#10b981" /> Verificación
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#8b93a5', marginTop: '3px', lineHeight: 1.4 }}>
+                    Corre el chequeo de MAIA antes de publicar.
+                  </div>
+                </div>
+                <div
+                  onClick={() => { setShowPublishMenu(false); doPublish({ skipCheck: true }); }}
+                  style={{ padding: '13px 16px', cursor: 'pointer' }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#fff8f0'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'white'}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '13px', fontWeight: 800, color: '#1a1f2e' }}>
+                    <Zap size={15} color="#f59e0b" /> Modo prueba
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#8b93a5', marginTop: '3px', lineHeight: 1.4 }}>
+                    Sin verificación. Va directo al enlace y el QR.
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Publish Modal */}
           {showPublishModal && (() => {
             const sectionPath = activeSection === 'miPagina' ? '' : `/${activeSection}`;
             const publicUrl = `${window.location.origin}/view/${publishedSlug || id}${sectionPath}`;
-            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(publicUrl)}`;
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(publicUrl)}`;
+            const qrFileName = `qr-${publishedSlug || id}-${activeSection}.png`;
+
+            // Obtiene el PNG del QR como Blob. Primero por fetch; si CORS lo bloquea,
+            // lo redibuja en un canvas a partir de la imagen ya cargada en el modal.
+            const getQrBlob = async () => {
+              try {
+                const res = await fetch(qrUrl, { mode: 'cors' });
+                if (res.ok) return await res.blob();
+              } catch { /* sigue con el fallback de canvas */ }
+              return await new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                  const canvas = document.createElement('canvas');
+                  canvas.width = img.naturalWidth || 600;
+                  canvas.height = img.naturalHeight || 600;
+                  const ctx = canvas.getContext('2d');
+                  ctx.fillStyle = '#ffffff';
+                  ctx.fillRect(0, 0, canvas.width, canvas.height);
+                  ctx.drawImage(img, 0, 0);
+                  canvas.toBlob(b => b ? resolve(b) : reject(new Error('canvas vacío')), 'image/png');
+                };
+                img.onerror = () => reject(new Error('no se pudo cargar el QR'));
+                img.src = qrUrl;
+              });
+            };
+
+            const flashQr = (state) => { setQrFeedback(state); setTimeout(() => setQrFeedback(null), 2600); };
+
+            const copyQrImage = async () => {
+              // Firefox todavía no soporta escribir imágenes en el portapapeles
+              if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
+                try { await navigator.clipboard.writeText(publicUrl); } catch { /* nada más que hacer */ }
+                flashQr('error');
+                return;
+              }
+              // Se arranca la descarga sin await para no perder el gesto del usuario:
+              // Safari exige que clipboard.write() se llame dentro de la activación.
+              const blobPromise = getQrBlob().then(b => new Blob([b], { type: 'image/png' }));
+              try {
+                await navigator.clipboard.write([new ClipboardItem({ 'image/png': blobPromise })]);
+                flashQr('copied');
+              } catch {
+                try {
+                  await navigator.clipboard.write([new ClipboardItem({ 'image/png': await blobPromise })]);
+                  flashQr('copied');
+                } catch {
+                  // Fallback final: al menos dejamos el enlace en el portapapeles
+                  try { await navigator.clipboard.writeText(publicUrl); } catch { /* nada más que hacer */ }
+                  flashQr('error');
+                }
+              }
+            };
+
+            const downloadQrImage = async () => {
+              try {
+                const blob = await getQrBlob();
+                const objectUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = objectUrl;
+                a.download = qrFileName;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(objectUrl);
+              } catch {
+                // Fallback: abrir el QR en otra pestaña para guardarlo a mano
+                window.open(qrUrl, '_blank', 'noopener');
+              }
+              flashQr('downloaded');
+            };
+
             return (
               <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowPublishModal(false)}>
                 <div style={{ background: 'white', borderRadius: '16px', padding: '32px', maxWidth: '480px', width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', position: 'relative' }} onClick={e => e.stopPropagation()}>
                   <button onClick={() => setShowPublishModal(false)} style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: '#888' }}>✕</button>
-                  <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-                    <div style={{ fontSize: '40px', marginBottom: '8px' }}>🎉</div>
-                    <h2 style={{ margin: '0 0 4px 0', fontSize: '22px', color: '#1a1a1a' }}>¡Maqueta publicada!</h2>
+                  <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                    <div style={{ fontSize: '40px', marginBottom: '8px' }}>{isTestPublish ? '🧪' : '🎉'}</div>
+                    <h2 style={{ margin: '0 0 4px 0', fontSize: '22px', color: '#1a1a1a' }}>
+                      {isTestPublish ? 'Enlace de prueba listo' : '¡Maqueta publicada!'}
+                    </h2>
                     <p style={{ color: '#888', fontSize: '14px', margin: 0 }}>Enlace de <strong>{SECTIONS.find(s => s.key === activeSection)?.label}</strong> · cualquier persona con el enlace puede verla</p>
+                    {isTestPublish && (
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginTop: '12px', background: '#fff7ed', border: '1px solid #fed7aa', color: '#b45309', borderRadius: '999px', padding: '5px 13px', fontSize: '11.5px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        <Zap size={13} /> Modo prueba · sin verificación
+                      </div>
+                    )}
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
-                    <img src={qrUrl} alt="QR Code" style={{ width: '160px', height: '160px', borderRadius: '12px', border: '3px solid #1a1f2e', padding: '6px' }} />
+
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', marginBottom: '22px' }}>
+                    <img src={qrUrl} alt="Código QR del enlace" crossOrigin="anonymous" style={{ width: '160px', height: '160px', borderRadius: '12px', border: '3px solid #1a1f2e', padding: '6px', background: 'white', boxSizing: 'border-box' }} />
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={copyQrImage}
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', background: qrFeedback === 'copied' ? '#dcfce7' : '#f4f6fb', color: qrFeedback === 'copied' ? '#15803d' : '#1a1f2e', border: `1px solid ${qrFeedback === 'copied' ? '#86efac' : '#e0e5ef'}`, borderRadius: '8px', padding: '8px 14px', cursor: 'pointer', fontSize: '12.5px', fontWeight: 700, transition: 'all 0.18s', whiteSpace: 'nowrap' }}
+                      >
+                        {qrFeedback === 'copied'
+                          ? <><CheckCircle2 size={14} /> QR copiado en el portapapeles</>
+                          : <><Copy size={14} /> Copiar imagen</>}
+                      </button>
+                      <button
+                        onClick={downloadQrImage}
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', background: qrFeedback === 'downloaded' ? '#dcfce7' : '#f4f6fb', color: qrFeedback === 'downloaded' ? '#15803d' : '#1a1f2e', border: `1px solid ${qrFeedback === 'downloaded' ? '#86efac' : '#e0e5ef'}`, borderRadius: '8px', padding: '8px 14px', cursor: 'pointer', fontSize: '12.5px', fontWeight: 700, transition: 'all 0.18s', whiteSpace: 'nowrap' }}
+                      >
+                        {qrFeedback === 'downloaded'
+                          ? <><CheckCircle2 size={14} /> QR descargado</>
+                          : <><Download size={14} /> Descargar QR</>}
+                      </button>
+                    </div>
+                    {qrFeedback === 'error' && (
+                      <span style={{ fontSize: '11.5px', color: '#b45309', textAlign: 'center' }}>
+                        Tu navegador no permite copiar imágenes. Copiamos el enlace y podés usar «Descargar QR».
+                      </span>
+                    )}
                   </div>
                   <div style={{ background: '#f4f6fb', border: '1px solid #e0e5ef', borderRadius: '8px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
                     <span style={{ flex: 1, fontSize: '13px', color: '#444', wordBreak: 'break-all', fontFamily: 'monospace' }}>{publicUrl}</span>
