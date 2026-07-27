@@ -829,13 +829,12 @@ function Editor() {
     setCanvases, setProjectTitle,
   });
 
-  // Autoguardado silencioso con Debounce (espera 1.5s sin cambios para guardar)
-  useEffect(() => {
-    if (isInitialLoad.current || !token) return;
-
-    const timer = setTimeout(() => {
-      setIsSaving(true);
-      fetch(`${API_URL}/api/projects/${id}`, {
+  // Guarda el proyecto contra la API. Se usa tanto en el autoguardado como
+  // antes de publicar, para no publicar un layout desactualizado.
+  const persistProject = async () => {
+    if (!token) return false;
+    try {
+      const res = await fetch(`${API_URL}/api/projects/${id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -851,15 +850,29 @@ function Editor() {
           homeSliderDesktopLayout: canvases.homeSlider.desktop,
           homeSliderMobileLayout: canvases.homeSlider.mobile
         })
-      })
-        .then(res => res.json())
-        .then(() => {
-          setTimeout(() => {
-            setIsSaving(false);
-            setLastSaved(new Date());
-          }, 500);
-        })
-        .catch(err => console.error('Error auto-guardando:', err));
+      });
+      if (!res.ok) throw new Error(`PATCH ${res.status}`);
+      await res.json();
+      setLastSaved(new Date());
+      return true;
+    } catch (err) {
+      console.error('Error guardando el proyecto:', err);
+      return false;
+    }
+  };
+
+  // Referencia siempre fresca, para poder guardar desde callbacks sin recrearlos
+  const persistProjectRef = useRef(persistProject);
+  persistProjectRef.current = persistProject;
+
+  // Autoguardado silencioso con Debounce (espera 1.5s sin cambios para guardar)
+  useEffect(() => {
+    if (isInitialLoad.current || !token) return;
+
+    const timer = setTimeout(async () => {
+      setIsSaving(true);
+      await persistProjectRef.current();
+      setTimeout(() => setIsSaving(false), 500);
     }, 1500);
 
     return () => clearTimeout(timer);
@@ -911,14 +924,31 @@ function Editor() {
     setIsTestPublish(skipCheck);
     setIsPublishing(true);
     try {
-      const res = await fetch(`${API_URL}/api/projects/${id}/publish`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await res.json();
-      setIsPublished(data.isPublished);
-      if (data.slug) setPublishedSlug(data.slug);
-      if (data.isPublished) { setQrFeedback(null); setShowPublishModal(true); }
+      // El autoguardado tiene 1.5s de debounce: forzamos el guardado y lo esperamos
+      // para que el enlace nunca muestre un layout viejo (o vacío).
+      const saved = await persistProjectRef.current();
+      if (!saved) {
+        alert('No pudimos guardar los últimos cambios, así que no publicamos para no dejar el enlace desactualizado. Revisá tu conexión y probá de nuevo.');
+        setIsPublishing(false);
+        if (!skipCheck) setMaiaCheckState(null);
+        return;
+      }
+
+      // El endpoint es un toggle: si ya está publicada, no la despublicamos sin
+      // querer; solo reabrimos el modal con el enlace y el QR.
+      if (isPublished) {
+        setQrFeedback(null);
+        setShowPublishModal(true);
+      } else {
+        const res = await fetch(`${API_URL}/api/projects/${id}/publish`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        setIsPublished(data.isPublished);
+        if (data.slug) setPublishedSlug(data.slug);
+        if (data.isPublished) { setQrFeedback(null); setShowPublishModal(true); }
+      }
     } catch (e) { console.error(e); }
     setIsPublishing(false);
     if (!skipCheck) setMaiaCheckState(null);

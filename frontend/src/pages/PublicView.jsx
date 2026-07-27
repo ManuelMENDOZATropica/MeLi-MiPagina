@@ -555,7 +555,9 @@ export default function PublicView() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const isMobile = isMobileDevice();
-  const [viewMode, setViewMode] = useState('mobile');
+  const [viewMode, setViewMode] = useState(isMobile ? 'mobile' : 'desktop');
+  // Evita repisar el modo si el usuario ya lo eligió a mano
+  const viewModeTouched = useRef(false);
   const containerRef = useRef(null);
   const [scale, setScale] = useState(1);
 
@@ -583,6 +585,19 @@ export default function PublicView() {
       })
       .catch(() => { setError(true); setLoading(false); });
   }, [id]);
+
+  // Si el canvas del modo actual está vacío pero el otro tiene componentes,
+  // mostramos ese. Evita que el enlace se vea en blanco cuando la maqueta se
+  // armó en un solo canvas (por ejemplo, solo Desktop).
+  useEffect(() => {
+    if (!project || viewModeTouched.current) return;
+    const keys = SECTION_LAYOUT_KEYS[section];
+    const current = project[viewMode === 'mobile' ? keys.mobile : keys.desktop];
+    const other = project[viewMode === 'mobile' ? keys.desktop : keys.mobile];
+    if ((!current || current.length === 0) && other?.length > 0) {
+      setViewMode(viewMode === 'mobile' ? 'desktop' : 'mobile');
+    }
+  }, [project, section, viewMode]);
 
   useEffect(() => {
     const update = () => {
@@ -628,7 +643,7 @@ export default function PublicView() {
         {!isMobile && (
           <div style={{ display: 'flex', background: '#f5f5f5', borderRadius: 8, padding: 3, gap: 2 }}>
             {['desktop', 'mobile'].map(m => (
-              <button key={m} onClick={() => setViewMode(m)} style={{ padding: '4px 14px', border: 'none', borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, background: viewMode === m ? 'white' : 'transparent', color: viewMode === m ? '#3483fa' : '#888', boxShadow: viewMode === m ? '0 1px 4px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.2s' }}>
+              <button key={m} onClick={() => { viewModeTouched.current = true; setViewMode(m); }} style={{ padding: '4px 14px', border: 'none', borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, background: viewMode === m ? 'white' : 'transparent', color: viewMode === m ? '#3483fa' : '#888', boxShadow: viewMode === m ? '0 1px 4px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.2s' }}>
                 {m === 'desktop' ? <Monitor size={13} /> : <Smartphone size={13} />} {m === 'desktop' ? 'Desktop' : 'Mobile'}
               </button>
             ))}
@@ -657,7 +672,18 @@ export default function PublicView() {
           {viewMode === 'desktop' ? <MeLiHeaderDesktop /> : <MeLiHeaderMobile />}
           <PageContextMock section={section} viewMode={viewMode} position="before" />
           <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignContent: 'flex-start', padding: section === 'miPagina' ? 20 : 0, gap: 20 }}>
-            {canvasItems?.map(item => renderPublicItem(item, viewMode))}
+            {canvasItems?.length > 0
+              ? canvasItems.map(item => renderPublicItem(item, viewMode))
+              : (
+                <div style={{ padding: '80px 20px', textAlign: 'center', color: '#9ba3b5', fontFamily: "'Proxima Nova','Inter',sans-serif" }}>
+                  <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#6b7280' }}>
+                    No hay componentes en {SECTION_LABELS[section]} · {viewMode === 'mobile' ? 'Mobile' : 'Desktop'}
+                  </p>
+                  <p style={{ margin: '6px 0 0', fontSize: 13 }}>
+                    Agregá componentes en ese canvas del editor y volvé a publicar.
+                  </p>
+                </div>
+              )}
           </div>
           <PageContextMock section={section} viewMode={viewMode} position="after" />
         </div>
