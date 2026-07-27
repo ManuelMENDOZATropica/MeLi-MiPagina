@@ -83,7 +83,12 @@ async function main() {
     const releido = await prisma.project.findUnique({
       where: { id: objetivo.id }, select: { rtbDesktopLayout: true },
     });
-    const ok = JSON.stringify(releido.rtbDesktopLayout) === JSON.stringify(marca);
+    // Postgres jsonb reordena las claves, asi que comparamos normalizando el orden
+    const normalizar = (v) => JSON.stringify(v, (_, val) =>
+      val && typeof val === 'object' && !Array.isArray(val)
+        ? Object.fromEntries(Object.entries(val).sort(([a], [b]) => a.localeCompare(b)))
+        : val);
+    const ok = normalizar(releido.rtbDesktopLayout) === normalizar(marca);
     console.log(ok
       ? '  ✅ Escritura y relectura OK. La base guarda RTB sin problemas.\n     => El problema NO es la base: esta en el backend deployado o en el front.'
       : `  ❌ Se escribio pero volvio distinto: ${JSON.stringify(releido.rtbDesktopLayout)?.slice(0, 120)}`);
