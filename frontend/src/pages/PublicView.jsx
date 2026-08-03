@@ -99,6 +99,68 @@ const renderPublicItem = (item, viewMode) => {
     );
   }
 
+  // ── Perfil Tienda Mobile (MeLi ui-ms-profile) ──────────────────
+  if (item.type === 'store_profile') {
+    const brandName = item.brandName || 'Marca';
+    const iconUrl = item.uploadedImages?.[0] || null;
+
+    return (
+      <div key={item.uniqueId} style={{ width: '100%' }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          padding: '12px 16px',
+          background: '#fff',
+          borderBottom: '1px solid #e8e8e8',
+          fontFamily: "-apple-system, 'Helvetica Neue', Arial, sans-serif",
+          gap: '12px',
+          width: '100%',
+          boxSizing: 'border-box',
+        }}>
+          {/* Ícono circular */}
+          <div style={{
+            width: '64px', height: '64px', borderRadius: '50%',
+            background: '#f5f5f5',
+            border: iconUrl ? '1.5px solid #d9d9d9' : '1.5px solid #e8e8e8',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            overflow: 'hidden', flexShrink: 0,
+          }}>
+            {iconUrl && (
+              <img src={iconUrl} alt={brandName} style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '4px', boxSizing: 'border-box' }} />
+            )}
+          </div>
+
+          {/* Información */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+                <circle cx="8" cy="8" r="8" fill="#3483FA" />
+                <path d="M4.5 8L6.8 10.5L11.5 5.5" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span style={{ fontSize: '12px', fontWeight: '500', color: '#3483fa' }}>Tienda oficial</span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+              <span style={{ fontSize: '17px', fontWeight: '700', color: '#111', lineHeight: 1.2, letterSpacing: '-0.2px' }}>
+                {brandName}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '3px' }}>
+              <span style={{ fontSize: '12px', color: '#767676', fontWeight: '400' }}>+780.1 mil seguidores</span>
+              <button style={{
+                fontSize: '13px', fontWeight: '600', color: '#3483fa',
+                background: 'rgba(52,131,250,0.10)',
+                border: 'none', borderRadius: '6px', padding: '4px 14px',
+                cursor: 'pointer', lineHeight: 1.4, letterSpacing: '0',
+              }}>Seguir</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (item.type === 'rtb_card') {
     const { bg: cardColor, text: txtColor } = resolveRtbColor(item.cardColor);
     const imgUrl = item.uploadedImages?.[0] || null;
