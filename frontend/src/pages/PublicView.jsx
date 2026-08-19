@@ -719,14 +719,14 @@ export default function PublicView() {
           flex: 1,
           overflowX: 'hidden',
           overflowY: 'auto',
-          background: '#f0f0f0',
+          background: '#ffffff',
           padding: isMobile ? 0 : '20px 0'
         }}
       >
         <div style={{
           width: viewMode === 'desktop' ? 1920 : 800,
           zoom: scale,
-          background: 'white',
+          background: '#ebebeb',
           margin: isMobile ? 0 : '0 auto',
           boxShadow: isMobile ? 'none' : '0 10px 40px rgba(0,0,0,0.12)'
         }}>

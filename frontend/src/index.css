@@ -7,6 +7,11 @@
   --meli-light-gray: #e5e9f0;
   --bg-color: #dfe4ec;
   --sidebar-bg: #f4f6fb;
+  /* Fondo real de la pagina de Mercado Libre: las piezas con esquinas
+     redondeadas se funden igual que en produccion */
+  --page-bg: #ebebeb;
+  /* Area alrededor del canvas (antes gris, ahora blanca) */
+  --canvas-surround: #ffffff;
   --border-color: #e0e5ef;
   --radius: 10px;
 }
@@ -155,13 +160,13 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background-color: var(--bg-color);
+  background-color: var(--canvas-surround);
   overflow: hidden;
 }
 
 .canvas-toolbar {
   height: 52px;
-  background: rgba(255,255,255,0.7);
+  background: rgba(250,251,253,0.85);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border-color);
   display: flex;
@@ -211,9 +216,9 @@ body {
 }
 
 .canvas-wrapper {
-  background: white;
+  background: var(--page-bg);
   min-height: 1500px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.07), 0 10px 30px rgba(0,0,0,0.1);
   transition: width 0.3s ease;
   position: relative;
   display: flex;
@@ -604,6 +609,7 @@ body {
 
 .component-placeholder {
   background-color: var(--meli-light-gray);
+  border: 1px solid rgba(0,0,0,0.07);
   display: flex;
   flex-direction: column;
   align-items: center;
