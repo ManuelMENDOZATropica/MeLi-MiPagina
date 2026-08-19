@@ -609,7 +609,6 @@ body {
 
 .component-placeholder {
   background-color: var(--meli-light-gray);
-  border: 1px solid rgba(0,0,0,0.07);
   display: flex;
   flex-direction: column;
   align-items: center;
