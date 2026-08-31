@@ -28,3 +28,8 @@ El sistema permite al equipo crear proyectos de "landings" donde se pueden organ
 * **Backend**: Un servidor en Node.js con Express que gestiona la API REST y la autenticación mediante JWT.
 * **Base de Datos**: Utiliza PostgreSQL y el ORM Prisma para manejar los modelos de usuarios y proyectos.
 * **Contenerización**: Incluye configuración de Docker Compose para levantar fácilmente una instancia local de la base de datos.
+
+## 5. Infraestructura y Despliegue
+* **Frontend**: Vercel (`mipagina.tropica.me`), proyecto `me-li-mi-pagina`.
+* **Backend**: Render, Web Service `meli-mipagina` (`meli-mipagina-ffwa.onrender.com`), deploy automático desde la rama `main` del repo.
+* **Base de Datos**: PostgreSQL 18 en Render (`MeLiMiPaginaSQL`). Migrada desde Supabase el 2026-08-31 (schema + datos). Plan free de Render: la instancia expira si no se pasa a un plan pago antes del 2026-09-30.
