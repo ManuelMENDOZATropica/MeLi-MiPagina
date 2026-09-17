@@ -113,7 +113,7 @@ export const componentsList = [
     id: "galeria_categorias_3",
     name: "Galería Categorías (x3)",
     desktopSize: { width: 372, height: 209 },
-    mobileSize: { width: 213, height: 119 },
+    mobileSize: { width: 328, height: 184 },
     notes: "Personaliza tu marca con imágenes",
     type: "gallery",
     section: "miPagina"
