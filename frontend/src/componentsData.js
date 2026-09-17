@@ -77,7 +77,7 @@ export const componentsList = [
     id: "carrusel_categorias_2",
     name: "Carrusel Categorías (x2)",
     desktopSize: { width: 574, height: 323 },
-    mobileSize: null,
+    mobileSize: { width: 574, height: 323 },
     notes: "Se visualiza en carrusel horizontal",
     type: "carousel",
     section: "miPagina"
@@ -86,7 +86,7 @@ export const componentsList = [
     id: "carrusel_categorias_3",
     name: "Carrusel Categorías (x3)",
     desktopSize: { width: 372, height: 209 },
-    mobileSize: null,
+    mobileSize: { width: 372, height: 209 },
     notes: "Lleva a un listado de productos",
     type: "carousel",
     section: "miPagina"
@@ -95,7 +95,7 @@ export const componentsList = [
     id: "carrusel_categorias_4",
     name: "Carrusel Categorías (x4)",
     desktopSize: { width: 271, height: 153 },
-    mobileSize: null,
+    mobileSize: { width: 271, height: 153 },
     notes: "Versión entregable única",
     type: "carousel",
     section: "miPagina"
