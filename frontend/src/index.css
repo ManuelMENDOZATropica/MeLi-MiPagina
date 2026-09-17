@@ -244,7 +244,10 @@ body {
 }
 
 .canvas-wrapper.mobile {
-  width: 800px;
+  /* Debe coincidir con MOBILE_CANVAS_WIDTH en canvasConfig.js.
+     Las medidas de los módulos del deck de MeLi están calculadas
+     para este ancho; si se cambia, el arreglo deja de coincidir. */
+  width: 375px;
 }
 
 /* NEW HEADER STYLES */

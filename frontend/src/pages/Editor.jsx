@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Monitor, Smartphone, GripVertical, Trash2, Image as ImageIcon, Layout, Type, Video, Search, MapPin, Tag, ChevronDown, Bell, ShoppingCart, User, AlignCenter, MoveHorizontal, ListMinus, AlignJustify, CornerDownLeft, ArrowLeft, CheckCircle2, Play, Edit3, Eye, EyeOff, Layers, Grid, Settings, ArrowRight, FileDown, Truck, Star, ShieldCheck, Zap, Copy, Download } from 'lucide-react';
 import { componentsList } from '../componentsData';
+import { DESKTOP_CANVAS_WIDTH, MOBILE_CANVAS_WIDTH, MOBILE_MAX_ZOOM } from '../canvasConfig';
 import { RTB_CARD_COLORS, resolveRtbColor } from '../rtbColors';
 import API_URL from '../api';
 import '../index.css';
@@ -1423,9 +1424,13 @@ function Editor() {
     const updateScale = () => {
       if (containerRef.current) {
         const containerWidth = containerRef.current.clientWidth - 60; // 30px padding on each side
-        const targetWidth = viewMode === 'desktop' ? 1920 : 800;
-        const newScale = containerWidth < targetWidth ? containerWidth / targetWidth : 1;
-        setScale(newScale);
+        const targetWidth = viewMode === 'desktop' ? DESKTOP_CANVAS_WIDTH : MOBILE_CANVAS_WIDTH;
+        // El desktop solo se achica para entrar; el mobile además puede
+        // agrandarse, porque a 375 real queda muy chico para trabajar.
+        // Es zoom de visualización: el layout siempre se calcula sobre
+        // MOBILE_CANVAS_WIDTH.
+        const maxScale = viewMode === 'desktop' ? 1 : MOBILE_MAX_ZOOM;
+        setScale(Math.min(containerWidth / targetWidth, maxScale));
       }
     };
 
@@ -1679,7 +1684,7 @@ function Editor() {
   // Resize handler para text_block
   useEffect(() => {
     if (!textResizing) return;
-    const canvasWidth = viewMode === 'desktop' ? 1920 : 800;
+    const canvasWidth = viewMode === 'desktop' ? DESKTOP_CANVAS_WIDTH : MOBILE_CANVAS_WIDTH;
     const onMove = (e) => {
       const dx = (e.clientX - textResizing.startX) / scale;
       const dy = (e.clientY - textResizing.startY) / scale;
@@ -1838,7 +1843,7 @@ function Editor() {
     }
 
     if (item.type === 'text_block') {
-      const canvasWidth = viewMode === 'desktop' ? 1920 : 800;
+      const canvasWidth = viewMode === 'desktop' ? DESKTOP_CANVAS_WIDTH : MOBILE_CANVAS_WIDTH;
       const tbW = item.textWidthPx ?? canvasWidth;
       const tbH = item.textHeightPx ?? 80;
       const isResizingThis = textResizing?.id === item.uniqueId;
@@ -3454,7 +3459,7 @@ function Editor() {
           </div>
 
           <div className="canvas-container" onMouseDown={handleMouseDown} ref={containerRef}>
-            <div style={{ width: (viewMode === 'desktop' ? 1920 : 800) * scale, display: 'flex', justifyContent: 'center', transition: 'width 0.3s ease' }}>
+            <div style={{ width: (viewMode === 'desktop' ? DESKTOP_CANVAS_WIDTH : MOBILE_CANVAS_WIDTH) * scale, display: 'flex', justifyContent: 'center', transition: 'width 0.3s ease' }}>
               <div className={`canvas-wrapper ${viewMode} ${activeSection !== 'miPagina' ? 'compact' : ''}`} ref={pdfCanvasRef} style={{ transform: `scale(${scale})`, transformOrigin: 'top center' }}>
                 {viewMode === 'mobile' ? (
                   <div className="mobile-app-header">

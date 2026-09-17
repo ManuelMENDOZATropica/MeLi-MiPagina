@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { Monitor, Smartphone, ChevronDown, Search, Tag, MapPin, Bell, ShoppingCart, Menu, ChevronRight, Truck, Star } from 'lucide-react';
 import API_URL from '../api';
+import { DESKTOP_CANVAS_WIDTH, MOBILE_CANVAS_WIDTH } from '../canvasConfig';
 import { resolveRtbColor } from '../rtbColors';
 
 const isMobileDevice = () => /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768;
@@ -80,7 +81,7 @@ const renderPublicItem = (item, viewMode) => {
   if (item.type === 'spacer') return <div key={item.uniqueId} style={{ width: '100%', height: height || 40 }} />;
 
   if (item.type === 'text_block') {
-    const canvasWidth = viewMode === 'desktop' ? 1920 : 800;
+    const canvasWidth = viewMode === 'desktop' ? DESKTOP_CANVAS_WIDTH : MOBILE_CANVAS_WIDTH;
     const tbW = item.textWidthPx ?? canvasWidth;
     const tbH = item.textHeightPx ?? 80;
     return (
@@ -665,7 +666,7 @@ export default function PublicView() {
       // Usar window.innerWidth, NO el clientWidth del contenedor
       // (el contenedor se expande por el hijo de 1920px y siempre da 1920)
       const vw = window.innerWidth;
-      const tw = viewMode === 'desktop' ? 1920 : 800;
+      const tw = viewMode === 'desktop' ? DESKTOP_CANVAS_WIDTH : MOBILE_CANVAS_WIDTH;
       setScale(vw < tw ? vw / tw : 1);
     };
     update();
@@ -724,7 +725,7 @@ export default function PublicView() {
         }}
       >
         <div style={{
-          width: viewMode === 'desktop' ? 1920 : 800,
+          width: viewMode === 'desktop' ? DESKTOP_CANVAS_WIDTH : MOBILE_CANVAS_WIDTH,
           zoom: scale,
           background: '#ebebeb',
           margin: isMobile ? 0 : '0 auto',
