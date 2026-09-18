@@ -820,3 +820,9 @@ body {
   0%, 100% { box-shadow: 0 0 0 3px #3483fa, 0 0 20px #3483fa88; }
   50%       { box-shadow: 0 0 0 6px #3483fa44, 0 0 32px #3483facc; }
 }
+
+/* Tira deslizable del carrusel de categorías (vista pública).
+   Se oculta la barra de scroll: en mobile se navega deslizando. */
+.carousel-strip::-webkit-scrollbar {
+  display: none;
+}

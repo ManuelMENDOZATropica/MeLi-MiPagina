@@ -64,9 +64,67 @@ const AnimatedBanner = ({ item, height }) => {
   );
 };
 
+// ─── Carrusel ───────────────────────────────────────────────────
+// Los módulos type:"carousel" usan la misma medida en mobile y desktop
+// (versión entregable única, confirmado por creativo), así que en mobile
+// son más anchos que el canvas a propósito: se navegan deslizando.
+// Se agrupan los consecutivos en una tira con scroll horizontal y snap.
+const CarouselStrip = ({ items, viewMode }) => (
+  <div
+    className="carousel-strip"
+    style={{
+      width: '100%',
+      display: 'flex',
+      flexWrap: 'nowrap',
+      gap: 20,
+      overflowX: 'auto',
+      overflowY: 'hidden',
+      scrollSnapType: 'x mandatory',
+      WebkitOverflowScrolling: 'touch',
+      scrollbarWidth: 'none',
+      msOverflowStyle: 'none',
+    }}
+  >
+    {items.map(child => (
+      <div
+        key={child.uniqueId}
+        style={{ flexShrink: 0, scrollSnapAlign: 'start', display: 'flex' }}
+      >
+        {renderPublicItem(child, viewMode)}
+      </div>
+    ))}
+  </div>
+);
+
+// Agrupa los carruseles consecutivos en una sola tira deslizable y deja
+// el resto de los módulos tal cual.
+const groupCarousels = (items = []) => {
+  const out = [];
+  let buffer = [];
+  const flush = () => {
+    if (!buffer.length) return;
+    out.push({ __strip: true, uniqueId: `strip-${buffer[0].uniqueId}`, items: buffer });
+    buffer = [];
+  };
+  for (const item of items) {
+    if (item.type === 'carousel') buffer.push(item);
+    else { flush(); out.push(item); }
+  }
+  flush();
+  return out;
+};
+
 // ─── Render Item ────────────────────────────────────────────────
 const renderPublicItem = (item, viewMode) => {
+  if (item.__strip) {
+    return <CarouselStrip key={item.uniqueId} items={item.items} viewMode={viewMode} />;
+  }
+
   if (item.type === 'rowGroup') {
+    const soloCarruseles = item.items?.length > 0 && item.items.every(c => c.type === 'carousel');
+    if (soloCarruseles) {
+      return <CarouselStrip key={item.uniqueId} items={item.items} viewMode={viewMode} />;
+    }
     return (
       <div key={item.uniqueId} style={{ display: 'flex', width: '100%', justifyContent: item.justify, flexWrap: 'wrap', gap: 20 }}>
         {item.items.map(child => renderPublicItem(child, viewMode))}
@@ -735,7 +793,7 @@ export default function PublicView() {
           <PageContextMock section={section} viewMode={viewMode} position="before" />
           <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignContent: 'flex-start', padding: section === 'miPagina' ? 20 : 0, gap: 20 }}>
             {canvasItems?.length > 0
-              ? canvasItems.map(item => renderPublicItem(item, viewMode))
+              ? groupCarousels(canvasItems).map(item => renderPublicItem(item, viewMode))
               : (
                 <div style={{ padding: '80px 20px', textAlign: 'center', color: '#9ba3b5', fontFamily: "'Proxima Nova','Inter',sans-serif" }}>
                   <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#6b7280' }}>
