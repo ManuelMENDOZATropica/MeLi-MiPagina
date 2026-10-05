@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Monitor, Smartphone, GripVertical, Trash2, Image as ImageIcon, Layout, Type, Video, Search, MapPin, Tag, ChevronDown, Bell, ShoppingCart, User, AlignCenter, MoveHorizontal, ListMinus, AlignJustify, CornerDownLeft, ArrowLeft, CheckCircle2, Play, Edit3, Eye, EyeOff, Layers, Grid, Settings, ArrowRight, FileDown, Truck, Star, ShieldCheck, Zap, Copy, Download } from 'lucide-react';
-import { componentsList } from '../componentsData';
+import { componentsList, getItemSize } from '../componentsData';
 import { DESKTOP_CANVAS_WIDTH, MOBILE_CANVAS_WIDTH, MOBILE_MAX_ZOOM } from '../canvasConfig';
 import { RTB_CARD_COLORS, resolveRtbColor } from '../rtbColors';
 import API_URL from '../api';
@@ -998,7 +998,7 @@ function Editor() {
         const item = itemsToCheck[idx];
         const imageUrl = item.uploadedImages[0];
         // Cotejar contra las medidas del canvas al que pertenece el módulo (no el viewMode actual)
-        const size = item._device === 'mobile' ? item.mobileSize : item.desktopSize;
+        const size = getItemSize(item, item._device === 'mobile' ? 'mobile' : 'desktop');
         const itemErrors = [];
 
         if (item.passedCheck) {
@@ -1232,7 +1232,7 @@ function Editor() {
     if (!foundItem) return;
 
     // Cotejar contra las medidas del canvas donde vive el módulo
-    const expectedSize = foundDevice === 'mobile' ? foundItem.mobileSize : foundItem.desktopSize;
+    const expectedSize = getItemSize(foundItem, foundDevice === 'mobile' ? 'mobile' : 'desktop');
     if (!expectedSize?.width || !expectedSize?.height) return;
     // Las tarjetas de producto, RTB cards y el Home Slider aceptan cualquier imagen sin validar dimensiones
     if (foundItem.type === 'product_card' || foundItem.type === 'rtb_card') return;
@@ -1592,13 +1592,13 @@ function Editor() {
   };
 
   const getScaledHeight = (item, mode) => {
-    const size = mode === 'desktop' ? item.desktopSize : item.mobileSize;
+    const size = getItemSize(item, mode);
     if (!size) return 100;
     return size.height;
   };
 
   const getScaledWidth = (item, mode) => {
-    const size = mode === 'desktop' ? item.desktopSize : item.mobileSize;
+    const size = getItemSize(item, mode);
     if (!size) return '100%';
     return size.width;
   };
@@ -1769,7 +1769,7 @@ function Editor() {
       );
     }
 
-    const size = viewMode === 'desktop' ? item.desktopSize : item.mobileSize;
+    const size = getItemSize(item, viewMode);
     const height = getScaledHeight(item, viewMode);
     const width = getScaledWidth(item, viewMode);
     const isSelected = selectedIds.has(item.uniqueId);
@@ -1784,9 +1784,11 @@ function Editor() {
     if (showSafeAreas && safeAreaStr) {
       const match = safeAreaStr.match(/(\d+)\s*x\s*(\d+)/);
       if (match) {
+        // En porcentaje de la pieza: en mobile la pieza se escala al canvas
+        // y el área segura tiene que escalar con ella.
         safeAreaStyle = {
-          width: `${match[1]}px`,
-          height: `${match[2]}px`,
+          width: typeof width === 'number' ? `${(match[1] / width) * 100}%` : `${match[1]}px`,
+          height: height ? `${(match[2] / height) * 100}%` : `${match[2]}px`,
           position: 'absolute',
           top: '50%',
           left: '50%',
@@ -1799,7 +1801,7 @@ function Editor() {
       }
     }
 
-    if (viewMode === 'mobile' && !item.mobileSize) {
+    if (viewMode === 'mobile' && !size) {
       return (
         <div
           key={item.uniqueId}
@@ -2574,13 +2576,18 @@ function Editor() {
       );
     }
 
+    // Igual que en PublicView: si la pieza es más ancha que el canvas se
+    // escala manteniendo la proporción en vez de angostarse y recortarse.
+    // Los carruseles se navegan deslizando a su medida real.
+    const fitToCanvas = item.type !== 'carousel' && typeof width === 'number' && height;
+
     return (
       <div
         key={item.uniqueId}
         data-id={item.uniqueId}
         className={`canvas-item ${isSelected ? 'selected' : ''} ${indicatorClass} ${draggedIndex === index ? 'is-dragging' : ''}`}
         draggable={!isInsideGroup && !isHoveringText}
-        style={{ width: `${width}px` }}
+        style={{ width: `${width}px`, maxWidth: fitToCanvas ? '100%' : undefined }}
         onDragStart={!isInsideGroup ? (e) => handleDragStartCanvas(e, index) : undefined}
         onDragEnd={() => { setDraggedIndex(null); setDragOverTarget(null); }}
         onDragOver={(e) => {
@@ -2679,7 +2686,7 @@ function Editor() {
         )}
         <div
           className="component-placeholder"
-          style={{ height: `${height}px`, width: '100%', position: 'relative', padding: 0 }}
+          style={{ ...(fitToCanvas ? { aspectRatio: `${width} / ${height}` } : { height: `${height}px` }), width: '100%', position: 'relative', padding: 0 }}
         >
           
             <>

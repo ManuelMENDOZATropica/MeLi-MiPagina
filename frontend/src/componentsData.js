@@ -131,7 +131,9 @@ export const componentsList = [
     id: "tarjeta_producto",
     name: "Tarjeta de Producto",
     desktopSize: { width: 271, height: 420 },
-    mobileSize: { width: 160, height: 300 },
+    // 156 para que entren 2 por fila en el canvas de 375 (156*2 + 20 = 332 <= 335),
+    // igual que en MeLi mobile. Con 160 sumaban 340 y se apilaban.
+    mobileSize: { width: 156, height: 300 },
     notes: "Tarjeta de producto estilo MeLi. Subir imagen del producto.",
     type: "product_card",
     section: "miPagina"
@@ -247,3 +249,13 @@ export const componentsList = [
     section: "rtb"
   }
 ];
+
+// Medida vigente de un módulo para un canvas. Los proyectos guardan una copia
+// del módulo al momento de agregarlo, así que si después se corrige la medida
+// acá, los proyectos viejos se quedarían con la anterior. Por eso se busca
+// siempre la del catálogo y solo se cae a la guardada si el módulo ya no existe.
+export const getItemSize = (item, mode) => {
+  const spec = componentsList.find(c => c.id === item.id);
+  const key = mode === 'desktop' ? 'desktopSize' : 'mobileSize';
+  return spec ? spec[key] : item[key];
+};

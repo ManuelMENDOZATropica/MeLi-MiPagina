@@ -4,6 +4,7 @@ import { Monitor, Smartphone, ChevronDown, Search, Tag, MapPin, Bell, ShoppingCa
 import API_URL from '../api';
 import { DESKTOP_CANVAS_WIDTH, MOBILE_CANVAS_WIDTH } from '../canvasConfig';
 import { resolveRtbColor } from '../rtbColors';
+import { getItemSize } from '../componentsData';
 
 const isMobileDevice = () => /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768;
 
@@ -132,7 +133,7 @@ const renderPublicItem = (item, viewMode) => {
     );
   }
 
-  const size = viewMode === 'desktop' ? item.desktopSize : item.mobileSize;
+  const size = getItemSize(item, viewMode);
   if (!size) return null;
   const { height, width } = size;
 
@@ -350,9 +351,14 @@ const renderPublicItem = (item, viewMode) => {
     );
   }
 
+  // Si el módulo es más ancho que el canvas (banners mobile de 600+ px en un
+  // canvas de 375) se escala manteniendo la proporción. Con height fijo el
+  // ancho se achicaba solo y la pieza quedaba más alargada y recortada.
+  // Los carruseles quedan afuera: se navegan deslizando a su medida real.
+  const fitToCanvas = item.type !== 'carousel' && typeof width === 'number' && height;
   return (
-    <div key={item.uniqueId} style={{ width, position: 'relative' }}>
-      <div style={{ height, width: '100%', position: 'relative', overflow: 'hidden', backgroundColor: '#ebebeb' }}>
+    <div key={item.uniqueId} style={{ width, maxWidth: fitToCanvas ? '100%' : undefined, position: 'relative' }}>
+      <div style={{ ...(fitToCanvas ? { aspectRatio: `${width} / ${height}` } : { height }), width: '100%', position: 'relative', overflow: 'hidden', backgroundColor: '#ebebeb' }}>
         {item.type === 'banner' && <AnimatedBanner item={item} height={height} />}
 
         {item.id === 'encabezado_portada_logo' && (<>

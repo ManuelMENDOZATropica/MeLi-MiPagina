@@ -6,6 +6,10 @@
 //
 //   Galería x2 / x3 (328 px) -> 328 <= 335              -> 1 por fila
 //   Galería x4      (156 px) -> 156*2 + 20 = 332 <= 335 -> grid 2x2
+//   Tarjeta producto (156 px) -> igual que Galería x4    -> 2 por fila
+//
+// Los banners mobile vienen más anchos que 335 (600, 720, 1080...): se
+// escalan al ancho disponible manteniendo su proporción, no se recortan.
 //
 // Si se cambia este valor, el arreglo de los módulos deja de coincidir
 // con el spec de MeLi. Ya pasó: estuvo en 920 y luego en 800, y las
