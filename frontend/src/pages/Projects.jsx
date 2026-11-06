@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Layout, LogOut, Trash2, X, Monitor, Smartphone } from 'lucide-react';
+import { Plus, Layout, LogOut, Trash2, X, Monitor, Smartphone, Search } from 'lucide-react';
 import '../index.css';
 import API_URL from '../api';
 
@@ -16,6 +16,9 @@ function Projects() {
   const [isCreating, setIsCreating] = useState(false);
   const [users, setUsers] = useState([]);
   const [selectedEditors, setSelectedEditors] = useState([]);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [scope, setScope] = useState('mine'); // 'mine' | 'all' (solo admin)
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     const savedUser = localStorage.getItem('tropica_user');
@@ -24,14 +27,23 @@ function Projects() {
     } else {
       const parsedUser = JSON.parse(savedUser);
       setUser(parsedUser);
-      fetch(`${API_URL}/api/projects`, {
+      fetch(`${API_URL}/api/me`, {
         headers: { 'Authorization': `Bearer ${parsedUser.token}` }
       })
+      .then(res => res.ok ? res.json() : null)
+      .then(me => setIsAdmin(!!me?.isAdmin))
+      .catch(() => setIsAdmin(false));
+    }
+  }, [navigate]);
+
+  useEffect(() => {
+    if (!user?.token) return;
+    const url = scope === 'all' ? `${API_URL}/api/projects?scope=all` : `${API_URL}/api/projects`;
+    fetch(url, { headers: { 'Authorization': `Bearer ${user.token}` } })
       .then(res => { if (!res.ok) throw new Error(`Error ${res.status}`); return res.json(); })
       .then(data => setProjects(Array.isArray(data) ? data : []))
       .catch(err => console.error('Error cargando proyectos:', err));
-    }
-  }, [navigate]);
+  }, [user, scope]);
 
   const handleLogout = () => {
     localStorage.removeItem('tropica_user');
@@ -112,6 +124,15 @@ function Projects() {
   const avatarSrc = user.user?.picture || user.user?.avatar || user.avatar;
   const displayName = user.user?.name || user.name || '';
   const displayEmail = user.user?.email || user.email || '';
+  const myId = user.user?.id || user.id;
+  const q = query.trim().toLowerCase();
+  const visibleProjects = q
+    ? projects.filter(p =>
+        (p.title || '').toLowerCase().includes(q) ||
+        (p.user?.name || '').toLowerCase().includes(q) ||
+        (p.user?.email || '').toLowerCase().includes(q))
+    : projects;
+  const ownerCount = new Set(projects.map(p => p.userId)).size;
 
   return (
     <>
@@ -150,6 +171,14 @@ function Projects() {
         .proj-page-header { margin-bottom: 32px; }
         .proj-page-header h1 { font-size: 32px; font-weight: 900; color: #1a1f2e; letter-spacing: -1px; margin: 0 0 4px; }
         .proj-page-header p { font-size: 13px; color: #6b7280; margin: 0; }
+        .proj-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+        .proj-tabs { display: inline-flex; background: #fff; border: 1px solid #e0e5ef; border-radius: 10px; padding: 3px; }
+        .proj-tab { border: none; background: transparent; padding: 8px 16px; font-size: 12px; font-weight: 700; font-family: 'Inter', sans-serif; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7280; border-radius: 7px; cursor: pointer; transition: all 0.18s; }
+        .proj-tab:hover { color: #1a1f2e; }
+        .proj-tab.is-active { background: #1a1f2e; color: #fff159; }
+        .proj-search { display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid #e0e5ef; border-radius: 10px; padding: 0 12px; height: 38px; min-width: 260px; color: #9ba3b5; }
+        .proj-search input { border: none; outline: none; background: transparent; font-size: 13px; font-family: 'Inter', sans-serif; color: #1a1f2e; flex: 1; }
+        .proj-empty { grid-column: 1 / -1; text-align: center; color: #9ba3b5; font-size: 13px; padding: 40px 0; }
 
         /* GRID */
         .proj-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; }
@@ -277,8 +306,30 @@ function Projects() {
         {/* BODY */}
         <div className="proj-body">
           <div className="proj-page-header">
-            <h1>Mis Proyectos</h1>
-            <p>{projects.length} proyecto{projects.length !== 1 ? 's' : ''} · Trópica Landing Builder</p>
+            <h1>{scope === 'all' ? 'Todos los proyectos' : 'Mis Proyectos'}</h1>
+            <p>
+              {projects.length} proyecto{projects.length !== 1 ? 's' : ''}
+              {scope === 'all' && ` · ${ownerCount} persona${ownerCount !== 1 ? 's' : ''}`}
+              {' · Trópica Landing Builder'}
+            </p>
+          </div>
+
+          <div className="proj-toolbar">
+            {isAdmin ? (
+              <div className="proj-tabs">
+                <button className={`proj-tab ${scope === 'mine' ? 'is-active' : ''}`} onClick={() => setScope('mine')}>Mis proyectos</button>
+                <button className={`proj-tab ${scope === 'all' ? 'is-active' : ''}`} onClick={() => setScope('all')}>Todos</button>
+              </div>
+            ) : <span />}
+            <label className="proj-search">
+              <Search size={14} />
+              <input
+                type="text"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder={scope === 'all' ? 'Buscar por proyecto o persona' : 'Buscar proyecto'}
+              />
+            </label>
           </div>
 
           <div className="proj-grid">
@@ -289,7 +340,10 @@ function Projects() {
             </div>
 
             {/* Existing projects */}
-            {projects.map(proj => (
+            {visibleProjects.length === 0 && projects.length > 0 && (
+              <p className="proj-empty">Nada coincide con "{query}".</p>
+            )}
+            {visibleProjects.map(proj => (
               <div key={proj.id} className="proj-card" onClick={() => navigate(`/editor/${proj.id}`)}>
                 <div className="proj-card-thumb">
                   <div className="proj-card-thumb-pattern" />
@@ -326,14 +380,16 @@ function Projects() {
                       </div>
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '11px', fontWeight: '600', color: '#e74c3c', background: '#fcebea', padding: '3px 8px', borderRadius: '10px' }}>Editor</span>
+                        {proj.editors?.some(ed => ed.userId === myId)
+                          ? <span style={{ fontSize: '11px', fontWeight: '600', color: '#e74c3c', background: '#fcebea', padding: '3px 8px', borderRadius: '10px' }}>Editor</span>
+                          : <span style={{ fontSize: '11px', fontWeight: '600', color: '#6b7280', background: '#eef1f6', padding: '3px 8px', borderRadius: '10px' }}>Admin</span>}
                         {proj.user && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#6b7280' }}>
                             <span>de</span>
                             <div title={proj.user.name || proj.user.email} style={{ width: '18px', height: '18px', borderRadius: '50%', background: '#fff159', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: 'bold', overflow: 'hidden' }}>
                               {proj.user.avatar ? <img src={proj.user.avatar} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (proj.user.name || proj.user.email || 'U').charAt(0).toUpperCase()}
                             </div>
-                            <span style={{ maxWidth: '60px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{proj.user.name || proj.user.email.split('@')[0]}</span>
+                            <span style={{ maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{proj.user.name || proj.user.email.split('@')[0]}</span>
                           </div>
                         )}
                       </div>

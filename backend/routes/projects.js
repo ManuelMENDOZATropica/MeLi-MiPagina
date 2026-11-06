@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import prisma from '../lib/prisma.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { isAdmin, projectAccessWhere } from '../lib/admin.js';
 
 const router = Router();
 let io = null;
@@ -24,11 +25,18 @@ const projectInclude = {
   editors: { include: { user: { select: { id: true, name: true, email: true, avatar: true } } } }
 };
 
-// GET todos los proyectos del usuario
+// GET quién soy (para saber si mostrar la vista de admin)
+router.get('/me', authenticateToken, (req, res) => {
+  res.json({ id: req.user.id, email: req.user.email, isAdmin: isAdmin(req.user) });
+});
+
+// GET proyectos del usuario; ?scope=all (solo admin) devuelve los de todos
 router.get('/projects', authenticateToken, async (req, res) => {
   try {
+    const wantsAll = req.query.scope === 'all';
+    if (wantsAll && !isAdmin(req.user)) return res.status(403).json({ error: 'Solo admins' });
     const projects = await prisma.project.findMany({
-      where: { OR: [{ userId: req.user.id }, { editors: { some: { userId: req.user.id } } }] },
+      where: wantsAll ? {} : { OR: [{ userId: req.user.id }, { editors: { some: { userId: req.user.id } } }] },
       include: projectInclude,
       orderBy: { updatedAt: 'desc' }
     });
@@ -68,7 +76,7 @@ router.get('/projects/:id', authenticateToken, async (req, res) => {
     const project = await prisma.project.findFirst({
       where: {
         id: req.params.id,
-        OR: [{ userId: req.user.id }, { editors: { some: { userId: req.user.id } } }]
+        ...projectAccessWhere(req.user)
       },
       include: projectInclude
     });
@@ -100,7 +108,7 @@ router.patch('/projects/:id', authenticateToken, async (req, res) => {
     if (title !== undefined) updateData.title = title;
 
     const existing = await prisma.project.findFirst({
-      where: { id: req.params.id, OR: [{ userId: req.user.id }, { editors: { some: { userId: req.user.id } } }] }
+      where: { id: req.params.id, ...projectAccessWhere(req.user) }
     });
     if (!existing) return res.status(404).json({ error: 'Project not found or unauthorized' });
 
@@ -163,7 +171,7 @@ router.post('/projects/:id/editors', authenticateToken, async (req, res) => {
     // Permitir al owner Y a los editores agregar colaboradores
     const isOwner = project.userId === req.user.id;
     const isEditor = project.editors.some(e => e.userId === req.user.id);
-    if (!isOwner && !isEditor) return res.status(403).json({ error: 'No tienes permiso para agregar colaboradores' });
+    if (!isOwner && !isEditor && !isAdmin(req.user)) return res.status(403).json({ error: 'No tienes permiso para agregar colaboradores' });
     if (project.userId === userId) return res.status(400).json({ error: 'El owner ya tiene acceso' });
 
     await prisma.projectEditor.upsert({
@@ -183,7 +191,7 @@ router.post('/projects/:id/editors', authenticateToken, async (req, res) => {
 router.post('/projects/:id/publish', authenticateToken, async (req, res) => {
   try {
     const project = await prisma.project.findFirst({
-      where: { id: req.params.id, OR: [{ userId: req.user.id }, { editors: { some: { userId: req.user.id } } }] }
+      where: { id: req.params.id, ...projectAccessWhere(req.user) }
     });
     if (!project) return res.status(404).json({ error: 'Project not found or unauthorized' });
 

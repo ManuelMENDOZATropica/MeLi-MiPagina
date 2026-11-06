@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import prisma from '../lib/prisma.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { projectAccessWhere } from '../lib/admin.js';
 
 let io;
 export const setIo = (ioInstance) => { io = ioInstance; };
@@ -17,7 +18,7 @@ const COMMENT_INCLUDE = {
 router.get('/projects/:id/comments', authenticateToken, async (req, res) => {
   try {
     const project = await prisma.project.findFirst({
-      where: { id: req.params.id, OR: [{ userId: req.user.id }, { editors: { some: { userId: req.user.id } } }] }
+      where: { id: req.params.id, ...projectAccessWhere(req.user) }
     });
     if (!project) return res.status(404).json({ error: 'Proyecto no encontrado o sin acceso' });
 
@@ -102,7 +103,7 @@ router.patch('/comments/:id/resolve', authenticateToken, async (req, res) => {
     if (!comment) return res.status(404).json({ error: 'Comment not found' });
 
     const project = await prisma.project.findFirst({
-      where: { id: comment.projectId, OR: [{ userId: req.user.id }, { editors: { some: { userId: req.user.id } } }] }
+      where: { id: comment.projectId, ...projectAccessWhere(req.user) }
     });
     if (!project) return res.status(403).json({ error: 'Sin permisos' });
 
