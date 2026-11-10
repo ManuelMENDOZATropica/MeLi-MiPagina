@@ -33,5 +33,5 @@ El sistema permite al equipo crear proyectos de "landings" donde se pueden organ
 * **GCP, proyecto `meli-mipagina`** (desde el 2026-11-10). Un solo servicio de Cloud Run (`meli-mipagina`, us-central1) sirve la API, socket.io y el frontend en `mipagina.tropica.me` (CNAME a `ghs.googlehosted.com` en Wix).
 * **Base de datos**: Cloud SQL Postgres 18 (`meli-mipagina-sql`), migrada desde Render.
 * **Secretos**: Secret Manager (`DATABASE_URL`, `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `CLOUDINARY_URL`, `GEMINI_API_KEY`).
-* **Desplegar**: `bash deploy-gcp.sh deploy` (Cloud Build + Cloud Run). Ver el script para setup y migración.
+* **Desplegar**: automático en cada push a `main` (trigger `deploy-main` de Cloud Build con `cloudbuild.yaml`). Manual: `bash deploy-gcp.sh deploy`.
 * **Antes**: frontend en Vercel (`me-li-mi-pagina`) y backend + Postgres en Render (suspendido el 2026-11-10).

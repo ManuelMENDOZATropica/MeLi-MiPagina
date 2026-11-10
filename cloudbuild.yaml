@@ -1,0 +1,33 @@
+# Build + deploy automático en cada push a main (trigger de Cloud Build en meli-mipagina).
+# Solo cambia la imagen: el resto de la configuración del servicio (Cloud SQL, secretos,
+# 1 instancia, acceso público) se conserva del último `deploy-gcp.sh deploy`.
+substitutions:
+  _REGION: us-central1
+  _SERVICE: meli-mipagina
+  _IMG: us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/meli-mipagina:${SHORT_SHA}
+
+steps:
+- id: build
+  name: gcr.io/cloud-builders/docker
+  entrypoint: bash
+  args: ['-c', 'docker build --build-arg VITE_GOOGLE_CLIENT_ID="$$GOOGLE_CLIENT_ID" -t ${_IMG} .']
+  secretEnv: [GOOGLE_CLIENT_ID]
+
+- id: push
+  name: gcr.io/cloud-builders/docker
+  args: [push, '${_IMG}']
+
+- id: deploy
+  name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+  entrypoint: gcloud
+  args: [run, deploy, '${_SERVICE}', --image, '${_IMG}', --region, '${_REGION}', --quiet]
+
+images: ['${_IMG}']
+
+availableSecrets:
+  secretManager:
+  - versionName: projects/${PROJECT_ID}/secrets/GOOGLE_CLIENT_ID/versions/latest
+    env: GOOGLE_CLIENT_ID
+
+options:
+  logging: CLOUD_LOGGING_ONLY
