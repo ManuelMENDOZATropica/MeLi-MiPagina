@@ -2,6 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { Server as SocketIOServer } from 'socket.io';
 import { v2 as cloudinary } from 'cloudinary';
 dotenv.config();
@@ -39,7 +42,8 @@ const allowedOrigins = [
   'https://meli-mipagina.onrender.com',
   'https://mipagina.tropica.me',
   'https://www.mipagina.tropica.me',
-  /\.vercel\.app$/
+  /\.vercel\.app$/,
+  /\.run\.app$/
 ];
 
 app.use(cors({
@@ -74,6 +78,15 @@ app.use('/api', exceptionsRouter);
 app.use('/api', commentsRouter);
 app.use('/api', notificationsRouter);
 app.use('/api', uploadRouter);
+
+// ── Frontend estático (Cloud Run: un solo servicio) ────────────────────────
+const distDir = process.env.FRONTEND_DIST
+  || path.join(path.dirname(fileURLToPath(import.meta.url)), '../frontend/dist');
+if (fs.existsSync(distDir)) {
+  app.use(express.static(distDir, { index: false, maxAge: '1h' }));
+  app.get(/^(?!\/api\/|\/socket\.io\/).*/, (req, res) =>
+    res.sendFile(path.join(distDir, 'index.html')));
+}
 
 // ── Socket.io ──────────────────────────────────────────────────────────────
 const io = new SocketIOServer(httpServer, {

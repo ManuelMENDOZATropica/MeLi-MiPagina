@@ -30,6 +30,8 @@ El sistema permite al equipo crear proyectos de "landings" donde se pueden organ
 * **Contenerización**: Incluye configuración de Docker Compose para levantar fácilmente una instancia local de la base de datos.
 
 ## 5. Infraestructura y Despliegue
-* **Frontend**: Vercel (`mipagina.tropica.me`), proyecto `me-li-mi-pagina`.
-* **Backend**: Render, Web Service `meli-mipagina` (`meli-mipagina-ffwa.onrender.com`), deploy automático desde la rama `main` del repo.
-* **Base de Datos**: PostgreSQL 18 en Render (`MeLiMiPaginaSQL`). Migrada desde Supabase el 2026-08-31 (schema + datos). Plan free de Render: la instancia expira si no se pasa a un plan pago antes del 2026-09-30.
+* **GCP, proyecto `meli-mipagina`** (desde el 2026-11-10). Un solo servicio de Cloud Run (`meli-mipagina`, us-central1) sirve la API, socket.io y el frontend en `mipagina.tropica.me` (CNAME a `ghs.googlehosted.com` en Wix).
+* **Base de datos**: Cloud SQL Postgres 18 (`meli-mipagina-sql`), migrada desde Render.
+* **Secretos**: Secret Manager (`DATABASE_URL`, `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `CLOUDINARY_URL`, `GEMINI_API_KEY`).
+* **Desplegar**: `bash deploy-gcp.sh deploy` (Cloud Build + Cloud Run). Ver el script para setup y migración.
+* **Antes**: frontend en Vercel (`me-li-mi-pagina`) y backend + Postgres en Render (suspendido el 2026-11-10).
